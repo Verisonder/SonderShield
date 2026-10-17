@@ -52,7 +52,7 @@ function setTab(t) {
   tab = t;
   document.querySelectorAll('nav .tab[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + t));
-  homeKey = '';
+  homeKey = ''; homeShape = '';
   render();
 }
 
@@ -107,20 +107,44 @@ function shieldSVG(phase) {
       <path class="bot" d="M0 88Q52 70 100 45V110H0Z" fill="var(--text)"/>
     </g></svg>`;
 }
+// Like the phone: numbers count up from 0 when Home appears and glide to new values after,
+// the ladder steps slide in from the right one by one, the tiles rise in, and the headline
+// rolls over when the state changes. Live updates only touch the numbers, so nothing replays.
+let homeShape = '', lastHead = '', shown = {};
+const ease = t => 1 - Math.pow(1 - t, 3);
+function countTo(node, to, f) {
+  const key = node.dataset.k, from = shown[key] ?? 0;
+  shown[key] = to;
+  if (node._raf) cancelAnimationFrame(node._raf);
+  if (from === to || matchMedia('(prefers-reduced-motion: reduce)').matches) { node.textContent = f(to); return; }
+  const dur = from === 0 ? 1100 : 500, t0 = performance.now();
+  const step = now => {
+    const k = Math.min(1, (now - t0) / dur);
+    node.textContent = f(from + (to - from) * ease(k));
+    if (k < 1) node._raf = requestAnimationFrame(step);
+  };
+  node._raf = requestAnimationFrame(step);
+}
 function renderHome() {
   const s = state.stats, on = state.on;
   const phase = busy || (on ? 'on' : 'off');
   const total = state.today[0], blocked = state.today[1];
-  const rate = total ? Math.round(blocked / total * 100) : 0;
   const label = { off: 'PROTECTION OFF', on: 'PROTECTION ON', starting: 'STARTING…', stopping: 'TURNING OFF…' }[phase];
   const head = { off: 'Ads get through.', on: 'Ads stop here.', starting: 'Starting up…', stopping: 'Turning off…' }[phase];
   const sub = phase === 'starting' ? 'Downloading lists and pointing Windows at SonderShield. This takes a few seconds.'
     : phase === 'stopping' ? 'Putting Windows back to its usual DNS.'
     : on ? (state.domains ? fmt(state.domains) + ' ad and tracker domains get nothing back.' : 'Loading block lists…')
     : 'Turn on to block ads and trackers for every app on this PC.';
-  const snap = justOn; justOn = false;
+  const warn = !busy && on && !state.active, problem = !busy && state.problem ? state.problem : '';
   const p = $('#page-home');
-  p.innerHTML = `
+  const shape = JSON.stringify([phase, warn, problem, sub]);
+  if (shape !== homeShape || justOn || !p.firstChild) {
+    const fresh = !p.firstChild || homeShape === '';
+    const snap = justOn; justOn = false;
+    const roll = !fresh && head !== lastHead;
+    homeShape = shape; lastHead = head;
+    if (fresh) shown = {};
+    p.innerHTML = `
     <div class="shieldwrap">
       <div class="shieldstage">
         <div class="ring ${snap ? 'go' : ''}"></div>
@@ -128,28 +152,42 @@ function renderHome() {
       </div>
       <div class="shieldlabel ${phase}">${label}</div>
     </div>
-    <div class="headline">${head}</div>
+    <div class="headline ${roll ? 'roll' : ''}">${head}</div>
     <div class="headsub">${sub}</div>
-    ${!busy && state.on && !state.active ? `<div class="banner" style="margin-top:22px">Windows isn't sending its lookups to SonderShield yet. If this stays, another DNS tool may be set, or a VPN is overriding DNS.</div>` : ''}
-    ${!busy && state.problem ? `<div class="banner" style="margin-top:22px">${esc(state.problem)}</div>` : ''}
-    <svg class="swoosh" viewBox="0 0 360 46" preserveAspectRatio="none">
-      <path class="blade ${phase === 'on' ? 'lit' : ''} ${snap ? 'sweep' : ''}" d="M0 46Q130 4 360 12L360 20Q155 16 0 46Z"/>
-      <path d="M0 46Q150 20 360 28L360 47L0 47Z" fill="var(--panel)"/>
-    </svg>
-    <div class="ladder">
-      <h2>TODAY</h2>
-      <div class="steps">
-        <div class="step"><div class="num">${fmt(total)}</div><div class="lbl">DNS queries</div></div>
-        <div class="step"><div class="num">${fmt(blocked)}</div><div class="lbl">ads & trackers blocked</div></div>
-        <div class="step"><div class="num">${rate}%</div><div class="lbl">of everything blocked</div></div>
+    ${warn ? `<div class="banner" style="margin-top:22px">Windows isn't sending its lookups to SonderShield yet. If this stays, another DNS tool may be set, or a VPN is overriding DNS.</div>` : ''}
+    ${problem ? `<div class="banner" style="margin-top:22px">${esc(problem)}</div>` : ''}
+    <div class="homebody ${fresh ? 'enter' : ''}">
+      <div class="todaycol">
+        <svg class="swoosh" viewBox="0 0 360 46" preserveAspectRatio="none">
+          <path class="blade ${phase === 'on' ? 'lit' : ''} ${snap ? 'sweep' : ''}" d="M0 46Q130 4 360 12L360 20Q155 16 0 46Z"/>
+          <path d="M0 46Q150 20 360 28L360 47L0 47Z" fill="var(--panel)"/>
+        </svg>
+        <div class="ladder">
+          <h2>TODAY</h2>
+          <div class="steps">
+            <div class="step"><div class="num" data-k="t"></div><div class="lbl">DNS queries</div></div>
+            <div class="step"><div class="num" data-k="b"></div><div class="lbl">ads & trackers blocked</div></div>
+            <div class="step"><div class="num" data-k="r"></div><div class="lbl">of everything blocked</div></div>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="grid3" style="margin-top:10px">
-      <div class="tile"><div class="num">${fmt(s.blocked)}</div><div class="lbl">blocked\nall time</div></div>
-      <div class="tile"><div class="num">${fmt(s.threats)}</div><div class="lbl">threats blocked\nmalware & phishing</div></div>
-      <div class="tile"><div class="num">${fmt(state.domains)}</div><div class="lbl">domains\non the lists</div></div>
+      <div class="sidetiles">
+        <div class="tile"><div class="num" data-k="all"></div><div class="lbl">blocked\nall time</div></div>
+        <div class="tile"><div class="num" data-k="thr"></div><div class="lbl">threats blocked\nmalware & phishing</div></div>
+        <div class="tile"><div class="num" data-k="dom"></div><div class="lbl">domains\non the lists</div></div>
+      </div>
     </div>`;
-  $('#shield').onclick = toggleProtection;
+    for (const n of p.querySelectorAll('.num[data-k]')) n.textContent = shown[n.dataset.k] != null ? (n.dataset.k === 'r' ? shown.r.toFixed(1) + '%' : fmt(Math.round(shown[n.dataset.k]))) : (n.dataset.k === 'r' ? '0.0%' : '0');
+    $('#shield').onclick = toggleProtection;
+  }
+  const n = k => p.querySelector(`.num[data-k="${k}"]`);
+  const whole = v => fmt(Math.round(v)), pct = v => v.toFixed(1) + '%';
+  countTo(n('t'), total, whole);
+  countTo(n('b'), blocked, whole);
+  countTo(n('r'), total ? blocked / total * 100 : 0, pct);
+  countTo(n('all'), s.blocked, whole);
+  countTo(n('thr'), s.threats, whole);
+  countTo(n('dom'), state.domains, whole);
 }
 
 async function toggleProtection() {

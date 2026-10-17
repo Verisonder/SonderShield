@@ -60,6 +60,7 @@ nav .spacer { flex: 1; }
 main { flex: 1; overflow-y: auto; overflow-x: hidden; }
 .page { display: none; padding: 32px 40px 48px; max-width: 980px; margin: 0 auto; }
 .page.active { display: block; }
+#page-home { max-width: 1180px; }
 .page h1 { font-size: 38px; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; }
 .kicker { color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: 1.5px; margin-bottom: 14px; }
 .sub { color: var(--dim); font-size: 14px; margin-bottom: 24px; }
@@ -102,7 +103,7 @@ main { flex: 1; overflow-y: auto; overflow-x: hidden; }
 
 /* Swoosh + stats ladder */
 .swoosh { display: block; height: 46px; width: 100%; margin-top: 18px; }
-.ladder { background: var(--panel); border-radius: 0 0 22px 22px; padding: 16px 24px 24px; margin-top: -1px; }
+.ladder { overflow: hidden; background: var(--panel); border-radius: 0 0 22px 22px; padding: 16px 24px 24px; margin-top: -1px; }
 .ladder h2 { font-size: 13px; font-weight: 700; letter-spacing: 1.5px; color: var(--faint); margin-bottom: 18px; }
 .steps { display: flex; flex-direction: column; gap: 14px; }
 .step { background: var(--card); border-radius: 16px; padding: 16px 20px; }
@@ -197,3 +198,31 @@ textarea.field { resize: vertical; min-height: 90px; font-family: 'DM Sans'; }
 @keyframes ring { 0% { transform: scale(.55); opacity: .7; } 100% { transform: scale(1.5); opacity: 0; } }
 @keyframes sweep { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 @media (prefers-reduced-motion: reduce) { .shieldbtn svg, .shieldbtn .top, .shieldbtn .bot, .ring, .blade, .shieldlabel { animation: none !important; } }
+
+/* Home body: today's ladder on the left, the three totals stacked beside it */
+.homebody { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr); gap: 12px; align-items: stretch; margin-top: 18px; }
+.todaycol .swoosh { margin-top: 0; }
+.sidetiles { display: flex; flex-direction: column; gap: 10px; padding-top: 46px; }
+.sidetiles .tile { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.sidetiles .tile { padding: 20px 22px; border-radius: 18px; }
+.sidetiles .tile .num { font-size: 30px; }
+@media (max-width: 900px) {
+  .homebody { grid-template-columns: 1fr; }
+  .sidetiles { display: grid; grid-template-columns: repeat(3, 1fr); padding-top: 0; }
+}
+.step .num, .tile .num { font-variant-numeric: tabular-nums; }
+
+/* Entrance, like the phone: steps slide in from the right one by one, tiles rise in */
+.homebody.enter .step { animation: slideIn .7s cubic-bezier(.22,1.25,.36,1) both; }
+.homebody.enter .step:nth-child(2) { animation-delay: .09s; }
+.homebody.enter .step:nth-child(3) { animation-delay: .18s; }
+.homebody.enter .tile { animation: riseIn .7s cubic-bezier(.22,1.2,.36,1) both; }
+.homebody.enter .tile:nth-child(1) { animation-delay: .14s; }
+.homebody.enter .tile:nth-child(2) { animation-delay: .21s; }
+.homebody.enter .tile:nth-child(3) { animation-delay: .28s; }
+.headline.roll { animation: roll .38s cubic-bezier(.4,0,.2,1); }
+.headsub, .shieldlabel { transition: color .4s; }
+@keyframes slideIn { from { transform: translateX(120px); opacity: 0; } }
+@keyframes riseIn { from { transform: translateY(36px); opacity: 0; } }
+@keyframes roll { from { transform: translateY(50%); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .homebody.enter .step, .homebody.enter .tile, .headline.roll { animation: none !important; } }
