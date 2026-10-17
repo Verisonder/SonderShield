@@ -59,10 +59,11 @@ data class ShieldColors(
 )
 
 enum class ThemeMode(val id: String, val label: String, val fr: String) {
-    Default("default", "Default", "Par défaut"), Light("light", "Light", "Clair"), Oled("oled", "OLED", "OLED"),
+    Default("default", "Default", "Par défaut"), Light("light", "Light", "Clair"),
     You("you", "Material You", "Material You");
 
     companion object {
+        /** Unknown ids, including the old "oled" (now the default), fall back to Default. */
         fun of(id: String?) = entries.firstOrNull { it.id == id } ?: Default
         /** Material You needs Android 12. */
         val youAvailable get() = Build.VERSION.SDK_INT >= 31
@@ -72,15 +73,12 @@ enum class ThemeMode(val id: String, val label: String, val fr: String) {
 /** The accent. One value: change it here to recolour the app. */
 val Electric = Color(0xFF3B82FF)
 
+/** Default: pure black (what used to be the OLED theme), panels a step lighter. */
 val DefaultColors = ShieldColors(
-    bg = Color(0xFF0D0D0D), panel = Color(0xFF1C1C1C), card2 = Color(0xFF2A2A2A), line = Color(0xFF262626),
+    bg = Color(0xFF000000), panel = Color(0xFF111111), card2 = Color(0xFF1E1E1E), line = Color(0xFF1A1A1A),
     text = Color(0xFFFFFFFF), dim = Color(0xFFBDBDBD), faint = Color(0xFF8A8A8A),
     accent = Electric, accentText = Electric, onAccent = Color(0xFF0D0D0D),
     pill = Color(0xFFFFFFFF), onPill = Color(0xFF0D0D0D), warn = Color(0xFFFFB020), off = Color(0xFF3A3A3A), dark = true,
-)
-
-val OledColors = DefaultColors.copy(
-    bg = Color(0xFF000000), panel = Color(0xFF111111), card2 = Color(0xFF1E1E1E), line = Color(0xFF1A1A1A),
 )
 
 val LightColors = ShieldColors(
@@ -208,7 +206,6 @@ private fun ShieldColors.withAccent(a: Color) = copy(
 fun colorsFor(mode: ThemeMode, accent: Color = Electric): ShieldColors = when (mode) {
     ThemeMode.Default -> DefaultColors.withAccent(accent)
     ThemeMode.Light -> LightColors.withAccent(accent)
-    ThemeMode.Oled -> OledColors.withAccent(accent)
     ThemeMode.You -> if (Build.VERSION.SDK_INT >= 31) {
         val ctx = LocalContext.current
         val dark = isSystemInDarkTheme()

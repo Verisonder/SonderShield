@@ -45,7 +45,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.animation.core.AnimationState
+import androidx.compose.animation.core.DecayAnimationSpec
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateDecay
+import androidx.compose.animation.core.calculateTargetValue
+import androidx.compose.animation.rememberSplineBasedDecay
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.gestures.FlingBehavior
+import androidx.compose.foundation.gestures.ScrollScope
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -74,7 +83,7 @@ import com.verisonder.sondershield.data.Prefs
 import kotlinx.coroutines.delay
 
 @Composable
-fun HomeScreen(onToggle: () -> Unit) {
+fun HomeScreen(onToggle: () -> Unit, scroll: ScrollState) {
     val ctx = LocalContext.current
     val prefs = remember { Prefs(ctx) }
     val phase by ShieldState.phase.collectAsState()
@@ -95,8 +104,10 @@ fun HomeScreen(onToggle: () -> Unit) {
     // past it, under the swoosh, shows the all-time stats.
     BoxWithConstraints(Modifier.fillMaxSize()) {
     val screen = maxHeight
-    val scroll = rememberScrollState()
-    Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
+    val screenPx = with(LocalDensity.current) { screen.toPx() }
+    val decay = rememberSplineBasedDecay<Float>()
+    val snap = remember(screenPx, decay) { PageSnapFling(scroll, screenPx, decay) }
+    Column(Modifier.fillMaxSize().verticalScroll(scroll, flingBehavior = snap)) {
     Column(Modifier.fillMaxWidth().height(screen)) {
         // Top bar: mark + wordmark, DNS server.
         Row(Modifier.fillMaxWidth().padding(start = Gutter, end = Gutter, top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -297,7 +308,6 @@ private fun BigToggle(phase: Phase, logo: Dp, onClick: () -> Unit) {
             Logo(
                 logo, lit = on, split = split.value,
                 modifier = Modifier
-                    .clip(CircleShape)
                     .clickable(interactionSource = press, indication = null, onClick = guardedClick)
                     .semantics { role = Role.Switch; contentDescription = if (on) descOn else descOff }
                     .graphicsLayer {
@@ -333,4 +343,47 @@ private fun privateDnsHost(ctx: Context): String? {
         if (!host.isNullOrEmpty()) return host
     }
     return null
+}
+
+/**
+ * Home scrolls like two pages: letting go anywhere between the first screen and the stats
+ * settles on one of them (by direction and speed); inside the stats it scrolls freely.
+ */
+private class PageSnapFling(
+    private val scroll: ScrollState,
+    private val pagePx: Float,
+    private val decay: DecayAnimationSpec<Float>,
+) : FlingBehavior {
+    override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
+        val start = scroll.value.toFloat()
+        val projected = decay.calculateTargetValue(start, initialVelocity)
+        val target: Float? = when {
+            start < pagePx -> when {
+                initialVelocity > 800f -> pagePx
+                initialVelocity < -800f -> 0f
+                else -> if (projected > pagePx / 2) pagePx else 0f
+            }
+            projected < pagePx -> if (projected < pagePx / 2) 0f else pagePx // flung back up out of the stats
+            else -> null
+        }
+        if (target == null) {
+            // Free scroll in the stats.
+            var velocity = initialVelocity
+            var last = 0f
+            AnimationState(0f, initialVelocity).animateDecay(decay) {
+                val delta = value - last
+                last = value
+                val consumed = scrollBy(delta)
+                velocity = this.velocity
+                if (kotlin.math.abs(delta - consumed) > 0.5f) cancelAnimation()
+            }
+            return velocity
+        }
+        var last = start
+        animate(start, target, initialVelocity, spring(dampingRatio = 0.85f, stiffness = 260f)) { v, _ ->
+            scrollBy(v - last)
+            last = v
+        }
+        return 0f
+    }
 }

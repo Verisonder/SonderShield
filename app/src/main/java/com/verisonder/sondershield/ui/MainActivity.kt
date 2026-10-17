@@ -14,6 +14,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -124,10 +127,18 @@ class MainActivity : ComponentActivity() {
                     return@ShieldTheme
                 }
                 var tab by rememberSaveable { mutableStateOf(Tab.Home) }
+                // Kept here so tapping Home while on Home can scroll it back to the top.
+                val homeScroll = rememberScrollState()
+                val uiScope = rememberCoroutineScope()
                 BackHandler(enabled = tab != Tab.Home) { tab = Tab.Home }
                 Scaffold(
                     containerColor = Palette.bg,
-                    bottomBar = { BottomBar(tab) { tab = it } },
+                    bottomBar = {
+                        BottomBar(tab) { t ->
+                            if (t == Tab.Home && tab == Tab.Home) uiScope.launch { homeScroll.animateScrollTo(0, spring(dampingRatio = 0.9f, stiffness = 300f)) }
+                            tab = t
+                        }
+                    },
                 ) { pad ->
                     Box(Modifier.fillMaxSize().background(Palette.bg).padding(pad)) {
                         // Tab change: the new screen slides in from the side it lives on and fades up.
@@ -141,7 +152,7 @@ class MainActivity : ComponentActivity() {
                             label = "tabs",
                         ) { t ->
                             when (t) {
-                                Tab.Home -> HomeScreen(onToggle = ::toggle)
+                                Tab.Home -> HomeScreen(onToggle = ::toggle, scroll = homeScroll)
                                 Tab.Log -> LogScreen()
                                 Tab.Rules -> RulesScreen()
                                 Tab.Apps -> AppsScreen()
