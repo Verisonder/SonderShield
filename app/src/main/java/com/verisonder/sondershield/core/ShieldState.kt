@@ -49,6 +49,8 @@ object ShieldState {
     val listsVersion = MutableStateFlow(0)
     /** Theme id from Settings; the activity recolours when it changes. */
     val theme = MutableStateFlow("default")
+    /** Accent colour (ARGB) from Settings. */
+    val accent = MutableStateFlow(0xFF3B82FF.toInt())
 
     private const val LOG_MAX = 2000
     private val ring = ArrayDeque<LogEntry>()
@@ -73,6 +75,7 @@ object ShieldState {
         engine.setListener(listener)
         today.value = Prefs(app).todayCounts()
         theme.value = Prefs(app).theme
+        accent.value = Prefs(app).accent
     }
 
     /** Pushes rules, upstream and list files from settings into the engine. */

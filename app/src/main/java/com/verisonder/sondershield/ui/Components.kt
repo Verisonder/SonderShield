@@ -2,6 +2,20 @@ package com.verisonder.sondershield.ui
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.material3.ripple
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -101,9 +115,10 @@ fun Block(
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val src = remember { MutableInteractionSource() }
     Column(
-        modifier.fillMaxWidth().clip(blockShape).background(color)
-            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
+        modifier.fillMaxWidth().let { if (onClick != null) it.pressScale(src) else it }.clip(blockShape).background(color)
+            .let { if (onClick != null) it.clickable(interactionSource = src, indication = ripple(), onClick = onClick) else it }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         content = content,
     )
@@ -119,8 +134,8 @@ fun OptionCard(
     subColor: Color? = null,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
-    val bg = if (selected) Palette.accent else Palette.panel
-    val fg = if (selected) Palette.onAccent else Palette.text
+    val bg by animateColorAsState(if (selected) Palette.accent else Palette.panel, tween(240), label = "card")
+    val fg by animateColorAsState(if (selected) Palette.onAccent else Palette.text, tween(240), label = "cardText")
     Block(Modifier.padding(bottom = 8.dp), color = bg, onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -152,7 +167,7 @@ fun Toggle(checked: Boolean, onDark: Boolean = false, onChange: (Boolean) -> Uni
         checked -> Palette.onAccent
         else -> Palette.faint
     }
-    val x by animateDpAsState(if (checked) 21.dp else 3.dp, label = "knob")
+    val x by animateDpAsState(if (checked) 21.dp else 3.dp, spring(dampingRatio = 0.6f, stiffness = 700f), label = "knob")
     Box(
         Modifier.padding(start = 10.dp).size(46.dp, 28.dp).clip(CircleShape).background(track)
             .clickable { onChange(!checked) },
@@ -170,16 +185,28 @@ fun ToggleCard(title: String, sub: String?, checked: Boolean, onChange: (Boolean
 /** Filter pill. Picked = solid (white on dark themes). */
 @Composable
 fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
+    val bg by animateColorAsState(if (selected) Palette.pill else Color.Transparent, tween(200), label = "chip")
+    val edge by animateColorAsState(if (selected) Palette.pill else Palette.line, tween(200), label = "chipEdge")
+    val fg by animateColorAsState(if (selected) Palette.onPill else Palette.text, tween(200), label = "chipText")
     Box(
-        Modifier.height(36.dp).clip(CircleShape)
-            .background(if (selected) Palette.pill else Color.Transparent)
-            .border(1.5.dp, if (selected) Palette.pill else Palette.line, CircleShape)
+        Modifier.height(36.dp).pressScale().clip(CircleShape)
+            .background(bg)
+            .border(1.5.dp, edge, CircleShape)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = if (selected) Palette.onPill else Palette.text, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        Text(text, color = fg, fontWeight = FontWeight.Bold, fontSize = 13.sp)
     }
+}
+
+/** Shrinks a little while pressed and springs back: a tactile tap on cards and pills. */
+@Composable
+fun Modifier.pressScale(source: MutableInteractionSource? = null): Modifier {
+    val src = source ?: remember { MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    val s by animateFloatAsState(if (pressed) 0.96f else 1f, spring(dampingRatio = 0.5f, stiffness = 900f), label = "press")
+    return this.scale(s)
 }
 
 @Composable
@@ -246,11 +273,13 @@ fun Field(
 
 /** The SonderShield mark. [lit]: top piece in the accent; otherwise grey. */
 @Composable
-fun Logo(size: Dp, lit: Boolean, modifier: Modifier = Modifier, top: Color? = null, bottom: Color? = null) {
-    val topColor by animateColorAsState(top ?: if (lit) Palette.accent else Palette.off, label = "logoTop")
+fun Logo(size: Dp, lit: Boolean, modifier: Modifier = Modifier, split: Float = 0f, top: Color? = null, bottom: Color? = null) {
+    val topColor by animateColorAsState(top ?: if (lit) Palette.accent else Palette.off, tween(420), label = "logoTop")
+    // split: the two pieces move apart along the cut (0 = closed).
+    val d = size * 0.07f * split
     Box(modifier.size(size, size * 1.1f)) {
-        Image(LogoParts.top, null, Modifier.matchParentSize(), colorFilter = ColorFilter.tint(topColor))
-        Image(LogoParts.bottom, null, Modifier.matchParentSize(), colorFilter = ColorFilter.tint(bottom ?: Palette.text))
+        Image(LogoParts.top, null, Modifier.matchParentSize().offset(x = -d * 0.6f, y = -d), colorFilter = ColorFilter.tint(topColor))
+        Image(LogoParts.bottom, null, Modifier.matchParentSize().offset(x = d * 0.6f, y = d), colorFilter = ColorFilter.tint(bottom ?: Palette.text))
     }
 }
 
@@ -268,7 +297,7 @@ fun Wordmark(size: Int = 19) {
  * top edge of [below]. Full width.
  */
 @Composable
-fun Swoosh(blade: Color, below: Color, modifier: Modifier = Modifier) {
+fun Swoosh(blade: Color, below: Color, modifier: Modifier = Modifier, progress: Float = 1f) {
     Canvas(modifier.fillMaxWidth().height(42.dp)) {
         val w = size.width
         val h = size.height
@@ -289,23 +318,36 @@ fun Swoosh(blade: Color, below: Color, modifier: Modifier = Modifier) {
             lineTo(0f, h + 1f)
             close()
         }
-        drawPath(bladePath, blade)
+        // The blade sweeps in from the left as protection turns on.
+        clipRect(right = w * progress) { drawPath(bladePath, blade) }
         drawPath(fill, below)
     }
 }
 
-/** One step of the offset "ladder": big number, two-line label. The last one is filled. */
+/**
+ * One step of the offset "ladder": big number, two-line label. The last one is filled.
+ * Slides in from the right (staggered by [index]) and counts up to [target].
+ */
 @Composable
-fun LadderStep(value: String, label: String, index: Int, onPanel: Boolean) {
+fun LadderStep(target: Double, format: (Double) -> String, label: String, index: Int, onPanel: Boolean) {
     val last = index == 2
     val bg = when { last -> Palette.accent; onPanel -> Palette.card2; else -> Palette.panel }
+    val enter = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        delay(90L * index)
+        enter.animateTo(1f, spring(dampingRatio = 0.72f, stiffness = 260f))
+    }
+    val count = remember { Animatable(0f) }
+    LaunchedEffect(target) { count.animateTo(target.toFloat(), tween(if (count.value == 0f) 1100 else 500, easing = FastOutSlowInEasing)) }
     Row(
-        Modifier.padding(start = (18 * index).dp).fillMaxWidth().clip(blockShape).background(bg)
-            .padding(horizontal = 18.dp, vertical = 14.dp),
+        Modifier.padding(start = (18 * index).dp).fillMaxWidth()
+            .graphicsLayer { translationX = (1f - enter.value) * 120.dp.toPx(); alpha = enter.value.coerceIn(0f, 1f) }
+            .clip(blockShape).background(bg)
+            .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            value, style = display(26), color = if (last) Palette.onAccent else Palette.accentText,
+            format(count.value.toDouble()), style = display(26), color = if (last) Palette.onAccent else Palette.accentText,
             maxLines = 1, modifier = Modifier.widthIn(min = 92.dp),
         )
         Spacer(Modifier.width(14.dp))

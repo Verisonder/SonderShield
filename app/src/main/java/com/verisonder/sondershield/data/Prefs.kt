@@ -70,6 +70,11 @@ class Prefs(context: Context) {
         get() = sp.getString("theme", "default") ?: "default"
         set(v) = sp.edit().putString("theme", v).apply()
 
+    /** Accent colour (ARGB). Default: electric blue. */
+    var accent: Int
+        get() = sp.getInt("accent", 0xFF3B82FF.toInt())
+        set(v) = sp.edit().putInt("accent", v).apply()
+
     /** 0 = never. */
     var updateHours: Int
         get() = sp.getInt("update.hours", 24)

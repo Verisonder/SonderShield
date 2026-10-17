@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.platform.LocalContext
@@ -168,17 +170,43 @@ private val type = Typography().let { t ->
     )
 }
 
-/** Resolves a theme setting to colours (Material You falls back to Default before Android 12). */
+/** Accent choices in Settings. Any other colour comes from the custom hue slider. */
+val AccentChoices = listOf(
+    "Electric" to Color(0xFF3B82FF), "Sky" to Color(0xFF38B6FF), "Indigo" to Color(0xFF5B6CFF),
+    "Cyan" to Color(0xFF00D1FF), "Lime" to Color(0xFFC8FF2E), "Green" to Color(0xFF00C46A),
+    "Yellow" to Color(0xFFFFD60A), "Orange" to Color(0xFFFF7A1A), "Red" to Color(0xFFFF4D3D),
+    "Pink" to Color(0xFFFF4FA3), "Purple" to Color(0xFFA66BFF), "White" to Color(0xFFF2F2F2),
+)
+
+/** Black or white, whichever reads better on [c]. */
+fun onColor(c: Color): Color = if (c.luminance() > 0.33f) Color(0xFF0D0D0D) else Color.White
+
+/** The accent tuned to read as text on a page: darker on light pages, lighter on dark ones. */
+private fun accentAsText(a: Color, dark: Boolean): Color {
+    var c = a
+    if (dark) {
+        repeat(6) { if (c.luminance() < 0.16f) c = lerp(c, Color.White, 0.18f) }
+    } else {
+        repeat(8) { if (c.luminance() > 0.18f) c = lerp(c, Color.Black, 0.16f) }
+    }
+    return c
+}
+
+private fun ShieldColors.withAccent(a: Color) = copy(
+    accent = a, accentText = accentAsText(a, dark), onAccent = onColor(a),
+)
+
+/** Resolves a theme and accent to colours (Material You keeps the wallpaper's own accent). */
 @Composable
-fun colorsFor(mode: ThemeMode): ShieldColors = when (mode) {
-    ThemeMode.Default -> DefaultColors
-    ThemeMode.Light -> LightColors
-    ThemeMode.Oled -> OledColors
+fun colorsFor(mode: ThemeMode, accent: Color = Electric): ShieldColors = when (mode) {
+    ThemeMode.Default -> DefaultColors.withAccent(accent)
+    ThemeMode.Light -> LightColors.withAccent(accent)
+    ThemeMode.Oled -> OledColors.withAccent(accent)
     ThemeMode.You -> if (Build.VERSION.SDK_INT >= 31) {
         val ctx = LocalContext.current
         val dark = isSystemInDarkTheme()
         youColors(if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx), dark)
-    } else DefaultColors
+    } else DefaultColors.withAccent(accent)
 }
 
 @Composable

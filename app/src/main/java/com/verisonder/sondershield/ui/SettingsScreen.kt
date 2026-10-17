@@ -4,6 +4,23 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -228,6 +245,8 @@ fun SettingsScreen() {
             }
             if (ThemeMode.of(themeId) == ThemeMode.You) {
                 Text("Colours from your wallpaper, light or dark with the system.", color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+            } else {
+                AccentPicker(prefs)
             }
         }
 
@@ -309,4 +328,52 @@ fun SettingsScreen() {
             dismissButton = { PillButton("Cancel", filled = false) { confirmReset = false } },
         )
     }
+}
+
+/** Accent colour: a row of swatches plus a hue slider for any other colour. */
+@Composable
+private fun AccentPicker(prefs: Prefs) {
+    val current by ShieldState.accent.collectAsState()
+    fun pick(c: Color) {
+        val argb = c.toArgb()
+        prefs.accent = argb
+        ShieldState.accent.value = argb
+    }
+    Text("ACCENT", color = Palette.faint, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, modifier = Modifier.padding(top = 18.dp, bottom = 10.dp))
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        for ((name, c) in AccentChoices) {
+            val sel = c.toArgb() == current
+            val ring by animateDpAsState(if (sel) 3.dp else 0.dp, spring(dampingRatio = 0.5f, stiffness = 600f), label = "ring")
+            Box(
+                Modifier.size(42.dp).pressScale().clip(CircleShape).border(ring, Palette.text, CircleShape).padding(ring + 2.dp)
+                    .clip(CircleShape).background(c).clickable { pick(c) }
+                    .semantics { contentDescription = name; selected = sel },
+            )
+        }
+    }
+    // Any hue, at full strength.
+    val isPreset = AccentChoices.any { it.second.toArgb() == current }
+    var hue by remember { mutableFloatStateOf(hueOf(Color(current))) }
+    Text(
+        if (isPreset) "Or pick any colour:" else "Your colour:", color = Palette.dim, fontSize = 13.sp,
+        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+    )
+    Box(Modifier.fillMaxWidth().height(36.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.fillMaxWidth().height(10.dp).clip(CircleShape)
+                .background(Brush.horizontalGradient((0..6).map { Color.hsv(it * 60f % 360f, 0.85f, 1f) })),
+        )
+        Slider(
+            value = hue, onValueChange = { hue = it; pick(Color.hsv(it, 0.85f, 1f)) }, valueRange = 0f..359f,
+            colors = SliderDefaults.colors(
+                thumbColor = Color.hsv(hue, 0.85f, 1f), activeTrackColor = Color.Transparent, inactiveTrackColor = Color.Transparent,
+            ),
+        )
+    }
+}
+
+private fun hueOf(c: Color): Float {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(c.toArgb(), hsv)
+    return hsv[0]
 }

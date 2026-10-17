@@ -14,6 +14,22 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -84,7 +100,8 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val themeId by ShieldState.theme.collectAsState()
-            val colors = colorsFor(ThemeMode.of(themeId))
+            val accentArgb by ShieldState.accent.collectAsState()
+            val colors = colorsFor(ThemeMode.of(themeId), Color(accentArgb))
             // Status and navigation bars follow the theme: light icons on dark themes and back.
             LaunchedEffect(colors) {
                 val bg = colors.bg.toArgb()
@@ -103,12 +120,23 @@ class MainActivity : ComponentActivity() {
                     bottomBar = { BottomBar(tab) { tab = it } },
                 ) { pad ->
                     Box(Modifier.fillMaxSize().background(Palette.bg).padding(pad)) {
-                        when (tab) {
-                            Tab.Home -> HomeScreen(onToggle = ::toggle)
-                            Tab.Log -> LogScreen()
-                            Tab.Rules -> RulesScreen()
-                            Tab.Apps -> AppsScreen()
-                            Tab.Settings -> SettingsScreen()
+                        // Tab change: the new screen slides in from the side it lives on and fades up.
+                        AnimatedContent(
+                            targetState = tab,
+                            transitionSpec = {
+                                val dir = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                                (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { it / 6 * dir } + fadeIn(tween(260)))
+                                    .togetherWith(slideOutHorizontally(tween(260)) { -it / 10 * dir } + fadeOut(tween(180)))
+                            },
+                            label = "tabs",
+                        ) { t ->
+                            when (t) {
+                                Tab.Home -> HomeScreen(onToggle = ::toggle)
+                                Tab.Log -> LogScreen()
+                                Tab.Rules -> RulesScreen()
+                                Tab.Apps -> AppsScreen()
+                                Tab.Settings -> SettingsScreen()
+                            }
                         }
                     }
                 }
@@ -150,22 +178,34 @@ private fun BottomBar(current: Tab, onPick: (Tab) -> Unit) {
         ) {
             for (t in Tab.entries) {
                 val on = t == current
+                // The picked tab widens into a pill and its name slides out next to the icon.
+                val weight by animateFloatAsState(if (on) 1.8f else 1f, spring(dampingRatio = 0.7f, stiffness = 500f), label = "w")
+                val pill by animateColorAsState(if (on) Palette.accent else Color.Transparent, tween(220), label = "pill")
+                val tint by animateColorAsState(if (on) Palette.onAccent else Palette.faint, tween(220), label = "tint")
+                val press = remember { MutableInteractionSource() }
+                val pressed by press.collectIsPressedAsState()
+                val scale by animateFloatAsState(if (pressed) 0.9f else 1f, spring(dampingRatio = 0.5f, stiffness = 900f), label = "s")
                 Box(
-                    Modifier.weight(if (on) 1.7f else 1f).fillMaxHeight()
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onPick(t) }
+                    Modifier.weight(weight).fillMaxHeight()
+                        .clickable(interactionSource = press, indication = null) { onPick(t) }
                         .semantics { role = Role.Tab; selected = on; contentDescription = t.label },
                     contentAlignment = Alignment.Center,
                 ) {
                     Row(
-                        Modifier.height(44.dp).clip(RoundedCornerShape(22.dp))
-                            .background(if (on) Palette.accent else Color.Transparent)
-                            .padding(horizontal = if (on) 14.dp else 10.dp),
+                        Modifier.scale(scale).height(44.dp).clip(RoundedCornerShape(22.dp)).background(pill)
+                            .padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(t.icon(), null, tint = if (on) Palette.onAccent else Palette.faint, modifier = Modifier.size(21.dp))
-                        if (on) {
-                            Spacer(Modifier.width(7.dp))
-                            Text(t.label, color = Palette.onAccent, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                        Icon(t.icon(), null, tint = tint, modifier = Modifier.size(21.dp))
+                        AnimatedVisibility(
+                            visible = on,
+                            enter = expandHorizontally(spring(dampingRatio = 0.8f, stiffness = 600f)) + fadeIn(tween(200, 60)),
+                            exit = shrinkHorizontally(tween(160)) + fadeOut(tween(100)),
+                        ) {
+                            Row {
+                                Spacer(Modifier.width(7.dp))
+                                Text(t.label, color = tint, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                            }
                         }
                     }
                 }

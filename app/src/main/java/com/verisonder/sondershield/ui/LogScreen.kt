@@ -85,7 +85,7 @@ fun LogScreen() {
             }
         } else {
             LazyColumn(Modifier.fillMaxSize()) {
-                items(shown) { e -> LogRow(e) { picked = e } }
+                items(shown) { e -> Box(Modifier.animateItem()) { LogRow(e) { picked = e } } }
             }
         }
     }
