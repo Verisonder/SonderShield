@@ -208,6 +208,7 @@ function renderHome() {
     chartKey = ''; topKey = '';
     watchReveal(p, fresh);
     $('#shield').onclick = toggleProtection;
+    const db = $('#diagbtn'); if (db) db.onclick = showDiag;
   }
   const n = k => p.querySelector(`.num[data-k="${k}"]`);
   countTo(n('t'), total);
@@ -352,7 +353,7 @@ async function toggleProtection() {
 // and what to do when it isn't.
 async function showDiag() {
   let d;
-  try { d = await api('diag'); } catch (e) { return; }
+  try { d = await api('diag'); } catch (e) { await ask({ title: 'DNS diagnostic', text: 'Could not read the network settings (' + e.message + '). Try again in a moment.', ok: 'OK', cancel: 'Close' }); return; }
   const bg = el('div', 'modal-bg');
   const adRows = (d.adapters || []).map(a => `
     <div class="diagrow ${a.ok ? 'ok' : 'bad'}">
