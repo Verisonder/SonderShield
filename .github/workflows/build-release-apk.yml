@@ -88,7 +88,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           cd engine
           GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build \
-            -trimpath -ldflags "-s -w -H=windowsgui" \
+            -trimpath -ldflags "-s -w -H=windowsgui -X main.version=$VERSION" \
             -o "../SonderShield.exe" ./cmd/sondershield
           cd ..
           mkdir -p winpkg

@@ -287,7 +287,14 @@ async function renderSettings() {
     <div class="seclabel"><span class="t">05 STATISTICS</span></div>
     <div class="card"><div class="row"><div class="grow"><div class="ctitle">Blocked in total</div><div class="csub">${fmt(state.stats.blocked)}</div></div>
       <button class="pill" id="resetstats">Reset</button></div></div>
-    <div class="seclabel"><span class="t">06 ABOUT</span></div>
+    <div class="seclabel"><span class="t">06 UPDATES</span></div>
+    <div class="card" id="updatecard">
+      <div class="row"><div class="grow"><div class="ctitle">Version ${esc(cat.version)}</div>
+        <div class="csub" id="updatestatus">Check for a newer version.</div></div>
+        <button class="pill" id="checkupdate">Check for updates</button></div>
+      <div id="updateaction" class="hidden" style="margin-top:12px"></div>
+    </div>
+    <div class="seclabel"><span class="t">07 ABOUT</span></div>
     <div class="card"><div class="ctitle">SonderShield for Windows</div>
       <div class="csub" style="margin-top:6px">By Verisonder. Free and open source under GPL-3.0. Everything stays on this PC: no account, no analytics.</div>
       <div class="csub" style="margin-top:8px">This version blocks ads, trackers and malware by DNS, and can cut off any app's internet. It points Windows' DNS at SonderShield on this PC.</div>
@@ -300,6 +307,40 @@ async function renderSettings() {
   $('#autostart').onclick = async () => { const on = !auto.on; await api('autostart?on=' + (on ? '1' : '0'), { method: 'POST' }); renderSettings(); };
   $('#resetstats').onclick = async () => { if (confirm('Reset all counters? The log stays.')) { await api('reset-stats', { method: 'POST' }); poll(); } };
   $('#src').onclick = () => open('https://github.com/Verisonder/SonderShield', '_blank');
+  $('#checkupdate').onclick = checkForUpdate;
+  if (cat.version === 'dev') { $('#updatestatus').textContent = 'Development build — updates are checked only in a released build.'; }
+}
+
+async function checkForUpdate() {
+  const btn = $('#checkupdate'), status = $('#updatestatus'), action = $('#updateaction');
+  btn.disabled = true; btn.textContent = 'Checking…';
+  try {
+    const u = await api('update/check');
+    btn.disabled = false; btn.textContent = 'Check again';
+    if (u.error) { status.textContent = 'Could not check: ' + u.error; return; }
+    if (!u.available) { status.textContent = "You're on the latest version."; action.classList.add('hidden'); return; }
+    status.textContent = 'Version ' + u.latest + ' is available.';
+    action.classList.remove('hidden');
+    action.innerHTML = `<div class="banner" style="color:var(--dim);border-color:var(--line);background:var(--card)">${esc((u.notes||'').slice(0,600))}</div>
+      <button class="pill filled" id="doupdate">Update now</button>
+      <span id="upmsg" style="color:var(--faint);font-size:13px;margin-left:10px"></span>`;
+    $('#doupdate').onclick = doUpdate;
+  } catch (e) { btn.disabled = false; btn.textContent = 'Check for updates'; status.textContent = 'Could not check for updates.'; }
+}
+
+async function doUpdate() {
+  const b = $('#doupdate'), msg = $('#upmsg');
+  b.disabled = true; b.textContent = 'Downloading…';
+  msg.textContent = 'This will restart SonderShield.';
+  try {
+    await api('update/apply', { method: 'POST' });
+    msg.textContent = 'Updating… the window will reopen in a moment.';
+    // The backend relaunches; this window's server goes away. Try to reopen shortly.
+  } catch (e) {
+    b.disabled = false; b.textContent = 'Update now';
+    let m = 'Update failed.'; try { m = (await e) || m; } catch (_) {}
+    msg.textContent = 'Update failed. You can download it from the Releases page.';
+  }
 }
 const save = () => postConfig(cfg);
 

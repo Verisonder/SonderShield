@@ -20,6 +20,7 @@ func main() {
 		return // we relaunched elevated, or the user declined
 	}
 
+	cleanupOldUpdate()
 	plat := newPlatform()
 	a := newApp(plat)
 	srv, err := newServer(a)

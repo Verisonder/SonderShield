@@ -124,7 +124,31 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 	case "programs":
 		writeJSON(w, s.a.plat.listPrograms())
 	case "catalog":
-		writeJSON(w, map[string]any{"upstreams": upstreams})
+		writeJSON(w, map[string]any{"upstreams": upstreams, "version": version})
+	case "update/check":
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+		defer cancel()
+		info, err := checkUpdate(ctx)
+		if err != nil {
+			writeJSON(w, map[string]any{"current": version, "error": err.Error()})
+			return
+		}
+		writeJSON(w, info)
+	case "update/apply":
+		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
+		err := applyUpdate(ctx, func() {
+			if s.a.running() {
+				s.a.stop()
+			}
+			removeInstance(s.a.plat.dataDir())
+		})
+		cancel()
+		if err != nil {
+			w.WriteHeader(500)
+			writeJSON(w, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, map[string]bool{"updating": true}) // the process is now relaunching
 	default:
 		http.NotFound(w, r)
 	}
