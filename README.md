@@ -32,14 +32,14 @@ Turn on **HTTPS filtering** and it goes further in your browsers: ad spaces and 
 | | |
 |---|---|
 | **Blocks everywhere** | Every app on the phone, through a DNS-only VPN. No speed or battery cost from routing. |
-| **Good lists, ready** | StevenBlack, AdGuard DNS, URLhaus, HaGeZi, OISD, EasyList, uBlock Origin filters, plus regional lists switched on for your language. Add any list by URL (hosts, AdBlock or plain domains). |
+| **Good lists, ready** | StevenBlack, AdGuard (DNS, Base, Mobile, Tracking, Social), EasyList, uBlock Origin, HaGeZi, OISD, URLhaus, Phishing Army, plus regional lists switched on for your language. Add any list by URL (hosts, AdBlock or plain domains). |
 | **Your rules win** | Block or allow any domain, subdomains included. Test a domain to see which list or rule decides. |
 | **HTTPS filtering** | Hides ads inside pages in the browsers you pick, with element hiding and scriptlets from the lists. Uses a certificate made on your phone. Banks, payments and government sites are never touched. |
 | **Encrypted DNS** | DNS over HTTPS with Cloudflare, Quad9, Google, AdGuard, or your own server. |
 | **WireGuard** | Import a `.conf` and your traffic leaves through your own server or VPN provider, still filtered. |
 | **Root mode** | On rooted phones, blocks without a VPN so another VPN can run alongside. |
 | **Live log** | Every lookup, with the app that asked. Search, filter, and block or allow from a tap. |
-| **Per-app bypass** | Let an app that breaks skip SonderShield. |
+| **Per-app control** | Let an app that breaks skip SonderShield, or cut an app off the internet entirely (firewall). |
 | **Always there** | Quick Settings tile, home screen widget, start on boot, always-on VPN. |
 | **Yours to shape** | Pure black, light, system or Material You theme, any accent colour. English, French and German. |
 | **Portable** | Export and import your settings; export the log as CSV. |

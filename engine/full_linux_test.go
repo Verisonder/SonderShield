@@ -146,6 +146,22 @@ func TestFullTunnel(t *testing.T) {
 	if e.Connections() < 1 {
 		t.Fatal("connection not counted")
 	}
+
+	// Firewall: the "phone" app (uid 4242 from the resolver) gets no TCP connection.
+	e.SetAppResolver(fixedUid(4242))
+	e.SetFirewall("4242")
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel2()
+	if c, err := gonet.DialContextTCP(ctx2, ph, tcpip.FullAddress{NIC: 1, Addr: tcpip.AddrFrom4([4]byte{93, 184, 216, 35}), Port: port}, ipv4.ProtocolNumber); err == nil {
+		c.Close()
+		t.Fatal("firewalled app connected")
+	}
+}
+
+type fixedUid int
+
+func (f fixedUid) Uid(proto int, srcIP string, srcPort int, dstIP string, dstPort int) int {
+	return int(f)
 }
 
 func TestParseWireGuard(t *testing.T) {

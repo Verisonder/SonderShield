@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -48,7 +49,7 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun LogScreen() {
+fun LogScreen(header: @Composable (kicker: String, sub: String, action: @Composable RowScope.() -> Unit) -> Unit) {
     val ctx = LocalContext.current
     val log by ShieldState.log.collectAsState()
     val phase by ShieldState.phase.collectAsState()
@@ -65,9 +66,9 @@ fun LogScreen() {
     val blockedCount = remember(log) { log.count { it.verdict == 1 } }
 
     Column(Modifier.fillMaxSize()) {
-        ScreenHeader(
-            tr("Log", "Journal", "Protokoll"), kicker = if (phase == Phase.OFF) tr("Paused", "En pause", "Pausiert") else tr("Live", "En direct", "Live"),
-            sub = tr("${log.size.grouped()} latest queries · ${blockedCount.grouped()} blocked", "${log.size.grouped()} dernières requêtes · ${blockedCount.grouped()} bloquées", "${log.size.grouped()} letzte Anfragen · ${blockedCount.grouped()} blockiert"),
+        header(
+            if (phase == Phase.OFF) tr("Paused", "En pause", "Pausiert") else tr("Live", "En direct", "Live"),
+            tr("${log.size.grouped()} latest queries · ${blockedCount.grouped()} blocked", "${log.size.grouped()} dernières requêtes · ${blockedCount.grouped()} bloquées", "${log.size.grouped()} letzte Anfragen · ${blockedCount.grouped()} blockiert"),
         ) {
             if (log.isNotEmpty()) IconPill(Icons.trash, tr("Clear log", "Vider le journal", "Protokoll leeren")) { ShieldState.clearLog() }
         }

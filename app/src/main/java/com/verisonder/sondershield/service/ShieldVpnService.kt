@@ -193,7 +193,8 @@ class ShieldVpnService : VpnService() {
             return
         }
         val bypass = prefs.bypassApps.mapNotNull { runCatching { packageManager.getApplicationInfo(it, 0).uid }.getOrNull() }
-        val (code, out) = Root.apply(android.os.Process.myUid(), bypass)
+        val blocked = prefs.firewallApps.mapNotNull { runCatching { packageManager.getApplicationInfo(it, 0).uid }.getOrNull() }
+        val (code, out) = Root.apply(android.os.Process.myUid(), bypass, blocked)
         if (code != 0) {
             Root.clear()
             ShieldState.problem.value = trc(this, "Root mode failed: ", "Le mode root a échoué : ", "Root-Modus fehlgeschlagen: ") + out.trim().lines().lastOrNull().orEmpty().ifEmpty { "su refused" }

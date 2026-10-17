@@ -103,10 +103,6 @@ private fun SettingsContent(onReload: () -> Unit) {
     var upstream by remember { mutableStateOf(prefs.upstreamId) }
     var custom by remember { mutableStateOf(prefs.customUpstream) }
     var testResult by remember { mutableStateOf<String?>(null) }
-    var enabled by remember { mutableStateOf(prefs.enabledLists) }
-    var lists by remember { mutableStateOf(prefs.allLists()) }
-    var updating by remember { mutableStateOf(false) }
-    var hours by remember { mutableIntStateOf(prefs.updateHours) }
     var ipv6 by remember { mutableStateOf(prefs.ipv6) }
     var boot by remember { mutableStateOf(prefs.startOnBoot) }
     var full by remember { mutableStateOf(prefs.fullTunnel) }
@@ -114,28 +110,13 @@ private fun SettingsContent(onReload: () -> Unit) {
     var wgOn by remember { mutableStateOf(prefs.wgOn) }
     var root by remember { mutableStateOf(prefs.rootMode) }
     var httpsOn by remember { mutableStateOf(prefs.httpsOn) }
-    var addList by remember { mutableStateOf(false) }
     var confirmReset by remember { mutableStateOf(false) }
-    var tick by remember { mutableIntStateOf(0) } // re-read list metadata
 
     fun applyUpstream() {
         prefs.upstreamId = upstream
         prefs.customUpstream = custom.trim()
         testResult = null
         if (phase == Phase.ON) scope.launch { ShieldState.applyConfig() }
-    }
-
-    fun listsChanged(download: List<BlockList> = emptyList()) {
-        prefs.enabledLists = enabled
-        scope.launch {
-            if (download.isNotEmpty()) {
-                updating = true
-                for (l in download) store.update(l)
-                updating = false
-                tick++
-            }
-            if (phase == Phase.ON) ShieldState.applyConfig()
-        }
     }
 
     Column(Modifier.verticalScroll(rememberScrollState())) {
@@ -180,68 +161,8 @@ private fun SettingsContent(onReload: () -> Unit) {
             }
         }
 
-        // 02 Block lists
-        Section(2, tr("Block lists", "Listes de blocage", "Blocklisten")) {
-            Row(Modifier.padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                PillButton(if (updating) tr("Updating…", "Mise à jour…", "Aktualisiere…") else tr("Update now", "Mettre à jour", "Jetzt aktualisieren"), filled = false, enabled = !updating) {
-                    scope.launch {
-                        updating = true
-                        val changed = store.updateEnabled(force = true)
-                        updating = false
-                        tick++
-                        if (changed && phase == Phase.ON) ShieldState.applyConfig()
-                    }
-                }
-                PillButton(tr("Add a list", "Ajouter une liste", "Liste hinzufügen"), filled = false) { addList = true }
-                if (updating) CircularProgressIndicator(color = Palette.accent, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-            }
-            // key(): metadata is read again whenever a download finishes.
-            key(tick, listsVersion) {
-                for (l in lists) {
-                    val on = l.id in enabled
-                    val meta = prefs.listMeta(l.id)
-                    val status = when {
-                        meta.error.isNotEmpty() -> tr("Error: ", "Erreur : ", "Fehler: ") + meta.error
-                        meta.updated > 0 -> "${meta.entries.grouped()} " + tr("entries", "entrées", "Einträge") + " · " + ago(meta.updated, lang())
-                        on -> tr("Downloads when protection starts", "Téléchargée au démarrage de la protection", "Wird beim Start des Schutzes geladen")
-                        else -> when (lang()) { "fr" -> aboutFr(l.id, l.about); "de" -> aboutDe(l.id, l.about); else -> l.about }
-                    }
-                    fun flip(v: Boolean) {
-                        enabled = if (v) enabled + l.id else enabled - l.id
-                        listsChanged(if (v && !store.file(l.id).isFile) listOf(l) else emptyList())
-                    }
-                    OptionCard(l.name, status, onClick = { flip(!on) }, subColor = if (meta.error.isNotEmpty()) Palette.warn else null) {
-                        if (l.id.startsWith("custom-")) {
-                            IconPill(Icons.trash, tr("Remove list", "Retirer la liste", "Liste entfernen")) {
-                                prefs.customLists = prefs.customLists.filter { it.id != l.id }
-                                store.delete(l.id)
-                                enabled = enabled - l.id
-                                lists = prefs.allLists()
-                                listsChanged()
-                            }
-                        }
-                        Toggle(on) { flip(it) }
-                    }
-                }
-            }
-        }
-
-        // 03 Updates
-        Section(3, tr("Update lists automatically", "Mise à jour automatique des listes", "Listen automatisch aktualisieren")) {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for ((h, label) in listOf(0 to tr("Off", "Non", "Aus"), 12 to "12 h", 24 to "24 h", 48 to "48 h")) {
-                    Chip(label, hours == h) {
-                        hours = h
-                        prefs.updateHours = h
-                        UpdateWorker.schedule(ctx)
-                    }
-                }
-            }
-            Text(tr("On Wi-Fi only, when the battery isn't low.", "En Wi-Fi uniquement, quand la batterie n'est pas faible.", "Nur im WLAN, wenn der Akku nicht schwach ist."), color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
-        }
-
-        // 04 Connection
-        Section(4, tr("Connection", "Connexion", "Verbindung")) {
+        // 02 Connection
+        Section(2, tr("Connection", "Connexion", "Verbindung")) {
             ToggleCard(tr("Start on boot", "Démarrer avec le téléphone", "Beim Hochfahren starten"), tr("Turn protection back on after a restart, if it was on.", "Réactive la protection après un redémarrage, si elle était active.", "Schaltet den Schutz nach einem Neustart wieder ein, wenn er an war."), boot) {
                 boot = it; prefs.startOnBoot = it
             }
@@ -265,8 +186,8 @@ private fun SettingsContent(onReload: () -> Unit) {
             ) { Icon(Icons.chevron, null, tint = Palette.faint, modifier = Modifier.size(18.dp)) }
         }
 
-        // 05 Tunnel
-        Section(5, tr("Tunnel", "Tunnel", "Tunnel")) {
+        // 03 Tunnel
+        Section(3, tr("Tunnel", "Tunnel", "Tunnel")) {
             val importWg = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
                 if (uri == null) return@rememberLauncherForActivityResult
                 val text = runCatching { readSmallText(ctx, uri) }.getOrNull()
@@ -354,8 +275,8 @@ private fun SettingsContent(onReload: () -> Unit) {
             }
         }
 
-        // 06 HTTPS filtering
-        Section(6, tr("HTTPS filtering", "Filtrage HTTPS", "HTTPS-Filterung")) {
+        // 04 HTTPS filtering
+        Section(4, tr("HTTPS filtering", "Filtrage HTTPS", "HTTPS-Filterung")) {
             HttpsSection(
                 prefs, root, httpsOn,
                 onSwitch = { on ->
@@ -370,11 +291,12 @@ private fun SettingsContent(onReload: () -> Unit) {
                             }
                             prefs.httpsOn = true; httpsOn = true
                             prefs.fullTunnel = true; full = true
-                            // The page rules live in EasyList and uBlock's list: switch them on too.
-                            val add = com.verisonder.sondershield.core.Catalog.pageListIds - enabled
+                            // The page rules live in EasyList and uBlock's list: switch them on too
+                            // (they download when the tunnel restarts).
+                            val add = com.verisonder.sondershield.core.Catalog.pageListIds - prefs.enabledLists
                             if (add.isNotEmpty()) {
-                                enabled = enabled + add
-                                listsChanged(lists.filter { it.id in add })
+                                prefs.enabledLists = prefs.enabledLists + add
+                                ShieldState.listsVersion.value++
                             }
                             ShieldVpnService.restartIfOn(ctx)
                         }
@@ -383,8 +305,8 @@ private fun SettingsContent(onReload: () -> Unit) {
             )
         }
 
-        // 07 Theme
-        Section(7, tr("Theme", "Thème", "Design")) {
+        // 05 Theme
+        Section(5, tr("Theme", "Thème", "Design")) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (m in ThemeMode.entries) {
                     if (m == ThemeMode.You && !ThemeMode.youAvailable) continue
@@ -401,8 +323,8 @@ private fun SettingsContent(onReload: () -> Unit) {
             }
         }
 
-        // 08 Backup and logs
-        Section(8, tr("Backup and logs", "Sauvegarde et journaux", "Sicherung und Protokolle")) {
+        // 06 Backup and logs
+        Section(6, tr("Backup and logs", "Sauvegarde et journaux", "Sicherung und Protokolle")) {
             val exportSettings = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
                 if (uri != null) toast(ctx, runCatching { Backup.export(ctx, uri) }.exceptionOrNull()?.message
                     ?: trc(ctx, "Settings saved", "Paramètres enregistrés", "Einstellungen gespeichert"))
@@ -462,16 +384,16 @@ private fun SettingsContent(onReload: () -> Unit) {
             }
         }
 
-        // 09 Statistics
-        Section(9, tr("Statistics", "Statistiques", "Statistik")) {
+        // 07 Statistics
+        Section(7, tr("Statistics", "Statistiques", "Statistik")) {
             OptionCard(tr("Blocked in total", "Bloqués au total", "Insgesamt blockiert"), ShieldState.stats.collectAsState().value.allBlocked.grouped())
             OptionCard(tr("Reset counters", "Remettre à zéro", "Zähler zurücksetzen"), tr("Today and all-time go back to zero. The log stays.", "Aujourd'hui et le total repartent de zéro. Le journal reste.", "Heute und Insgesamt fangen wieder bei null an. Das Protokoll bleibt."), onClick = { confirmReset = true }) {
                 Icon(Icons.chevron, null, tint = Palette.faint, modifier = Modifier.size(18.dp))
             }
         }
 
-        // 10 About
-        Section(10, tr("About", "À propos", "Über")) {
+        // 08 About
+        Section(8, tr("About", "À propos", "Über")) {
             Block {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Logo(30.dp, lit = true)
@@ -504,37 +426,6 @@ private fun SettingsContent(onReload: () -> Unit) {
             }
         }
         Spacer(Modifier.height(28.dp))
-    }
-
-    if (addList) {
-        var name by remember { mutableStateOf("") }
-        var url by remember { mutableStateOf("") }
-        val ok = name.isNotBlank() && url.startsWith("https://")
-        AlertDialog(
-            onDismissRequest = { addList = false },
-            containerColor = Palette.panel,
-            shape = RoundedCornerShape(24.dp),
-            title = { Text(tr("Add a block list", "Ajouter une liste", "Blockliste hinzufügen"), style = display(20), color = Palette.text) },
-            text = {
-                Column {
-                    Field(name, { name = it }, tr("Name", "Nom", "Name"), Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(8.dp))
-                    Field(url, { url = it.trim() }, tr("https://… (hosts, AdBlock or domains)", "https://… (hosts, AdBlock ou domaines)", "https://… (hosts, AdBlock oder Domains)"), Modifier.fillMaxWidth(), keyboard = KeyboardType.Uri)
-                }
-            },
-            confirmButton = {
-                PillButton(tr("Add", "Ajouter", "Hinzufügen"), enabled = ok) {
-                    val l = BlockList("", name.trim().replace("|", " "), url, url)
-                    prefs.customLists = prefs.customLists + l
-                    lists = prefs.allLists()
-                    val added = lists.last()
-                    enabled = enabled + added.id
-                    addList = false
-                    listsChanged(listOf(added))
-                }
-            },
-            dismissButton = { PillButton(tr("Cancel", "Annuler", "Abbrechen"), filled = false) { addList = false } },
-        )
     }
 
     if (confirmReset) {
@@ -697,42 +588,4 @@ private fun upstreamSub(name: String, lang: String): String {
     return t.replaceFirstChar { it.uppercase() }
 }
 
-/** French descriptions of the built-in lists. */
-private fun aboutFr(id: String, en: String): String = when (id) {
-    "stevenblack" -> "Pubs et malwares. Le fichier hosts classique."
-    "adguard-dns" -> "Pubs et traqueurs, pensé pour le blocage DNS."
-    "urlhaus" -> "Sites qui diffusent des malwares en ce moment. Petite."
-    "hagezi-pro" -> "Liste plus forte : pubs, traçage et télémétrie. Casse rarement quelque chose."
-    "hagezi-tif" -> "Phishing, arnaques et malwares. Grande."
-    "hagezi-xiaomi" -> "Télémétrie Xiaomi / HyperOS. Peut masquer certaines pubs et thèmes MIUI."
-    "oisd-small" -> "Pubs uniquement, très peu de faux positifs."
-    "liste-fr" -> "Régies pub et traqueurs français."
-    "liste-ar" -> "Régies pub en langue arabe. Petite."
-    "easylist-de" -> "Régies pub et traqueurs allemands."
-    "easylist-es" -> "Régies pub et traqueurs espagnols."
-    "easylist-it" -> "Régies pub et traqueurs italiens."
-    "easylist-pt" -> "Régies pub et traqueurs portugais."
-    "easylist" -> "La liste de pubs principale des navigateurs. Masque les emplacements de pub quand le filtrage HTTPS est activé."
-    "ublock" -> "Contre les murs anti-bloqueur et les pubs tenaces (scriptlets). Pour le filtrage HTTPS."
-    else -> en
-}
 
-/** German descriptions of the built-in lists. */
-private fun aboutDe(id: String, en: String): String = when (id) {
-    "stevenblack" -> "Werbung und Malware. Die klassische hosts-Datei."
-    "adguard-dns" -> "Werbung und Tracker, für DNS-Blocking gemacht."
-    "urlhaus" -> "Seiten, die gerade Malware verbreiten. Klein."
-    "hagezi-pro" -> "Stärkere Liste: Werbung, Tracking und Telemetrie. Macht selten etwas kaputt."
-    "hagezi-tif" -> "Phishing, Betrug und Malware. Groß."
-    "hagezi-xiaomi" -> "Xiaomi-/HyperOS-Telemetrie. Kann einige MIUI-Werbung und Designs ausblenden."
-    "oisd-small" -> "Nur Werbung, sehr wenige Fehlalarme."
-    "liste-fr" -> "Französische Werbenetzwerke und Tracker."
-    "liste-ar" -> "Arabischsprachige Werbenetzwerke. Klein."
-    "easylist-de" -> "Deutsche Werbenetzwerke und Tracker."
-    "easylist-es" -> "Spanische Werbenetzwerke und Tracker."
-    "easylist-it" -> "Italienische Werbenetzwerke und Tracker."
-    "easylist-pt" -> "Portugiesische Werbenetzwerke und Tracker."
-    "easylist" -> "Die wichtigste Werbeliste für Browser. Blendet Werbeflächen aus, wenn die HTTPS-Filterung an ist."
-    "ublock" -> "Gegen Adblock-Sperren und hartnäckige Werbung (Scriptlets). Für die HTTPS-Filterung."
-    else -> en
-}

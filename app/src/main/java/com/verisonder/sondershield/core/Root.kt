@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit
 object Root {
     const val PORT = 5353
     private const val CHAIN = "SONDERSHIELD"
+    private const val FW = "SONDERSHIELD_FW"
 
     /** Runs a script as root. Returns (exit code, output). */
     fun run(script: String, timeoutSec: Long = 15): Pair<Int, String> = try {
@@ -32,8 +33,15 @@ object Root {
     fun available(): Boolean = run("id").let { (code, out) -> code == 0 && "uid=0" in out }
 
     /** Installs the redirect. [ownUid] and [bypassUids] keep their normal DNS. */
-    fun apply(ownUid: Int, bypassUids: Collection<Int>): Pair<Int, String> {
+    fun apply(ownUid: Int, bypassUids: Collection<Int>, firewallUids: Collection<Int> = emptyList()): Pair<Int, String> {
         val s = StringBuilder()
+        // Firewall: no internet at all for these apps.
+        for (ipt in listOf("iptables", "ip6tables")) {
+            s.append("$ipt -w -N $FW 2>/dev/null\n")
+            s.append("$ipt -w -F $FW\n")
+            for (u in firewallUids) s.append("$ipt -w -A $FW -m owner --uid-owner $u ! -o lo -j REJECT\n")
+            s.append("$ipt -w -C OUTPUT -j $FW 2>/dev/null || $ipt -w -I OUTPUT -j $FW\n")
+        }
         for (ipt in listOf("iptables", "ip6tables")) {
             s.append("$ipt -w -t nat -N $CHAIN 2>/dev/null\n")
             s.append("$ipt -w -t nat -F $CHAIN || exit 3\n")
@@ -52,6 +60,9 @@ object Root {
             s.append("while $ipt -w -t nat -D OUTPUT -j $CHAIN 2>/dev/null; do :; done\n")
             s.append("$ipt -w -t nat -F $CHAIN 2>/dev/null\n")
             s.append("$ipt -w -t nat -X $CHAIN 2>/dev/null\n")
+            s.append("while $ipt -w -D OUTPUT -j $FW 2>/dev/null; do :; done\n")
+            s.append("$ipt -w -F $FW 2>/dev/null\n")
+            s.append("$ipt -w -X $FW 2>/dev/null\n")
         }
         run(s.toString())
     }

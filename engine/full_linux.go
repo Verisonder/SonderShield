@@ -111,6 +111,11 @@ func flowAddrs(id stack.TransportEndpointID) (src net.IP, srcPort int, dst net.I
 func (e *Engine) onTCP(ctx context.Context, r *fullRunner, req *tcp.ForwarderRequest) {
 	id := req.ID()
 	src, srcPort, dst, dstPort := flowAddrs(id)
+	uid := e.appFor(6, src, srcPort, dst, dstPort)
+	if e.firewalled(uid) {
+		req.Complete(true) // reset: this app has no internet
+		return
+	}
 	var wq waiter.Queue
 	ep, terr := req.CreateEndpoint(&wq)
 	if terr != nil {
@@ -119,7 +124,6 @@ func (e *Engine) onTCP(ctx context.Context, r *fullRunner, req *tcp.ForwarderReq
 	}
 	req.Complete(false)
 	app := gonet.NewTCPConn(&wq, ep)
-	uid := e.appFor(6, src, srcPort, dst, dstPort)
 
 	r.wg.Add(1)
 	go func() {
@@ -171,6 +175,9 @@ func (e *Engine) onUDP(ctx context.Context, r *fullRunner, req *udp.ForwarderReq
 	id := req.ID()
 	src, srcPort, dst, dstPort := flowAddrs(id)
 	uid := e.appFor(17, src, srcPort, dst, dstPort)
+	if e.firewalled(uid) {
+		return
+	}
 	if dstPort == 443 && e.mitmFor(uid) != nil {
 		return // no QUIC for filtered apps: they fall back to TCP, which can be filtered
 	}

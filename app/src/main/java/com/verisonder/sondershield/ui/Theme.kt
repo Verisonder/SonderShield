@@ -249,6 +249,7 @@ object Icons {
     val close = icon("close", "M6 6l12 12", "M18 6L6 18")
     val trash = icon("trash", "M4 7h16", "M9 7V4h6v3", "M6 7l1 13h10l1-13")
     val chevron = icon("chevron", "M9 6l6 6-6 6")
+    val filter = icon("filter", "M12 3.5l7.5 2.8v5.4c0 4.6-3.1 7.9-7.5 9.3-4.4-1.4-7.5-4.7-7.5-9.3V6.3z")
     val check = icon("check", "M5 12.5l4.5 4.5L19 7")
 }
 

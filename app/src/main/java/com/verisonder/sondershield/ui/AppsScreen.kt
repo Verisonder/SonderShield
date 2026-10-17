@@ -73,6 +73,9 @@ fun AppsScreen() {
     val prefs = remember { Prefs(ctx) }
     var apps by remember { mutableStateOf(appCache) }
     var bypass by remember { mutableStateOf(prefs.bypassApps) }
+    var blocked by remember { mutableStateOf(prefs.firewallApps) }
+    var mode by rememberSaveable { mutableIntStateOf(0) } // 0 bypass, 1 firewall
+    val firewallWorks = prefs.tunnelFull || prefs.rootMode
     var query by rememberSaveable { mutableStateOf("") }
     var pending by remember { mutableIntStateOf(0) }
 
@@ -89,34 +92,63 @@ fun AppsScreen() {
 
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(
-            tr("Apps", "Applis", "Apps"), kicker = tr("Bypass", "Exceptions", "Ausnahmen"),
-            sub = tr(
+            tr("Apps", "Applis", "Apps"),
+            kicker = if (mode == 0) tr("Bypass", "Exceptions", "Ausnahmen") else tr("Firewall", "Pare-feu", "Firewall"),
+            sub = if (mode == 0) tr(
                 "Apps switched on here skip SonderShield, so their ads aren't blocked. Use it for an app that breaks.",
                 "Les applis activées ici contournent SonderShield : leurs pubs ne sont pas bloquées. Utile pour une appli qui ne marche plus.",
                 "Hier eingeschaltete Apps umgehen SonderShield, ihre Werbung wird also nicht blockiert. Nützlich für eine App, die nicht mehr geht.",
+            ) else tr(
+                "Apps switched on here get no internet at all, on Wi-Fi and mobile data.",
+                "Les applis activées ici n'ont plus du tout accès à internet, en Wi-Fi comme en données mobiles.",
+                "Hier eingeschaltete Apps bekommen gar kein Internet mehr, weder im WLAN noch mobil.",
             ),
         )
+        ChipRow(Modifier.padding(top = 4.dp)) {
+            Chip(tr("Bypass", "Exceptions", "Ausnahmen"), mode == 0) { mode = 0 }
+            Chip(tr("No internet", "Sans internet", "Kein Internet"), mode == 1) { mode = 1 }
+        }
+        if (mode == 1 && !firewallWorks) {
+            Text(
+                tr(
+                    "The firewall needs Full tunnel or Root mode (Settings › Tunnel). Until then these apps keep their internet.",
+                    "Le pare-feu a besoin du tunnel complet ou du mode root (Réglages › Tunnel). D'ici là, ces applis gardent internet.",
+                    "Die Firewall braucht den vollen Tunnel oder den Root-Modus (Einstellungen › Tunnel). Bis dahin behalten diese Apps ihr Internet.",
+                ),
+                color = Palette.warn, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(horizontal = Gutter).padding(top = 10.dp),
+            )
+        }
         Field(query, { query = it }, tr("Search apps", "Rechercher une appli", "Apps suchen"), Modifier.fillMaxWidth().padding(horizontal = Gutter).padding(top = 10.dp), leading = Icons.search)
         val list = apps
         if (list == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Palette.accent) }
             return@Column
         }
-        // Bypassing apps first, then the rest alphabetically.
+        val set = if (mode == 0) bypass else blocked
+        // Switched-on apps first, then the rest alphabetically.
         val shown = list.filter { query.isBlank() || it.label.contains(query, true) || it.pkg.contains(query, true) }
-            .sortedBy { if (it.pkg in bypass) 0 else 1 }
-        if (bypass.isNotEmpty() && query.isBlank()) {
+            .sortedBy { if (it.pkg in set) 0 else 1 }
+        if (set.isNotEmpty() && query.isBlank()) {
             Text(
-                tr("${bypass.size} bypassing", "${bypass.size} en exception", "${bypass.size} ausgenommen"), color = Palette.accentText, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp,
+                if (mode == 0) tr("${bypass.size} bypassing", "${bypass.size} en exception", "${bypass.size} ausgenommen")
+                else tr("${blocked.size} without internet", "${blocked.size} sans internet", "${blocked.size} ohne Internet"), color = Palette.accentText, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp,
                 modifier = Modifier.padding(horizontal = Gutter).padding(top = 14.dp),
             )
         }
         LazyColumn(Modifier.fillMaxSize().padding(top = 6.dp)) {
             items(shown, key = { it.pkg }) { a ->
-                val on = a.pkg in bypass
+                val on = a.pkg in set
+                // An app is either bypassing or cut off, not both.
                 fun flip() {
-                    bypass = if (on) bypass - a.pkg else bypass + a.pkg
+                    if (mode == 0) {
+                        bypass = if (on) bypass - a.pkg else bypass + a.pkg
+                        if (!on) blocked = blocked - a.pkg
+                    } else {
+                        blocked = if (on) blocked - a.pkg else blocked + a.pkg
+                        if (!on) bypass = bypass - a.pkg
+                    }
                     prefs.bypassApps = bypass
+                    prefs.firewallApps = blocked
                     pending++
                 }
                 Column(Modifier.fillMaxWidth().clickable { flip() }) {

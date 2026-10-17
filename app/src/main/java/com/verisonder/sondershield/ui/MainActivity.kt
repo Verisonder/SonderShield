@@ -79,7 +79,7 @@ import com.verisonder.sondershield.core.ShieldState
 import com.verisonder.sondershield.service.ShieldVpnService
 
 enum class Tab(val label: String, val fr: String, val de: String) {
-    Home("Home", "Accueil", "Start"), Log("Log", "Journal", "Protokoll"), Rules("Rules", "Règles", "Regeln"),
+    Home("Home", "Accueil", "Start"), Filter("Filter", "Filtre", "Filter"), Rules("Rules", "Règles", "Regeln"),
     Apps("Apps", "Applis", "Apps"), Settings("Settings", "Réglages", "Einstellungen")
 }
 
@@ -154,7 +154,7 @@ class MainActivity : ComponentActivity() {
                         ) { t ->
                             when (t) {
                                 Tab.Home -> HomeScreen(onToggle = ::toggle, scroll = homeScroll)
-                                Tab.Log -> LogScreen()
+                                Tab.Filter -> FilterScreen()
                                 Tab.Rules -> RulesScreen()
                                 Tab.Apps -> AppsScreen()
                                 Tab.Settings -> SettingsScreen()
@@ -244,7 +244,7 @@ private fun BottomBar(current: Tab, onPick: (Tab) -> Unit) {
 
 private fun Tab.icon() = when (this) {
     Tab.Home -> Icons.home
-    Tab.Log -> Icons.log
+    Tab.Filter -> Icons.filter
     Tab.Rules -> Icons.rules
     Tab.Apps -> Icons.apps
     Tab.Settings -> Icons.settings

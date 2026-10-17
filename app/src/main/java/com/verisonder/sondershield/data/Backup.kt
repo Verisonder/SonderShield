@@ -22,6 +22,7 @@ object Backup {
             put("upstream", p.upstreamId); put("customUpstream", p.customUpstream)
             put("blockRules", p.blockRules); put("allowRules", p.allowRules)
             put("bypass", JSONArray(p.bypassApps.toList()))
+            put("firewall", JSONArray(p.firewallApps.toList()))
             put("ipv6", p.ipv6); put("fullTunnel", p.fullTunnel); put("root", p.rootMode); put("httpsOn", p.httpsOn); put("httpsSkip", p.httpsSkip)
             p.httpsApps?.let { put("httpsApps", JSONArray(it.toList())) }
             put("boot", p.startOnBoot); put("updateHours", p.updateHours)
@@ -45,6 +46,7 @@ object Backup {
         if (o.has("customUpstream")) p.customUpstream = o.getString("customUpstream")
         if (o.has("blockRules")) p.blockRules = o.getString("blockRules")
         if (o.has("allowRules")) p.allowRules = o.getString("allowRules")
+        o.optJSONArray("firewall")?.let { a -> p.firewallApps = (0 until a.length()).map { a.getString(it) }.toSet() }
         o.optJSONArray("bypass")?.let { a -> p.bypassApps = (0 until a.length()).map { a.getString(it) }.toSet() }
         if (o.has("ipv6")) p.ipv6 = o.getBoolean("ipv6")
         if (o.has("fullTunnel")) p.fullTunnel = o.getBoolean("fullTunnel")

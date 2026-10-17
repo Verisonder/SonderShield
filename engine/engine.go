@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -36,6 +37,7 @@ type Engine struct {
 	uids uidCache
 	cos  atomic.Pointer[cosmetics] // page rules from the lists (HTTPS filtering)
 	mitm atomic.Pointer[mitmConfig]
+	fw   atomic.Pointer[map[int]bool] // full tunnel: apps with no internet
 
 	listBlock, listAllow domainSet // last loaded lists, reused when only rules change
 	listNames            []string
@@ -151,6 +153,23 @@ func (e *Engine) SetUpstream(spec string) error {
 }
 
 func (e *Engine) SetListener(l Listener) { e.lis.Store(&listenerBox{l}) }
+
+// SetFirewall cuts these apps (uids, comma separated) off the internet in the full tunnel.
+// Empty: nobody. Takes effect for new connections.
+func (e *Engine) SetFirewall(uids string) {
+	m := map[int]bool{}
+	for _, u := range strings.Split(uids, ",") {
+		if n, err := strconv.Atoi(strings.TrimSpace(u)); err == nil && n >= 0 {
+			m[n] = true
+		}
+	}
+	e.fw.Store(&m)
+}
+
+func (e *Engine) firewalled(uid int) bool {
+	m := e.fw.Load()
+	return m != nil && uid >= 0 && (*m)[uid]
+}
 
 // SetAppResolver lets the engine name the app behind each query and connection.
 func (e *Engine) SetAppResolver(r AppResolver) { e.apps.Store(&resolverBox{r}) }

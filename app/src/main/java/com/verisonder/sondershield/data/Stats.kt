@@ -133,6 +133,6 @@ class Stats(context: Context) {
         private const val HOUR = 3_600_000L
         private const val TOP_KEEP = 1000
         /** Lists whose hits count as threats (malware, phishing) rather than ads. */
-        val THREAT_LISTS = setOf("urlhaus", "hagezi-tif")
+        val THREAT_LISTS = setOf("urlhaus", "hagezi-tif", "rpilist-malware", "phishing-army")
     }
 }

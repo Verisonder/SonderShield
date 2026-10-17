@@ -115,7 +115,7 @@ fun RulesScreen() {
 
             Section(2, if (allowTab) tr("Allowed", "Autorisés", "Erlaubt") + " (${rules.size})" else tr("Blocked", "Bloqués", "Blockiert") + " (${rules.size})") {
                 if (rules.isEmpty()) {
-                    Text(tr("No rules yet. You can also add them from the Log.", "Aucune règle. Vous pouvez aussi en ajouter depuis le Journal.", "Noch keine Regeln. Du kannst sie auch im Protokoll hinzufügen."), color = Palette.faint, fontSize = 13.sp, modifier = Modifier.padding(bottom = 16.dp))
+                    Text(tr("No rules yet. You can also add them from Filter › Log.", "Aucune règle. Vous pouvez aussi en ajouter depuis Filtre › Journal.", "Noch keine Regeln. Du kannst sie auch unter Filter › Protokoll hinzufügen."), color = Palette.faint, fontSize = 13.sp, modifier = Modifier.padding(bottom = 16.dp))
                 }
             }
         }

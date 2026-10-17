@@ -69,6 +69,11 @@ class Prefs(context: Context) {
         get() = sp.getStringSet("bypass", emptySet())?.toSet() ?: emptySet()
         set(v) = sp.edit().putStringSet("bypass", v).apply()
 
+    /** Firewall: apps with no internet at all (full tunnel or root mode). */
+    var firewallApps: Set<String>
+        get() = sp.getStringSet("firewall", emptySet())?.toSet() ?: emptySet()
+        set(v) = sp.edit().putStringSet("firewall", v).apply()
+
     var ipv6: Boolean
         get() = sp.getBoolean("ipv6", true)
         set(v) = sp.edit().putBoolean("ipv6", v).apply()

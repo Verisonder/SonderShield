@@ -127,6 +127,7 @@ object ShieldState {
                 problem.value = com.verisonder.sondershield.ui.trc(app, "DNS server setting is invalid: ${e.message}. Using Cloudflare.", "Réglage du serveur DNS invalide : ${e.message}. Cloudflare est utilisé.", "DNS-Server-Einstellung ungültig: ${e.message}. Cloudflare wird verwendet.")
                 engine.setUpstream(Upstreams.byId(Upstreams.DEFAULT)!!.spec)
             }
+            engine.setFirewall(if (prefs.tunnelFull) Https.uids(app, prefs.firewallApps) else "")
             try {
                 if (prefs.httpsOn && prefs.caPem.isEmpty()) prefs.caPem = shield.Shield.generateCA()
                 val on = prefs.httpsOn && prefs.tunnelFull
