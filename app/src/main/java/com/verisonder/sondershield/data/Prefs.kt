@@ -17,8 +17,20 @@ class Prefs(context: Context) {
         set(v) = sp.edit().putBoolean("on", v).apply()
 
     var enabledLists: Set<String>
-        get() = sp.getStringSet("lists.enabled", null)?.toSet() ?: Catalog.defaultIds
+        get() = sp.getStringSet("lists.enabled", null)?.toSet() ?: firstRunLists().also { enabledLists = it }
         set(v) = sp.edit().putStringSet("lists.enabled", v).apply()
+
+    /** First run: the defaults plus regional lists for the phone's languages. */
+    private fun firstRunLists(): Set<String> {
+        val locales = android.content.res.Resources.getSystem().configuration.locales
+        val langs = (0 until locales.size()).map { locales[it].language }
+        val country = if (locales.size() > 0) locales[0].country else ""
+        return Catalog.defaultsFor(langs, country)
+    }
+
+    var onboarded: Boolean
+        get() = sp.getBoolean("onboarded", false)
+        set(v) = sp.edit().putBoolean("onboarded", v).apply()
 
     /** Custom lists, one "name|url" per line. */
     var customLists: List<BlockList>

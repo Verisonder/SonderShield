@@ -83,6 +83,7 @@ object ShieldState {
     fun init(context: Context) {
         if (::app.isInitialized) return
         app = context.applicationContext
+        com.verisonder.sondershield.data.CrashLog.install(app)
         engine.setListener(listener)
         today.value = Prefs(app).todayCounts()
         theme.value = Prefs(app).theme
@@ -141,6 +142,7 @@ object ShieldState {
                     lastBlocked = b
                     today.value = prefs.todayCounts()
                     store?.let { stats.value = it.snapshot() }
+                    com.verisonder.sondershield.service.ShieldWidget.update(app, throttle = true)
                 }
                 if (tick % 15 == 0) store?.save()
             }

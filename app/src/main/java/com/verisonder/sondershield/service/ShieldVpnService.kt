@@ -80,6 +80,7 @@ class ShieldVpnService : VpnService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                Prefs(this).wantOn = false // also when it comes from the notification or the widget
                 ShieldState.scope.launch { lock.withLock { teardown() } }
                 return START_NOT_STICKY
             }
@@ -91,7 +92,7 @@ class ShieldVpnService : VpnService() {
             else -> {
                 // ACTION_START, a null intent after the system restarted us (START_STICKY),
                 // or android.net.VpnService from always-on VPN.
-                if (intent?.action == SERVICE_INTERFACE) Prefs(this).wantOn = true
+                if (intent?.action == SERVICE_INTERFACE || intent?.action == ACTION_START) Prefs(this).wantOn = true
                 if (intent == null && !Prefs(this).wantOn) {
                     stopSelf()
                     return START_NOT_STICKY
@@ -255,5 +256,6 @@ class ShieldVpnService : VpnService() {
 
     private fun refreshTile() {
         TileService.requestListeningState(this, ComponentName(this, ShieldTile::class.java))
+        ShieldWidget.update(this)
     }
 }

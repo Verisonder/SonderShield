@@ -113,6 +113,14 @@ class MainActivity : ComponentActivity() {
                 window.decorView.setBackgroundColor(bg)
             }
             ShieldTheme(colors) {
+                var onboarded by rememberSaveable { mutableStateOf(com.verisonder.sondershield.data.Prefs(this).onboarded) }
+                if (!onboarded) {
+                    OnboardingScreen(onAllowVpn = ::turnOn, onDone = {
+                        com.verisonder.sondershield.data.Prefs(this).onboarded = true
+                        onboarded = true
+                    })
+                    return@ShieldTheme
+                }
                 var tab by rememberSaveable { mutableStateOf(Tab.Home) }
                 BackHandler(enabled = tab != Tab.Home) { tab = Tab.Home }
                 Scaffold(

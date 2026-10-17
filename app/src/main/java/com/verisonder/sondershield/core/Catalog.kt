@@ -7,6 +7,8 @@ data class BlockList(
     val url: String,
     val about: String,
     val defaultOn: Boolean = false,
+    /** Languages it's meant for: switched on by default when the phone uses one of them. */
+    val langs: Set<String> = emptySet(),
 )
 
 object Catalog {
@@ -46,9 +48,47 @@ object Catalog {
             "https://small.oisd.nl/",
             "Ads only, very low false positives.",
         ),
+        // Regional: ad networks of one language area. On by default for the phone's languages.
+        BlockList(
+            "liste-fr", "Liste FR",
+            "https://raw.githubusercontent.com/easylist/listefr/master/liste_fr.txt",
+            "French ad networks and trackers.", langs = setOf("fr"),
+        ),
+        BlockList(
+            "liste-ar", "Liste AR",
+            "https://raw.githubusercontent.com/easylist/listear/master/Liste_AR.txt",
+            "Arabic-language ad networks. Small.", langs = setOf("ar"),
+        ),
+        BlockList(
+            "easylist-de", "EasyList Germany",
+            "https://easylist.to/easylistgermany/easylistgermany.txt",
+            "German ad networks and trackers.", langs = setOf("de"),
+        ),
+        BlockList(
+            "easylist-es", "EasyList Spanish",
+            "https://easylist-downloads.adblockplus.org/easylistspanish.txt",
+            "Spanish ad networks and trackers.", langs = setOf("es"),
+        ),
+        BlockList(
+            "easylist-it", "EasyList Italy",
+            "https://easylist-downloads.adblockplus.org/easylistitaly.txt",
+            "Italian ad networks and trackers.", langs = setOf("it"),
+        ),
+        BlockList(
+            "easylist-pt", "EasyList Portuguese",
+            "https://easylist-downloads.adblockplus.org/easylistportuguese.txt",
+            "Portuguese ad networks and trackers.", langs = setOf("pt"),
+        ),
     )
 
     val defaultIds: Set<String> = lists.filter { it.defaultOn }.map { it.id }.toSet()
+
+    /** Defaults plus the regional lists for these languages (and, in the Maghreb, French and Arabic). */
+    fun defaultsFor(langs: Collection<String>, country: String): Set<String> {
+        val want = langs.toMutableSet()
+        if (country.uppercase() in setOf("MA", "DZ", "TN")) want += setOf("fr", "ar")
+        return defaultIds + lists.filter { l -> l.langs.any { it in want } }.map { it.id }
+    }
 }
 
 /** A DNS server the engine forwards allowed queries to. */

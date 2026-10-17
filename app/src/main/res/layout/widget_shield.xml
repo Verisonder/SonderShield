@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home screen widget: the mark (lit when on), the state, blocked today. Tap toggles. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="18dp"
+    android:paddingEnd="18dp">
+
+    <FrameLayout
+        android:layout_width="38dp"
+        android:layout_height="42dp">
+        <ImageView
+            android:id="@+id/widget_top"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:importantForAccessibility="no"
+            android:src="@drawable/logo_top" />
+        <ImageView
+            android:id="@+id/widget_bottom"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:importantForAccessibility="no"
+            android:src="@drawable/logo_bottom" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+        <TextView
+            android:id="@+id/widget_state"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/unbounded_extrabold"
+            android:maxLines="1"
+            android:textColor="#FFFFFFFF"
+            android:textSize="17sp" />
+        <TextView
+            android:id="@+id/widget_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:fontFamily="@font/dmsans_medium"
+            android:maxLines="1"
+            android:textColor="#FFBDBDBD"
+            android:textSize="13sp" />
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One piece of the SonderShield mark, white so the widget can tint it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp" android:height="110dp" android:viewportWidth="100" android:viewportHeight="110">
+    <group>
+        <clip-path android:pathData="M0,0H100V30Q46,60 0,80Z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M50,4L92,18V52C92,78 74,97 50,106C26,97 8,78 8,52V18Z" />
+    </group>
+</vector>

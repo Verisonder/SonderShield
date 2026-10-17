@@ -4,6 +4,10 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.horizontalScroll
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.verisonder.sondershield.data.Backup
+import com.verisonder.sondershield.data.CrashLog
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -81,6 +85,13 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen() {
+    // An import rewrites every setting: re-read them all by starting the screen over.
+    var reload by remember { mutableIntStateOf(0) }
+    key(reload) { SettingsContent(onReload = { reload++ }) }
+}
+
+@Composable
+private fun SettingsContent(onReload: () -> Unit) {
     val ctx = LocalContext.current
     val prefs = remember { Prefs(ctx) }
     val store = remember { ListStore(ctx) }
@@ -263,16 +274,77 @@ fun SettingsScreen() {
             }
         }
 
-        // 06 Statistics
-        Section(6, "Statistics") {
+        // 06 Backup and logs
+        Section(6, tr("Backup and logs", "Sauvegarde et journaux")) {
+            val exportSettings = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+                if (uri != null) toast(ctx, runCatching { Backup.export(ctx, uri) }.exceptionOrNull()?.message
+                    ?: trc(ctx, "Settings saved", "Paramètres enregistrés"))
+            }
+            val importSettings = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                if (uri == null) return@rememberLauncherForActivityResult
+                val err = runCatching { Backup.import(ctx, uri) }.exceptionOrNull()
+                if (err != null) {
+                    toast(ctx, err.message ?: "Import failed")
+                } else {
+                    ShieldState.theme.value = prefs.theme
+                    ShieldState.accent.value = prefs.accent
+                    UpdateWorker.schedule(ctx)
+                    ShieldVpnService.restartIfOn(ctx)
+                    toast(ctx, trc(ctx, "Settings restored", "Paramètres restaurés"))
+                    onReload()
+                }
+            }
+            val exportLog = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+                if (uri != null) toast(ctx, runCatching { Backup.exportLog(ctx, uri, ShieldState.log.value) }.exceptionOrNull()?.message
+                    ?: trc(ctx, "Log saved", "Journal enregistré"))
+            }
+            OptionCard(
+                tr("Export settings", "Exporter les paramètres"),
+                tr("Lists, rules, apps, DNS server, theme. Not the stats or the log.", "Listes, règles, applis, serveur DNS, thème. Pas les statistiques ni le journal."),
+                onClick = { exportSettings.launch("sondershield-settings-${Backup.stamp()}.json") },
+            ) { Icon(Icons.chevron, null, tint = Palette.faint, modifier = Modifier.size(18.dp)) }
+            OptionCard(
+                tr("Import settings", "Importer des paramètres"),
+                tr("From a file exported here. Replaces what you have now.", "Depuis un fichier exporté ici. Remplace vos réglages actuels."),
+                onClick = { importSettings.launch(arrayOf("application/json", "text/plain", "*/*")) },
+            ) { Icon(Icons.chevron, null, tint = Palette.faint, modifier = Modifier.size(18.dp)) }
+            OptionCard(
+                tr("Export the log", "Exporter le journal"),
+                tr("The latest ${ShieldState.log.value.size} queries as a CSV file.", "Les ${ShieldState.log.value.size} dernières requêtes en fichier CSV."),
+                onClick = { exportLog.launch("sondershield-log-${Backup.stamp()}.csv") },
+            ) { Icon(Icons.chevron, null, tint = Palette.faint, modifier = Modifier.size(18.dp)) }
+            var crash by remember { mutableStateOf(CrashLog.read(ctx)) }
+            crash?.let { c ->
+                OptionCard(
+                    tr("Last crash", "Dernier plantage"),
+                    c.lineSequence().take(2).joinToString(" · "),
+                    subColor = Palette.warn,
+                    onClick = {
+                        ctx.startActivity(
+                            Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, c), null)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    },
+                ) {
+                    IconPill(Icons.trash, tr("Clear", "Effacer")) { CrashLog.clear(ctx); crash = null }
+                }
+                Text(
+                    tr("Kept on this phone only. Tap to share it.", "Gardé sur ce téléphone uniquement. Touchez pour le partager."),
+                    color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
+        }
+
+        // 07 Statistics
+        Section(7, "Statistics") {
             OptionCard("Blocked in total", prefs.allTimeBlocked.grouped())
             OptionCard("Reset counters", "Today and all-time go back to zero. The log stays.", onClick = { confirmReset = true }) {
                 Icon(Icons.chevron, null, tint = Palette.faint, modifier = Modifier.size(18.dp))
             }
         }
 
-        // 07 About
-        Section(7, "About") {
+        // 08 About
+        Section(8, "About") {
             Block {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Logo(30.dp, lit = true)
@@ -448,3 +520,6 @@ private fun hueOf(c: Color): Float {
     android.graphics.Color.colorToHSV(c.toArgb(), hsv)
     return hsv[0]
 }
+
+private fun toast(ctx: android.content.Context, text: String) =
+    android.widget.Toast.makeText(ctx, text, android.widget.Toast.LENGTH_SHORT).show()

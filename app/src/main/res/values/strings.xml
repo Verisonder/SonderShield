@@ -7,4 +7,5 @@
     <string name="note_stop">Turn off</string>
     <string name="tile_on">On</string>
     <string name="tile_off">Off</string>
+    <string name="widget_description">Protection on or off, and ads blocked today. Tap to switch.</string>
 </resources>
