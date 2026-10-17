@@ -20,3 +20,7 @@ HANDOFF.md
 
 # Downloaded by CI from wintun.net and embedded in the Windows app.
 engine/cmd/sondershield/wintun/
+
+# local build outputs
+engine/sondershield
+engine/sondershield.exe
