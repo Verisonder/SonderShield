@@ -192,7 +192,7 @@ textarea.field { resize: vertical; min-height: 90px; font-family: 'DM Sans'; }
 .ring.go { animation: ring .9s ease-out; }
 .blade { fill: var(--off); transition: fill .4s; }
 .blade.lit { fill: var(--accent); }
-.blade.sweep { animation: sweep .7s ease-out; }
+.blade.sweep { animation: sweepFromRight .7s ease-out; }
 @keyframes breathe { 0%,100% { filter: drop-shadow(0 0 14px color-mix(in srgb, var(--accent) 35%, transparent)); } 50% { filter: drop-shadow(0 0 28px color-mix(in srgb, var(--accent) 60%, transparent)); } }
 @keyframes rock { 0%,100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
 @keyframes pulse { 50% { opacity: .4; } }
@@ -200,6 +200,7 @@ textarea.field { resize: vertical; min-height: 90px; font-family: 'DM Sans'; }
 @keyframes dropBot { 0% { transform: none; } 35% { transform: translate(5px,9px); } 100% { transform: none; } }
 @keyframes ring { 0% { transform: scale(.55); opacity: .7; } 100% { transform: scale(1.5); opacity: 0; } }
 @keyframes sweep { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes sweepFromRight { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0 0 0 0); } }
 @media (prefers-reduced-motion: reduce) { .shieldbtn svg, .shieldbtn .top, .shieldbtn .bot, .ring, .blade, .shieldlabel { animation: none !important; } }
 
 /* Home body: today's ladder on the left, the three totals stacked beside it */

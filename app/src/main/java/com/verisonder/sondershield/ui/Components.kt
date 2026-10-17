@@ -318,8 +318,8 @@ fun Swoosh(blade: Color, below: Color, modifier: Modifier = Modifier, progress: 
             lineTo(0f, h + 1f)
             close()
         }
-        // The blade sweeps in from the left as protection turns on.
-        clipRect(right = w * progress) { drawPath(bladePath, blade) }
+        // The blade sweeps in from the right as protection turns on.
+        clipRect(left = w * (1f - progress)) { drawPath(bladePath, blade) }
         drawPath(fill, below)
     }
 }
