@@ -72,7 +72,7 @@ async function poll() {
       if (logs.length > 2000) logs.length = 2000;
       if (tab === 'filter' && filterView === 'log') drawLog();
     }
-    if (tab === 'conns' && connView2 === 'live' && !connPaused) { conns = await api('connections'); drawConns(); }
+    if (tab === 'conns' && connView2 === 'live' && !connPaused) { conns = await api('connections'); if (!connOpen.size) drawConns(); }
     else if (tab === 'conns' && connView2 === 'history') { hist = await api('history'); drawConns(); }
   } catch (e) { /* server starting or gone */ }
 }
@@ -379,32 +379,6 @@ async function toggleProtection() {
   }, wait);
 }
 
-function timeAgo(ms) {
-  const s = Math.max(0, (Date.now() - ms) / 1000);
-  if (s < 60) return 'just now';
-  if (s < 3600) return Math.floor(s / 60) + 'm ago';
-  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
-  return Math.floor(s / 86400) + 'd ago';
-}
-function drawHistory(box) {
-  if (!hist) return;
-  const q = connSearch.trim().toLowerCase();
-  let list = hist;
-  if (q) list = hist.filter(e => (e.app || '').toLowerCase().includes(q) || (e.domain || '').toLowerCase().includes(q) || (e.remote || '').includes(q));
-  if (!list.length) {
-    box.innerHTML = `<div class="empty">${hist.length ? 'Nothing matches.' : 'No history yet. It builds up while protection is on.'}</div>`;
-    return;
-  }
-  box.innerHTML = list.slice(0, 500).map(e => `
-    <div class="histrow ${e.blocked ? 'isblocked' : ''}">
-      <div class="histmain">
-        <span class="cdest">${e.domain ? esc(e.domain) : `<span class="cip">${esc(e.remote)}</span>`}${e.direct ? '<span class="cdirect">direct IP</span>' : ''}${e.blocked ? '<span class="cgblocked" style="margin-left:8px">blocked</span>' : ''}</span>
-        <span class="histago">${timeAgo(e.lastSeen)}</span>
-      </div>
-      <div class="histsub"><span class="histapp">${esc(e.app || 'Unknown')}</span><span class="cport">:${e.port}</span>${e.count > 1 ? `<span class="histcount">×${e.count}</span>` : ''}</div>
-    </div>`).join('');
-}
-
 // ---- DNS diagnostic ----
 // Shows whether Windows is really sending its DNS to SonderShield, adapter by adapter,
 // and what to do when it isn't.
@@ -443,53 +417,141 @@ async function showDiag() {
 // with the hostname filled in from what SonderShield resolved. Connections to an IP that
 // was never looked up are flagged "direct IP" — a DNS filter can't see their name.
 let conns = null, hist = null, connPaused = false, connSearch = '', connView2 = 'live';
+let connFilter = 'all', connGroup = 'app', connSort = 'recent', connOpen = new Set();
 function renderConns() {
   const p = $('#page-conns');
   const live = connView2 === 'live';
+  if (live && connSort === 'recent') connSort = 'most';
+  const chips = (name, cur, opts) => opts.map(([v, l]) => `<button class="chip sm ${cur === v ? 'active' : ''}" data-${name}="${v}">${l}</button>`).join('');
   p.innerHTML = `<div class="kicker">NETWORK</div><h1>Connections</h1>
     <div class="subtabs"><button class="chip ${live ? 'active' : ''}" id="cv-live">Live</button><button class="chip ${live ? '' : 'active'}" id="cv-hist">History</button></div>
     <div class="sub">${live ? 'Every app talking to the internet right now, and where to.' : 'Everything each app has connected to since protection turned on.'}</div>
     <div class="connbar">
-      <input class="field" id="connsearch" placeholder="Search app or domain…" value="${escapeAttr(connSearch)}">
+      <input class="field" id="connsearch" placeholder="Search app, site or address…" value="${escapeAttr(connSearch)}">
       ${live ? `<button class="pill ${connPaused ? 'filled' : ''}" id="connpause">${connPaused ? 'Resume' : 'Pause'}</button>` : ''}
     </div>
+    <div class="connctl">
+      <div class="cgrp"><span class="clabel">Show</span>${chips('f', connFilter, [['all', 'All'], ['allowed', 'Allowed'], ['blocked', 'Blocked'], ['direct', 'Direct IP']])}</div>
+      <div class="cgrp"><span class="clabel">Group</span>${chips('g', connGroup, [['app', 'App'], ['site', 'Site'], ['none', 'None']])}</div>
+      <div class="cgrp"><span class="clabel">Sort</span>${chips('s', connSort, live ? [['most', 'Most'], ['name', 'Name']] : [['recent', 'Recent'], ['most', 'Most seen'], ['name', 'Name']])}</div>
+    </div>
     <div id="connlist"><div class="empty">Reading…</div></div>`;
-  $('#cv-live').onclick = () => { connView2 = 'live'; renderConns(); poll(); };
-  $('#cv-hist').onclick = () => { connView2 = 'history'; renderConns(); poll(); };
+  $('#cv-live').onclick = () => { connView2 = 'live'; connOpen.clear(); renderConns(); poll(); };
+  $('#cv-hist').onclick = () => { connView2 = 'history'; connOpen.clear(); renderConns(); poll(); };
   $('#connsearch').oninput = e => { connSearch = e.target.value; drawConns(); };
   const pb = $('#connpause'); if (pb) pb.onclick = () => { connPaused = !connPaused; renderConns(); if (!connPaused) poll(); };
+  p.querySelectorAll('[data-f]').forEach(c => c.onclick = () => { connFilter = c.dataset.f; renderConns(); });
+  p.querySelectorAll('[data-g]').forEach(c => c.onclick = () => { connGroup = c.dataset.g; renderConns(); });
+  p.querySelectorAll('[data-s]').forEach(c => c.onclick = () => { connSort = c.dataset.s; renderConns(); });
   drawConns();
 }
+
+function timeAgo(ms) {
+  const s = Math.max(0, (Date.now() - ms) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return Math.floor(s / 86400) + 'd ago';
+}
+
+// Live connections and history rows, in one shape.
+function connItems() {
+  if (connView2 === 'history') return (hist || []).map(e => ({ ...e, key: 'h|' + e.app + '|' + e.remote + '|' + e.domain }));
+  return (conns || []).map(c => ({
+    app: c.app, path: c.path, domain: c.domain, remote: c.remoteAddr, port: c.remotePort, state: c.state,
+    blocked: c.blocked, direct: c.direct, count: 1, lastSeen: Date.now(),
+    key: 'l|' + c.pid + '|' + c.localPort + '|' + c.remoteAddr + '|' + c.remotePort,
+  }));
+}
+
 function drawConns() {
   const box = $('#connlist');
   if (!box) return;
-  if (connView2 === 'history') { drawHistory(box); return; }
-  if (!conns) return;
+  const live = connView2 === 'live';
+  if (live ? !conns : !hist) return;
   const q = connSearch.trim().toLowerCase();
-  let list = conns;
-  if (q) list = conns.filter(c => (c.app || '').toLowerCase().includes(q) || (c.domain || '').toLowerCase().includes(q) || (c.remoteAddr || '').includes(q));
+  let list = connItems();
+  if (q) list = list.filter(i => (i.app || '').toLowerCase().includes(q) || (i.domain || '').toLowerCase().includes(q) || (i.remote || '').includes(q));
+  if (connFilter === 'allowed') list = list.filter(i => !i.blocked);
+  else if (connFilter === 'blocked') list = list.filter(i => i.blocked);
+  else if (connFilter === 'direct') list = list.filter(i => i.direct);
   if (!list.length) {
-    box.innerHTML = `<div class="empty">${conns.length ? 'Nothing matches.' : 'No outbound connections right now.' }${ q ? '' : ' (On Linux this list is empty.)'}</div>`;
+    const none = live ? 'No outbound connections right now.' : 'No history yet. It builds up while protection is on.';
+    box.innerHTML = `<div class="empty">${connItems().length ? 'Nothing matches.' : none}${live && !q ? ' (On Linux this list is empty.)' : ''}</div>`;
     return;
   }
-  // Group by app.
-  const groups = {};
-  for (const c of list) { (groups[c.app || 'Unknown'] ||= []).push(c); }
-  const names = Object.keys(groups).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-  box.innerHTML = names.map(name => {
-    const g = groups[name];
-    const blocked = g[0].blocked;
-    const rows = g.map(c => `
-      <div class="connrow">
-        <span class="cdest">${c.domain ? esc(c.domain) : `<span class="cip">${esc(c.remoteAddr)}</span>`}${c.direct ? '<span class="cdirect">direct IP</span>' : ''}</span>
-        <span class="cport">:${c.remotePort}</span>
-        <span class="cstate ${c.state === 'established' ? 'live' : ''}">${esc(c.state)}</span>
-      </div>`).join('');
+  const site = i => i.domain || i.remote;
+  const cmp = {
+    recent: (a, b) => b.lastSeen - a.lastSeen,
+    most: (a, b) => b.count - a.count,
+    name: (a, b) => site(a).localeCompare(site(b)),
+  }[connSort] || (() => 0);
+  list.sort(cmp);
+
+  const keyOf = { app: i => i.app || 'Unknown', site: site, none: () => '' }[connGroup];
+  const groups = new Map();
+  for (const i of list) { const k = keyOf(i); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); }
+  const order = [...groups.keys()];
+  const total = k => groups.get(k).reduce((n, i) => n + i.count, 0);
+  if (connSort === 'name') order.sort((a, b) => a.localeCompare(b));
+  else if (connSort === 'most') order.sort((a, b) => total(b) - total(a));
+
+  const row = i => {
+    const open = connOpen.has(i.key);
+    const dest = `${i.domain ? esc(i.domain) : `<span class="cip">${esc(i.remote)}</span>`}${i.direct ? '<span class="cdirect">direct IP</span>' : ''}${i.blocked ? '<span class="cgblocked sm">blocked</span>' : ''}`;
+    const who = `${appIconHTML(i.path, i.app)}<span class="crapp">${esc(i.app || 'Unknown')}</span>`;
+    const main = connGroup === 'app' ? `<span class="cdest">${dest}</span>`
+      : connGroup === 'site' ? `<span class="cdest cwho">${who}</span>`
+      : `<span class="cdest cwho">${who}<span class="csep">→</span>${dest}</span>`;
+    const meta = live ? `<span class="cstate ${i.state === 'established' ? 'live' : ''}">${esc(i.state || '')}</span>`
+      : `${i.count > 1 ? `<span class="histcount">×${i.count}</span>` : ''}<span class="histago">${timeAgo(i.lastSeen)}</span>`;
+    const kv = (k, v) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`;
+    const detail = !open ? '' : `<div class="conndetail">
+        ${kv('App', esc(i.app || 'Unknown'))}
+        ${kv('Program', `<span class="mono">${esc(i.path || '—')}</span>`)}
+        ${kv('Site', i.domain ? esc(i.domain) : 'No lookup seen (direct to the address)')}
+        ${kv('Address', `<span class="mono">${esc(i.remote)}:${i.port}</span>`)}
+        ${live ? kv('State', esc(i.state || '')) : kv('First seen', new Date(i.firstSeen).toLocaleString()) + kv('Last seen', new Date(i.lastSeen).toLocaleString()) + kv('Times seen', i.count)}
+        ${kv('Status', i.blocked ? 'This app is blocked' : 'Allowed')}
+        <div class="dacts">
+          ${i.path ? `<button class="pill" data-act="app" data-key="${escapeAttr(i.key)}">App rules…</button>` : ''}
+          <button class="pill danger" data-act="ip" data-key="${escapeAttr(i.key)}">Block this address</button>
+          <button class="pill" data-act="copy" data-key="${escapeAttr(i.key)}">Copy address</button>
+        </div></div>`;
+    return `<div class="connrow2 ${open ? 'open' : ''}"><div class="crmain" data-key="${escapeAttr(i.key)}">${main}<span class="cport">:${i.port}</span>${meta}</div>${detail}</div>`;
+  };
+  box.innerHTML = order.map(k => {
+    const g = groups.get(k);
+    if (connGroup === 'none') return `<div class="conngroup"><div class="congbody">${g.map(row).join('')}</div></div>`;
+    const head = connGroup === 'app' ? `${appIconHTML(g[0].path, k)}<span class="cgname">${esc(k)}</span>` : `<span class="cgname">${esc(k)}</span>`;
+    const blocked = connGroup === 'app' && g[0].blocked;
     return `<div class="conngroup ${blocked ? 'isblocked' : ''}">
-      <div class="conghead"><span class="cgname">${esc(name)}</span>${blocked ? '<span class="cgblocked">blocked</span>' : ''}<span class="cgcount">${g.length}</span></div>
-      <div class="congbody">${rows}</div>
-    </div>`;
+      <div class="conghead">${head}${blocked ? '<span class="cgblocked">blocked</span>' : ''}<span class="cgcount">${g.length}</span></div>
+      <div class="congbody">${g.map(row).join('')}</div></div>`;
   }).join('');
+
+  const byKey = k => list.find(i => i.key === k);
+  box.onclick = async ev => {
+    const act = ev.target.closest('[data-act]');
+    if (act) {
+      const i = byKey(act.dataset.key);
+      if (!i) return;
+      if (act.dataset.act === 'app') openApp(i.path);
+      else if (act.dataset.act === 'copy') { try { await navigator.clipboard.writeText(i.remote); act.textContent = 'Copied'; } catch (e) {} }
+      else if (act.dataset.act === 'ip') {
+        const ok = await ask({ title: 'Block ' + i.remote + '?', text: 'Every app loses access to this address' + (i.domain ? ' (' + i.domain + ')' : '') + ' while protection is on. You can remove it in Firewall › Block by address or port.', ok: 'Block', danger: true });
+        if (!ok) return;
+        cfg.netBlocks = [...(cfg.netBlocks || []), { kind: 'ip', value: i.remote, note: i.domain || i.app || '' }];
+        await postConfig(cfg);
+        act.textContent = 'Blocked'; act.disabled = true;
+      }
+      return;
+    }
+    const m = ev.target.closest('.crmain');
+    if (!m) return;
+    connOpen.has(m.dataset.key) ? connOpen.delete(m.dataset.key) : connOpen.add(m.dataset.key);
+    drawConns();
+  };
 }
 
 // ---- Filter ----
