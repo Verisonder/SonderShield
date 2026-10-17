@@ -78,22 +78,35 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("ipv6", true)
         set(v) = sp.edit().putBoolean("ipv6", v).apply()
 
-    // Data plan: total mobile allowance, when the cycle started, and how many days it lasts.
-    // All three > 0 means a plan is set up.
+    // Data plan (mobile data): a limit, and how the counter resets — "daily" (every midnight),
+    // "monthly" (same date each month, counted from planStartMillis) or "custom" (from
+    // planStartMillis to the end of the day planEndMillis falls on).
     var planTotalBytes: Long
         get() = sp.getLong("plan.total", 0L)
         set(v) = sp.edit().putLong("plan.total", v).apply()
+
+    var planMode: String
+        get() = sp.getString("plan.mode", "monthly") ?: "monthly"
+        set(v) = sp.edit().putString("plan.mode", v).apply()
 
     var planStartMillis: Long
         get() = sp.getLong("plan.start", 0L)
         set(v) = sp.edit().putLong("plan.start", v).apply()
 
-    var planDays: Int
-        get() = sp.getInt("plan.days", 0)
-        set(v) = sp.edit().putInt("plan.days", v).apply()
+    var planEndMillis: Long
+        get() = sp.getLong("plan.end", 0L)
+        set(v) = sp.edit().putLong("plan.end", v).apply()
 
     val planActive: Boolean
-        get() = planTotalBytes > 0 && planStartMillis > 0 && planDays > 0
+        get() = planTotalBytes > 0 && when (planMode) {
+            "daily" -> true
+            "custom" -> planStartMillis > 0 && planEndMillis >= planStartMillis
+            else -> planStartMillis > 0
+        }
+
+    fun clearPlan() {
+        sp.edit().remove("plan.total").remove("plan.mode").remove("plan.start").remove("plan.end").remove("plan.days").apply()
+    }
 
     /** Route all traffic through the engine, not only DNS (needed for WireGuard). */
     var fullTunnel: Boolean

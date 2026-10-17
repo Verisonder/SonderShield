@@ -2,6 +2,7 @@ package com.verisonder.sondershield.ui
 
 import android.app.DatePickerDialog
 import android.content.Context
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -66,7 +68,7 @@ fun DataScreen() {
     var view by rememberSaveable { mutableIntStateOf(0) } // 0 usage, 1 rules
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(tr("Data", "Données", "Daten"), kicker = tr("On this phone", "Sur ce téléphone", "Auf diesem Handy"))
-        ChipRow(Modifier.padding(start = Gutter, bottom = 6.dp)) {
+        ChipRow(Modifier.padding(bottom = 2.dp)) {
             Chip(tr("Usage", "Conso", "Verbrauch"), view == 0) { view = 0 }
             Chip(tr("Rules", "Règles", "Regeln"), view == 1) { view = 1 }
         }
@@ -145,7 +147,7 @@ fun DataMonitorScreen() {
     }
 
     var data by remember { mutableStateOf<MonitorData?>(null) }
-    LaunchedEffect(refresh, prefs.planStartMillis, prefs.planTotalBytes, prefs.planDays) {
+    LaunchedEffect(refresh, prefs.planMode, prefs.planStartMillis, prefs.planEndMillis, prefs.planTotalBytes) {
         data = withContext(Dispatchers.IO) { computeMonitor(ctx, prefs) }
     }
     val d = data
@@ -171,7 +173,7 @@ fun DataMonitorScreen() {
         }
         item {
             Column(Modifier.padding(horizontal = Gutter).padding(top = 28.dp)) {
-                Kicker(tr("Monthly plan", "Forfait mensuel", "Monatstarif"), Modifier.onSeen(planSeen).reveal(planSeen.value))
+                Kicker(tr("Data plan", "Forfait", "Datentarif"), Modifier.onSeen(planSeen).reveal(planSeen.value))
                 Spacer(Modifier.height(12.dp))
                 if (!prefs.planActive || editing) {
                     Box(Modifier.reveal(planSeen.value, 1)) {
@@ -223,12 +225,21 @@ private fun UsageCard(icon: ImageVector, tint: Color, label: String, u: DataUsag
 /** Plan at a glance: the filled accent block (like Home's block rate), a bar that fills in, tiles. */
 @Composable
 private fun PlanSummary(prefs: Prefs, usedBytes: Long, seen: Boolean, onEdit: () -> Unit) {
+    val now = System.currentTimeMillis()
+    val (_, end) = planPeriod(prefs, now)
     val total = prefs.planTotalBytes
     val remainingTarget = (total - usedBytes).coerceAtLeast(0L)
-    val dailyQuota = if (prefs.planDays > 0) total / prefs.planDays else 0L
-    val validTill = prefs.planStartMillis + prefs.planDays.toLong() * 86_400_000L
-    val daysLeft = ceil((validTill - System.currentTimeMillis()) / 86_400_000.0).toLong().coerceAtLeast(0L)
+    val msLeft = (end - now).coerceAtLeast(0L)
+    val daysLeft = ceil(msLeft / 86_400_000.0).toLong()
+    val hoursLeft = ceil(msLeft / 3_600_000.0).toLong()
+    val dailyQuota = if (daysLeft > 0) remainingTarget / daysLeft else 0L
     val frac = if (total > 0) (usedBytes.toFloat() / total).coerceIn(0f, 1f) else 0f
+    val mode = prefs.planMode
+    val modeLabel = when (mode) {
+        "daily" -> tr("resets daily", "remise à zéro chaque jour", "täglich zurückgesetzt")
+        "custom" -> tr("custom period", "période personnalisée", "eigener Zeitraum")
+        else -> tr("resets monthly", "remise à zéro chaque mois", "monatlich zurückgesetzt")
+    }
 
     val remaining = counted(remainingTarget.toDouble(), seen).toLong()
     val used = counted(usedBytes.toDouble(), seen).toLong()
@@ -246,12 +257,11 @@ private fun PlanSummary(prefs: Prefs, usedBytes: Long, seen: Boolean, onEdit: ()
         ) {
             Text(fmtBytes(remaining), style = display(28), color = Palette.onAccent, maxLines = 1, modifier = Modifier.weight(1f))
             Text(
-                tr("left of", "restants sur", "übrig von") + "\n" + fmtBytes(total),
+                tr("left of", "restants sur", "übrig von") + " " + fmtBytes(total) + "\n" + modeLabel,
                 color = Palette.onAccent, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium,
             )
         }
         Spacer(Modifier.height(8.dp))
-        // Used share of the plan, as a bar that fills in.
         Box(Modifier.fillMaxWidth().reveal(seen, 2).clip(blockShape).background(Palette.card2).padding(horizontal = 16.dp, vertical = 14.dp)) {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -265,12 +275,19 @@ private fun PlanSummary(prefs: Prefs, usedBytes: Long, seen: Boolean, onEdit: ()
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatTile(fmtBytes(dailyQuota), tr("daily quota", "quota quotidien", "Tageskontingent"), Modifier.weight(1f).reveal(seen, 3))
-            StatTile(
-                "$daysLeft " + tr("days", "jours", "Tage"),
-                tr("left, valid till", "restants, jusqu'au", "übrig, gültig bis") + "\n" + ordinalDate(validTill),
-                Modifier.weight(1f).reveal(seen, 4),
-            )
+            if (mode == "daily") {
+                StatTile(fmtBytes(total), tr("daily limit", "limite par jour", "Tageslimit"), Modifier.weight(1f).reveal(seen, 3))
+                StatTile(
+                    "$hoursLeft h", tr("left today,\nresets at midnight", "restantes,\nremise à zéro à minuit", "übrig,\nReset um Mitternacht"),
+                    Modifier.weight(1f).reveal(seen, 4),
+                )
+            } else {
+                StatTile(fmtBytes(dailyQuota), tr("a day to stay\nwithin the limit", "par jour pour\nrester dans la limite", "pro Tag, um im\nLimit zu bleiben"), Modifier.weight(1f).reveal(seen, 3))
+                val endLabel = if (mode == "custom") tr("left, ends on", "restants, fin le", "übrig, endet am") else tr("left, resets on", "restants, remise le", "übrig, Reset am")
+                // A custom period ends at the end of its last day; show that day, not the next.
+                val shownEnd = if (mode == "custom") end - 1 else end
+                StatTile("$daysLeft " + tr("days", "jours", "Tage"), endLabel + "\n" + ordinalDate(shownEnd), Modifier.weight(1f).reveal(seen, 4))
+            }
         }
         Box(Modifier.padding(top = 12.dp).reveal(seen, 5)) {
             PillButton(tr("Edit plan", "Modifier", "Bearbeiten"), filled = false, onClick = onEdit)
@@ -286,60 +303,119 @@ private fun StatTile(value: String, label: String, modifier: Modifier = Modifier
     }
 }
 
+/** Plan setup, with the reference app's choices: how the counter resets, and the data limit. */
 @Composable
 private fun PlanSetup(prefs: Prefs, onDone: () -> Unit, onCancel: () -> Unit) {
     val ctx = LocalContext.current
-    var amount by rememberSaveable { mutableStateOf(if (prefs.planTotalBytes > 0) trimNum(prefs.planTotalBytes / 1_000_000_000.0) else "") }
-    var unitGb by rememberSaveable { mutableStateOf(true) }
-    var days by rememberSaveable { mutableStateOf(if (prefs.planDays > 0) prefs.planDays.toString() else "30") }
+    val had = prefs.planTotalBytes
+    var mode by rememberSaveable { mutableStateOf(prefs.planMode) }
+    var unitGb by rememberSaveable { mutableStateOf(had == 0L || had >= 1_000_000_000L) }
+    var amount by rememberSaveable {
+        mutableStateOf(if (had <= 0L) "" else if (had >= 1_000_000_000L) trimNum(had / 1_000_000_000.0) else trimNum(had / 1_000_000.0))
+    }
     var start by rememberSaveable { mutableStateOf(if (prefs.planStartMillis > 0) prefs.planStartMillis else DataUsage.startOfToday()) }
+    var end by rememberSaveable { mutableStateOf(if (prefs.planEndMillis > 0) prefs.planEndMillis else DataUsage.startOfToday() + 29L * 86_400_000L) }
     var error by remember { mutableStateOf<String?>(null) }
 
     Column(Modifier.fillMaxWidth().clip(blockShape).background(Palette.card2).padding(16.dp)) {
         Text(
-            if (prefs.planActive) tr("Edit your plan", "Modifier le forfait", "Tarif bearbeiten") else tr("Track your mobile plan", "Suivez votre forfait", "Tarif verfolgen"),
+            if (prefs.planActive) tr("Edit your plan", "Modifier le forfait", "Tarif bearbeiten") else tr("Track your data plan", "Suivez votre forfait", "Datentarif verfolgen"),
             style = display(18), color = Palette.text,
         )
         Text(
-            tr("How much data you get, and for how long.", "Combien de données, et pour combien de temps.", "Wie viele Daten, und wie lange."),
-            color = Palette.dim, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 14.dp),
+            tr("Counts mobile data only.", "Compte uniquement les données mobiles.", "Zählt nur mobile Daten."),
+            color = Palette.dim, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp),
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Field(amount, { amount = it; error = null }, tr("Data, e.g. 20", "Données, ex. 20", "Daten, z. B. 20"), Modifier.weight(1f), keyboard = KeyboardType.Decimal)
-            Spacer(Modifier.width(8.dp))
-            Chip("GB", unitGb) { unitGb = true }
-            Spacer(Modifier.width(6.dp))
-            Chip("MB", !unitGb) { unitGb = false }
+
+        SetupLabel(tr("Reset counter", "Remise à zéro", "Zähler zurücksetzen"))
+        OptionCard(
+            tr("Daily", "Chaque jour", "Täglich"), tr("Starts again every day at midnight", "Repart de zéro chaque jour à minuit", "Beginnt jeden Tag um Mitternacht neu"),
+            selected = mode == "daily", onClick = { mode = "daily"; error = null },
+        )
+        OptionCard(
+            tr("Monthly", "Chaque mois", "Monatlich"), tr("Starts again on the same date each month", "Repart de zéro à la même date chaque mois", "Beginnt jeden Monat am selben Tag neu"),
+            selected = mode == "monthly", onClick = { mode = "monthly"; error = null },
+        )
+        OptionCard(
+            tr("Custom", "Personnalisé", "Eigener Zeitraum"), tr("Your own start and end dates", "Vos propres dates de début et de fin", "Eigenes Start- und Enddatum"),
+            selected = mode == "custom", onClick = { mode = "custom"; error = null },
+        )
+        when (mode) {
+            "monthly" -> DateRow(tr("Started on", "Commencé le", "Begonnen am"), start) { start = it }
+            "custom" -> {
+                DateRow(tr("Starts", "Début", "Beginn"), start) { start = it; error = null }
+                DateRow(tr("Ends", "Fin", "Ende"), end) { end = it; error = null }
+            }
         }
-        Spacer(Modifier.height(10.dp))
-        Field(days, { days = it; error = null }, tr("Days it lasts", "Durée en jours", "Dauer in Tagen"), Modifier.fillMaxWidth(), keyboard = KeyboardType.Number)
-        Spacer(Modifier.height(12.dp))
+
+        SetupLabel(tr("Data limit", "Limite de données", "Datenlimit"))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(tr("Started", "Début", "Beginn"), color = Palette.dim, fontSize = 13.sp, modifier = Modifier.weight(1f))
-            PillButton(ordinalDate(start), filled = false) { pickDate(ctx, start) { start = it } }
+            Field(amount, { amount = it; error = null }, "0.00", Modifier.weight(1f), keyboard = KeyboardType.Decimal)
+            Spacer(Modifier.width(10.dp))
+            Segmented(listOf("MB", "GB"), if (unitGb) 1 else 0) { unitGb = it == 1 }
         }
         error?.let { Text(it, color = Palette.warn, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)) }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(16.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             PillButton(tr("Save", "Enregistrer", "Speichern")) {
                 val amt = amount.trim().replace(',', '.').toDoubleOrNull()
                 if (amt == null || amt <= 0) {
-                    error = trc(ctx, "Enter how much data the plan has.", "Entrez la quantité de données du forfait.", "Gib die Datenmenge des Tarifs ein.")
+                    error = trc(ctx, "Enter the data limit.", "Entrez la limite de données.", "Gib das Datenlimit ein.")
                     return@PillButton
                 }
-                val dys = days.trim().toIntOrNull()
-                if (dys == null || dys <= 0) {
-                    error = trc(ctx, "Enter how many days it lasts.", "Entrez la durée en jours.", "Gib die Dauer in Tagen ein.")
+                if (mode == "custom" && end < start) {
+                    error = trc(ctx, "The end date is before the start.", "La date de fin est avant le début.", "Das Enddatum liegt vor dem Beginn.")
                     return@PillButton
                 }
                 prefs.planTotalBytes = (amt * if (unitGb) 1_000_000_000.0 else 1_000_000.0).toLong()
-                prefs.planDays = dys
-                prefs.planStartMillis = start
+                prefs.planMode = mode
+                prefs.planStartMillis = if (mode == "daily") DataUsage.startOfToday() else start
+                prefs.planEndMillis = if (mode == "custom") end else 0L
                 onDone()
             }
             if (prefs.planActive) {
                 Spacer(Modifier.width(10.dp))
                 PillButton(tr("Cancel", "Annuler", "Abbrechen"), filled = false, onClick = onCancel)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    tr("Remove", "Supprimer", "Entfernen"), color = Palette.warn, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clip(CircleShape).clickable { prefs.clearPlan(); onDone() }.padding(horizontal = 8.dp, vertical = 10.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SetupLabel(text: String) {
+    Text(
+        text.uppercase(), color = Palette.faint, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.5.sp,
+        modifier = Modifier.padding(top = 18.dp, bottom = 10.dp),
+    )
+}
+
+@Composable
+private fun DateRow(label: String, value: Long, onPick: (Long) -> Unit) {
+    val ctx = LocalContext.current
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = Palette.dim, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        PillButton(ordinalDate(value), filled = false) { pickDate(ctx, value, onPick) }
+    }
+}
+
+/** Two-way switch (MB | GB), in the same pill style as the app's chips. */
+@Composable
+private fun Segmented(options: List<String>, selected: Int, onPick: (Int) -> Unit) {
+    Row(Modifier.height(48.dp).clip(CircleShape).background(Palette.panel).padding(4.dp)) {
+        options.forEachIndexed { i, o ->
+            val on = i == selected
+            val bg by animateColorAsState(if (on) Palette.pill else Color.Transparent, tween(200), label = "seg")
+            val fg by animateColorAsState(if (on) Palette.onPill else Palette.dim, tween(200), label = "segText")
+            Box(
+                Modifier.fillMaxHeight().clip(CircleShape).background(bg).clickable { onPick(i) }.padding(horizontal = 18.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(o, color = fg, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
         }
     }
@@ -407,8 +483,10 @@ private fun computeMonitor(ctx: Context, prefs: Prefs): MonitorData {
     val tStart = DataUsage.startOfToday()
     val tm = DataUsage.mobile(ctx, tStart, now)
     val tw = DataUsage.wifi(ctx, tStart, now)
-    val cycleStart = if (prefs.planActive) prefs.planStartMillis.coerceAtMost(now) else DataUsage.midnight(29)
-    val cycleMobile = DataUsage.mobile(ctx, cycleStart, now).total
+    val cycleMobile = if (prefs.planActive) {
+        val (ps, pe) = planPeriod(prefs, now)
+        if (ps < now) DataUsage.mobile(ctx, ps, minOf(now, pe)).total else 0L
+    } else 0L
     val fmt = SimpleDateFormat("EEE", Locale.getDefault())
     val week = (6 downTo 0).map { i ->
         val s = DataUsage.midnight(i)
@@ -418,6 +496,36 @@ private fun computeMonitor(ctx: Context, prefs: Prefs): MonitorData {
         DayUsage(fmt.format(Date(s)), m, w)
     }
     return MonitorData(tm, tw, cycleMobile, week)
+}
+
+/** The plan's current counting window [start, end) in millis. */
+private fun planPeriod(prefs: Prefs, now: Long): Pair<Long, Long> = when (prefs.planMode) {
+    "daily" -> DataUsage.startOfToday() to DataUsage.midnight(-1)
+    "custom" -> prefs.planStartMillis to endOfDay(prefs.planEndMillis)
+    else -> {
+        val anchor = prefs.planStartMillis
+        fun monthsAfter(n: Int): Long {
+            val c = Calendar.getInstance()
+            c.timeInMillis = anchor
+            c.add(Calendar.MONTH, n)
+            return c.timeInMillis
+        }
+        var k = 0
+        while (monthsAfter(k + 1) <= now && k < 1200) k++
+        monthsAfter(k) to monthsAfter(k + 1)
+    }
+}
+
+/** Midnight at the end of the day [ms] falls on. */
+private fun endOfDay(ms: Long): Long {
+    val c = Calendar.getInstance()
+    c.timeInMillis = ms
+    c.set(Calendar.HOUR_OF_DAY, 0)
+    c.set(Calendar.MINUTE, 0)
+    c.set(Calendar.SECOND, 0)
+    c.set(Calendar.MILLISECOND, 0)
+    c.add(Calendar.DAY_OF_YEAR, 1)
+    return c.timeInMillis
 }
 
 private fun fmtBytes(b: Long): String {
