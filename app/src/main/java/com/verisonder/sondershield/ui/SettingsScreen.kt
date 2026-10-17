@@ -4,6 +4,21 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -11,8 +26,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -330,10 +343,16 @@ fun SettingsScreen() {
     }
 }
 
-/** Accent colour: a row of swatches plus a hue slider for any other colour. */
+/**
+ * Accent colour: a row of swatches, the last one a rainbow "custom" circle that opens a hue
+ * bar for any other colour.
+ */
 @Composable
 private fun AccentPicker(prefs: Prefs) {
     val current by ShieldState.accent.collectAsState()
+    val isPreset = AccentChoices.any { it.second.toArgb() == current }
+    var showCustom by remember { mutableStateOf(false) }
+    var hue by remember { mutableFloatStateOf(hueOf(Color(current))) }
     fun pick(c: Color) {
         val argb = c.toArgb()
         prefs.accent = argb
@@ -342,33 +361,85 @@ private fun AccentPicker(prefs: Prefs) {
     Text("ACCENT", color = Palette.faint, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, modifier = Modifier.padding(top = 18.dp, bottom = 10.dp))
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         for ((name, c) in AccentChoices) {
-            val sel = c.toArgb() == current
-            val ring by animateDpAsState(if (sel) 3.dp else 0.dp, spring(dampingRatio = 0.5f, stiffness = 600f), label = "ring")
-            Box(
-                Modifier.size(42.dp).pressScale().clip(CircleShape).border(ring, Palette.text, CircleShape).padding(ring + 2.dp)
-                    .clip(CircleShape).background(c).clickable { pick(c) }
-                    .semantics { contentDescription = name; selected = sel },
-            )
+            Swatch(name, fill = Brush.linearGradient(listOf(c, c)), selected = c.toArgb() == current) {
+                showCustom = false
+                pick(c)
+            }
+        }
+        // Custom: rainbow until a custom colour is in use, then that colour inside a rainbow ring.
+        val rainbow = Brush.sweepGradient((0..6).map { Color.hsv(it * 60f % 360f, 0.85f, 1f) })
+        Swatch(
+            "Custom colour", fill = if (isPreset) rainbow else Brush.linearGradient(listOf(Color(current), Color(current))),
+            selected = !isPreset || showCustom, ring = if (isPreset) null else rainbow,
+        ) {
+            showCustom = !showCustom
+            if (showCustom && isPreset) { hue = hueOf(Color(current)); pick(Color.hsv(hue, 0.85f, 1f)) }
         }
     }
-    // Any hue, at full strength.
-    val isPreset = AccentChoices.any { it.second.toArgb() == current }
-    var hue by remember { mutableFloatStateOf(hueOf(Color(current))) }
-    Text(
-        if (isPreset) "Or pick any colour:" else "Your colour:", color = Palette.dim, fontSize = 13.sp,
-        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
-    )
-    Box(Modifier.fillMaxWidth().height(36.dp), contentAlignment = Alignment.Center) {
-        Box(
-            Modifier.fillMaxWidth().height(10.dp).clip(CircleShape)
-                .background(Brush.horizontalGradient((0..6).map { Color.hsv(it * 60f % 360f, 0.85f, 1f) })),
+    AnimatedVisibility(
+        visible = showCustom,
+        enter = expandVertically(spring(dampingRatio = 0.8f, stiffness = 500f)) + fadeIn(),
+        exit = shrinkVertically(tween(200)) + fadeOut(tween(150)),
+    ) {
+        Column(Modifier.padding(top = 16.dp)) {
+            Text("Drag to pick any colour", color = Palette.dim, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
+            HueBar(hue) { h -> hue = h; pick(Color.hsv(h, 0.85f, 1f)) }
+        }
+    }
+}
+
+/** A colour circle drawn on a canvas so its edge and selection ring stay smooth. */
+@Composable
+private fun Swatch(name: String, fill: Brush, selected: Boolean, ring: Brush? = null, onClick: () -> Unit) {
+    val ringWidth by animateFloatAsState(if (selected) 1f else 0f, spring(dampingRatio = 0.55f, stiffness = 600f), label = "ring")
+    val ringColor = Palette.text
+    Canvas(
+        Modifier.size(44.dp).pressScale().clip(CircleShape).clickable(onClick = onClick)
+            .semantics { contentDescription = name; this.selected = selected },
+    ) {
+        val r = size.minDimension / 2
+        val stroke = 2.5.dp.toPx()
+        val gap = 3.dp.toPx()
+        // Unselected: the colour fills the whole circle. Selected: it shrinks to leave a gap
+        // and a ring (white, or rainbow for a custom colour) appears around it.
+        val inner = r - (stroke + gap) * ringWidth
+        if (ringWidth > 0f) {
+            if (ring != null) drawCircle(ring, radius = r - stroke / 2, style = Stroke(stroke))
+            else drawCircle(ringColor, radius = r - stroke / 2, style = Stroke(stroke), alpha = ringWidth)
+        }
+        drawCircle(fill, radius = inner)
+    }
+}
+
+/** Rainbow track with a round thumb; tap or drag anywhere on it. */
+@Composable
+private fun HueBar(hue: Float, onHue: (Float) -> Unit) {
+    val thumbBorder = Palette.text
+    Canvas(
+        Modifier.fillMaxWidth().height(36.dp)
+            .pointerInput(Unit) { detectTapGestures { onHue((it.x / size.width).coerceIn(0f, 1f) * 359f) } }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures { change, _ ->
+                    change.consume()
+                    onHue((change.position.x / size.width).coerceIn(0f, 1f) * 359f)
+                }
+            }
+            .semantics { contentDescription = "Custom colour" },
+    ) {
+        val thumbR = size.height / 2 - 2.dp.toPx()
+        val left = thumbR
+        val right = size.width - thumbR
+        val trackH = 12.dp.toPx()
+        drawRoundRect(
+            Brush.horizontalGradient((0..6).map { Color.hsv(it * 60f % 360f, 0.85f, 1f) }, startX = left, endX = right),
+            topLeft = Offset(left, (size.height - trackH) / 2), size = Size(right - left, trackH),
+            cornerRadius = CornerRadius(trackH / 2),
         )
-        Slider(
-            value = hue, onValueChange = { hue = it; pick(Color.hsv(it, 0.85f, 1f)) }, valueRange = 0f..359f,
-            colors = SliderDefaults.colors(
-                thumbColor = Color.hsv(hue, 0.85f, 1f), activeTrackColor = Color.Transparent, inactiveTrackColor = Color.Transparent,
-            ),
-        )
+        val x = left + (right - left) * (hue / 359f)
+        val c = Offset(x, size.height / 2)
+        drawCircle(Color.Black.copy(alpha = 0.25f), radius = thumbR + 1.dp.toPx(), center = c)
+        drawCircle(thumbBorder, radius = thumbR, center = c)
+        drawCircle(Color.hsv(hue, 0.85f, 1f), radius = thumbR - 3.dp.toPx(), center = c)
     }
 }
 
