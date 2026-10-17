@@ -58,8 +58,14 @@ func checkUpdate(ctx context.Context) (updateInfo, error) {
 	}
 	info.Latest = strings.TrimPrefix(r.TagName, "v")
 	info.Notes = r.Body
+	// Prefer the plain .exe; older releases only have the zip.
 	for _, a := range r.Assets {
-		if strings.HasPrefix(a.Name, "SonderShield-Windows") && strings.HasSuffix(a.Name, ".zip") {
+		if strings.HasPrefix(a.Name, "SonderShield-Windows") && strings.HasSuffix(a.Name, ".zip") && info.url == "" {
+			info.url = a.URL
+		}
+	}
+	for _, a := range r.Assets {
+		if strings.HasPrefix(a.Name, "SonderShield-Windows") && strings.HasSuffix(a.Name, ".exe") {
 			info.url = a.URL
 		}
 	}
@@ -101,7 +107,7 @@ func applyUpdate(ctx context.Context, onBeforeExit func()) error {
 	if err != nil {
 		return err
 	}
-	// Download the release zip.
+	// Download the new build (the .exe itself, or the zip it's in).
 	req, _ := http.NewRequestWithContext(ctx, "GET", info.url, nil)
 	req.Header.Set("User-Agent", "SonderShield")
 	resp, err := (&http.Client{Timeout: 5 * time.Minute}).Do(req)
@@ -109,7 +115,7 @@ func applyUpdate(ctx context.Context, onBeforeExit func()) error {
 		return errors.New("download failed")
 	}
 	defer resp.Body.Close()
-	tmpZip, err := os.CreateTemp("", "ss-update-*.zip")
+	tmpZip, err := os.CreateTemp(filepath.Dir(exe), "ss-update-*.part")
 	if err != nil {
 		return err
 	}
@@ -120,9 +126,12 @@ func applyUpdate(ctx context.Context, onBeforeExit func()) error {
 	}
 	tmpZip.Close()
 
-	// Pull SonderShield.exe out of the zip, next to the current one.
 	newExe := exe + ".new"
-	if err := extractExe(tmpZip.Name(), newExe); err != nil {
+	if strings.HasSuffix(strings.ToLower(info.url), ".exe") {
+		if err := os.Rename(tmpZip.Name(), newExe); err != nil {
+			return err
+		}
+	} else if err := extractExe(tmpZip.Name(), newExe); err != nil {
 		return err
 	}
 	// Hand off to the platform-specific swap (rename-and-relaunch on Windows).

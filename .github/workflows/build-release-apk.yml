@@ -105,6 +105,7 @@ jobs:
             'Free and open source, GPL-3.0: https://github.com/Verisonder/SonderShield' \
             > winpkg/README.txt
           cd winpkg && zip -r "../SonderShield-Windows-$VERSION.zip" . && cd ..
+          cp SonderShield.exe "SonderShield-Windows-$VERSION.exe"
       - name: Build
         shell: bash
         env:
@@ -131,7 +132,8 @@ jobs:
           cp "$APK" "$NAMED"
 
           WINZIP=$(ls SonderShield-Windows-*.zip | head -n 1)
-          gh release create "$GITHUB_REF_NAME" "$NAMED" "$WINZIP" \
+          WINEXE=$(ls SonderShield-Windows-*.exe | head -n 1)
+          gh release create "$GITHUB_REF_NAME" "$NAMED" "$WINEXE" "$WINZIP" \
             --repo "$GITHUB_REPOSITORY" \
             --title "SonderShield $VERSION" \
             --notes-file docs/releasenote/release_notes_$GITHUB_REF_NAME.md

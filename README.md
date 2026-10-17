@@ -46,7 +46,7 @@ Turn on **HTTPS filtering** and it goes further in your browsers: ad spaces and 
 
 ## Install
 
-**Android:** download the APK below. **Windows:** download `SonderShield-Windows-x.y.z.zip` from the latest release, unzip it, and run `SonderShield.exe` (Windows asks for administrator rights to change the PC's DNS and firewall).
+**Android:** download the APK below. **Windows:** download `SonderShield-Windows-x.y.z.exe` from the latest release and run it (Windows asks for administrator rights to change the PC's DNS and firewall).
 
 1. Download `SonderShield-x.y.z.apk` from the [latest release](https://github.com/Verisonder/SonderShield/releases/latest) and open it.
 2. Follow the first-run steps: allow the VPN, keep it running in the background.
