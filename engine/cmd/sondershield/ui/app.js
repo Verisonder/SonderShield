@@ -763,7 +763,7 @@ async function renderSettings() {
     </div>
     <div class="seclabel"><span class="t">08 ABOUT</span></div>
     <div class="card"><div class="ctitle">SonderShield for Windows</div>
-      <div class="csub" style="margin-top:6px">By Verisonder. Free and open source under GPL-3.0. Everything stays on this PC: no account, no analytics.</div>
+      <div class="csub" style="margin-top:6px">By Verisonder. Free and open source under Apache 2.0. Everything stays on this PC: no account, no analytics.</div>
       <div class="csub" style="margin-top:8px">Blocks ads, trackers and malware by DNS, and can cut off any app's internet.${state.on ? (state.mode === 'adapter' ? ' Filtering through the SonderShield network adapter.' : ' Filtering on this PC (port 53).') : ''}</div>
       <div style="margin-top:12px"><button class="pill" id="diagbtn2">Run DNS diagnostic</button> <button class="pill" id="src">Source code</button></div></div>`;
   p.querySelectorAll('.pick[data-up]').forEach(r => r.onclick = () => {

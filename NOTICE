@@ -1,0 +1,18 @@
+SonderShield
+Copyright 2026 Verisonder
+
+This product is SonderShield by Verisonder:
+https://github.com/Verisonder/SonderShield
+
+If you redistribute SonderShield or build on it, keep this NOTICE file and say
+that your work is based on SonderShield by Verisonder. The SonderShield name and
+logo belong to the author; use them only to credit the origin, not to suggest
+the author endorses your work.
+
+Third-party material:
+- Fonts Unbounded and DM Sans: SIL Open Font License 1.1 (see licenses/).
+- Windows builds include wintun.dll by WireGuard LLC, under its own licence.
+- Open-source Go and Android libraries, each under its own licence
+  (MIT, BSD or Apache-2.0).
+- Block lists are downloaded from their authors at runtime and keep their own
+  licences.

@@ -43,6 +43,7 @@ Name: "autostart"; Description: "Start SonderShield with Windows"; GroupDescript
 Source: "{#Src}\SonderShield.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Src}\wintun.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
+Source: "..\NOTICE"; DestDir: "{app}"; DestName: "NOTICE.txt"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\SonderShield"; Filename: "{app}\SonderShield.exe"; AppUserModelID: "Verisonder.SonderShield"

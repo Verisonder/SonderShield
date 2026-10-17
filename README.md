@@ -6,7 +6,7 @@
   <a href="https://github.com/Verisonder/SonderShield/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Verisonder/SonderShield?style=flat-square&color=3B82FF&label=release"></a>
   <a href="https://github.com/Verisonder/SonderShield/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/Verisonder/SonderShield/total?style=flat-square&color=3B82FF"></a>
   <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3B82FF?style=flat-square">
-  <a href="LICENSE"><img alt="GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-3B82FF?style=flat-square"></a>
+  <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-3B82FF?style=flat-square"></a>
   <a href="https://github.com/Verisonder/SonderShield/actions/workflows/checks.yml"><img alt="Checks" src="https://img.shields.io/github/actions/workflow/status/Verisonder/SonderShield/checks.yml?branch=main&style=flat-square&label=checks"></a>
 </p>
 
@@ -84,8 +84,20 @@ Engine tests: `cd engine && go test -race ./...`
 
 No account, no analytics, no crash reporting sent anywhere. The log and statistics live on the phone. Block lists are downloaded straight from their authors. The HTTPS certificate is created on the phone and never leaves it.
 
-## Licence
+## Using SonderShield
 
-[GPL-3.0-only](LICENSE). Block lists belong to their authors and keep their own licences. Fonts: Unbounded and DM Sans, SIL Open Font License.
+You're welcome to use it, change it and share it — just:
+
+- ✅ **Keep the credit** — leave the copyright and `NOTICE` in place
+- 🚫 **Don't claim it as your own** — don't pass SonderShield off as something you created; if you build on it, say it's based on SonderShield by Verisonder
+- 🚫 **Don't imply endorsement** — the SonderShield name and logo are the author's; name them only to credit the origin
+
+Want to do something beyond that? Just ask first. 🛡️
+
+## License
+
+Apache License 2.0 — see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). Free to use with attribution; you may not claim it as your own or imply the author's endorsement.
+
+Block lists belong to their authors and keep their own licences. Fonts: Unbounded and DM Sans, SIL Open Font License.
 
 <p align="center"><sub>By <a href="https://github.com/Verisonder">Verisonder</a></sub></p>

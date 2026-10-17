@@ -405,9 +405,9 @@ private fun SettingsContent(onReload: () -> Unit) {
                 }
                 Text(
                     tr(
-                        "By Verisonder. Free and open source under GPL-3.0. Everything stays on this phone: no account, no analytics.",
-                        "Par Verisonder. Libre et open source sous GPL-3.0. Tout reste sur ce téléphone : pas de compte, pas de statistiques envoyées.",
-                        "Von Verisonder. Frei und quelloffen unter GPL-3.0. Alles bleibt auf diesem Handy: kein Konto, keine Statistik wird gesendet.",
+                        "By Verisonder. Free and open source under Apache 2.0. Everything stays on this phone: no account, no analytics.",
+                        "Par Verisonder. Libre et open source sous Apache 2.0. Tout reste sur ce téléphone : pas de compte, pas de statistiques envoyées.",
+                        "Von Verisonder. Frei und quelloffen unter Apache 2.0. Alles bleibt auf diesem Handy: kein Konto, keine Statistik wird gesendet.",
                     ),
                     color = Palette.dim, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 12.dp),
                 )
