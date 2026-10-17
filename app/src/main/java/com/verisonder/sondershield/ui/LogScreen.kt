@@ -66,21 +66,21 @@ fun LogScreen() {
 
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(
-            tr("Log", "Journal"), kicker = if (phase == Phase.OFF) tr("Paused", "En pause") else tr("Live", "En direct"),
-            sub = tr("${log.size.grouped()} latest queries · ${blockedCount.grouped()} blocked", "${log.size.grouped()} dernières requêtes · ${blockedCount.grouped()} bloquées"),
+            tr("Log", "Journal", "Protokoll"), kicker = if (phase == Phase.OFF) tr("Paused", "En pause", "Pausiert") else tr("Live", "En direct", "Live"),
+            sub = tr("${log.size.grouped()} latest queries · ${blockedCount.grouped()} blocked", "${log.size.grouped()} dernières requêtes · ${blockedCount.grouped()} bloquées", "${log.size.grouped()} letzte Anfragen · ${blockedCount.grouped()} blockiert"),
         ) {
-            if (log.isNotEmpty()) IconPill(Icons.trash, tr("Clear log", "Vider le journal")) { ShieldState.clearLog() }
+            if (log.isNotEmpty()) IconPill(Icons.trash, tr("Clear log", "Vider le journal", "Protokoll leeren")) { ShieldState.clearLog() }
         }
-        Field(query, { query = it }, tr("Search domains or apps", "Rechercher un domaine ou une appli"), Modifier.fillMaxWidth().padding(horizontal = Gutter).padding(top = 10.dp), leading = Icons.search)
+        Field(query, { query = it }, tr("Search domains or apps", "Rechercher un domaine ou une appli", "Domains oder Apps suchen"), Modifier.fillMaxWidth().padding(horizontal = Gutter).padding(top = 10.dp), leading = Icons.search)
         ChipRow(Modifier.padding(top = 6.dp, bottom = 4.dp)) {
-            Chip(tr("All", "Tout"), filter == 0) { filter = 0 }
-            Chip(tr("Blocked", "Bloqués"), filter == 1) { filter = 1 }
-            Chip(tr("Allowed", "Autorisés"), filter == 2) { filter = 2 }
+            Chip(tr("All", "Tout", "Alle"), filter == 0) { filter = 0 }
+            Chip(tr("Blocked", "Bloqués", "Blockiert"), filter == 1) { filter = 1 }
+            Chip(tr("Allowed", "Autorisés", "Erlaubt"), filter == 2) { filter = 2 }
         }
         if (shown.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    if (phase == Phase.OFF) tr("Turn protection on to see DNS queries here.", "Activez la protection pour voir les requêtes DNS ici.") else tr("Nothing yet. Open an app or a website.", "Rien pour l'instant. Ouvrez une appli ou un site."),
+                    if (phase == Phase.OFF) tr("Turn protection on to see DNS queries here.", "Activez la protection pour voir les requêtes DNS ici.", "Schalte den Schutz ein, um hier DNS-Anfragen zu sehen.") else tr("Nothing yet. Open an app or a website.", "Rien pour l'instant. Ouvrez une appli ou un site.", "Noch nichts. Öffne eine App oder Website."),
                     color = Palette.faint, fontSize = 14.sp, textAlign = TextAlign.Center,
                 )
             }
@@ -102,40 +102,40 @@ fun LogScreen() {
                 Column {
                     Text(
                         when (e.verdict) {
-                            1 -> tr("Blocked by ", "Bloqué par ") + reasonLabel(ctx, e.reason)
-                            2 -> tr("Failed: ", "Échec : ") + e.reason
-                            else -> tr("Allowed", "Autorisé") + if (e.reason.isNotEmpty()) " (${e.reason})" else ""
+                            1 -> tr("Blocked by ", "Bloqué par ", "Blockiert durch ") + reasonLabel(ctx, e.reason)
+                            2 -> tr("Failed: ", "Échec : ", "Fehler: ") + e.reason
+                            else -> tr("Allowed", "Autorisé", "Erlaubt") + if (e.reason.isNotEmpty()) " (${e.reason})" else ""
                         },
                         color = if (e.verdict == 1) Palette.accentText else Palette.dim, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                     )
                     Text("${e.typeName} · ${time(e.time)}${if (e.ms > 0) " · ${e.ms} ms" else ""}", color = Palette.faint, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
-                    AppNames.label(ctx, e.uid)?.let { Text(tr("Asked by ", "Demandé par ") + it, color = Palette.dim, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp)) }
+                    AppNames.label(ctx, e.uid)?.let { Text(tr("Asked by ", "Demandé par ", "Angefragt von ") + it, color = Palette.dim, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp)) }
                     if (e.verdict == 1 && isListReason(e.reason)) {
-                        Text(tr("Allowing it adds an allow rule, which wins over every list.", "L'autoriser ajoute une règle d'autorisation, qui passe avant toutes les listes."), color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+                        Text(tr("Allowing it adds an allow rule, which wins over every list.", "L'autoriser ajoute une règle d'autorisation, qui passe avant toutes les listes.", "Erlauben fügt eine Erlauben-Regel hinzu, die vor jeder Liste gilt."), color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
                     }
                 }
             },
             confirmButton = {
                 if (e.verdict == 1) {
-                    PillButton(tr("Allow", "Autoriser")) {
+                    PillButton(tr("Allow", "Autoriser", "Erlauben")) {
                         prefs.allowRules = addLine(prefs.allowRules, e.domain)
                         prefs.blockRules = removeLine(prefs.blockRules, e.domain)
                         ShieldState.applyRules()
                         picked = null
-                        Toast.makeText(ctx, trc(ctx, "Allowed ", "Autorisé : ") + e.domain, Toast.LENGTH_SHORT).show()
+                        Toast.makeText(ctx, trc(ctx, "Allowed ", "Autorisé : ", "Erlaubt: ") + e.domain, Toast.LENGTH_SHORT).show()
                     }
                 } else {
-                    PillButton(tr("Block", "Bloquer")) {
+                    PillButton(tr("Block", "Bloquer", "Blockieren")) {
                         prefs.blockRules = addLine(prefs.blockRules, e.domain)
                         prefs.allowRules = removeLine(prefs.allowRules, e.domain)
                         ShieldState.applyRules()
                         picked = null
-                        Toast.makeText(ctx, trc(ctx, "Blocked ", "Bloqué : ") + e.domain, Toast.LENGTH_SHORT).show()
+                        Toast.makeText(ctx, trc(ctx, "Blocked ", "Bloqué : ", "Blockiert: ") + e.domain, Toast.LENGTH_SHORT).show()
                     }
                 }
             },
             dismissButton = {
-                PillButton(tr("Copy", "Copier"), filled = false) {
+                PillButton(tr("Copy", "Copier", "Kopieren"), filled = false) {
                     ctx.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("domain", e.domain))
                     picked = null
                 }
@@ -171,11 +171,11 @@ private fun LogRow(e: LogEntry, onClick: () -> Unit) {
             Spacer(Modifier.width(10.dp))
             when {
                 blocked -> Text(
-                    tr("BLOCKED", "BLOQUÉ"), color = Palette.onAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+                    tr("BLOCKED", "BLOQUÉ", "BLOCKIERT"), color = Palette.onAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
                     modifier = Modifier.clip(CircleShape).background(Palette.accent).padding(horizontal = 9.dp, vertical = 5.dp),
                 )
                 else -> Text(
-                    when { e.verdict == 2 -> tr("failed", "échec"); e.reason == "cached" -> tr("cached", "en cache"); else -> "${e.ms} ms" },
+                    when { e.verdict == 2 -> tr("failed", "échec", "Fehler"); e.reason == "cached" -> tr("cached", "en cache", "Cache"); else -> "${e.ms} ms" },
                     color = if (e.verdict == 2) Palette.warn else Palette.faint, fontSize = 11.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.clip(CircleShape).border(1.5.dp, Palette.line, CircleShape).padding(horizontal = 9.dp, vertical = 4.dp),
                 )

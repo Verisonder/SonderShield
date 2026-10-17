@@ -10,11 +10,11 @@ fun reasonLabel(ctx: Context, reason: String): String {
         return Prefs(ctx).allLists().firstOrNull { it.id == id }?.name ?: id
     }
     return when (reason) {
-        "your allow rule" -> trc(ctx, "your allow rule", "votre règle d'autorisation")
-        "your block rule" -> trc(ctx, "your block rule", "votre règle de blocage")
-        "list exception" -> trc(ctx, "list exception", "exception d'une liste")
-        "block list" -> trc(ctx, "block list", "liste de blocage")
-        "cached" -> trc(ctx, "cached", "en cache")
+        "your allow rule" -> trc(ctx, "your allow rule", "votre règle d'autorisation", "deine Erlauben-Regel")
+        "your block rule" -> trc(ctx, "your block rule", "votre règle de blocage", "deine Blockier-Regel")
+        "list exception" -> trc(ctx, "list exception", "exception d'une liste", "Listen-Ausnahme")
+        "block list" -> trc(ctx, "block list", "liste de blocage", "Blockliste")
+        "cached" -> trc(ctx, "cached", "en cache", "Cache")
         else -> reason
     }
 }

@@ -106,18 +106,18 @@ fun HomeStats() {
     val topSeen = remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxWidth().background(Palette.panel).padding(horizontal = Gutter).padding(bottom = 28.dp)) {
-        Kicker(tr("All time", "Depuis le début"), Modifier.padding(top = 10.dp).onSeen(allSeen).reveal(allSeen.value))
+        Kicker(tr("All time", "Depuis le début", "Insgesamt"), Modifier.padding(top = 10.dp).onSeen(allSeen).reveal(allSeen.value))
         Spacer(Modifier.height(12.dp))
         val seen = allSeen.value
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Tile(compact(counted(s.allTotal.toDouble(), seen).toLong()), tr("DNS queries", "requêtes DNS"), Modifier.weight(1f).reveal(seen, 1))
-            Tile(compact(counted(s.allBlocked.toDouble(), seen).toLong()), tr("blocked", "bloquées"), Modifier.weight(1f).reveal(seen, 2))
+            Tile(compact(counted(s.allTotal.toDouble(), seen).toLong()), tr("DNS queries", "requêtes DNS", "DNS-Anfragen"), Modifier.weight(1f).reveal(seen, 1))
+            Tile(compact(counted(s.allBlocked.toDouble(), seen).toLong()), tr("blocked", "bloquées", "blockiert"), Modifier.weight(1f).reveal(seen, 2))
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Tile(compact(counted(s.allThreats.toDouble(), seen).toLong()), tr("threats blocked\nmalware and phishing", "menaces bloquées\nmalwares et phishing"), Modifier.weight(1f).reveal(seen, 3))
+            Tile(compact(counted(s.allThreats.toDouble(), seen).toLong()), tr("threats blocked\nmalware and phishing", "menaces bloquées\nmalwares et phishing", "Bedrohungen blockiert\nMalware und Phishing"), Modifier.weight(1f).reveal(seen, 3))
             Tile(
-                if (domains > 0) compact(counted(domains.toDouble(), seen).toLong()) else "–", tr("filter rules\nloaded now", "règles de filtre\nchargées"),
+                if (domains > 0) compact(counted(domains.toDouble(), seen).toLong()) else "–", tr("filter rules\nloaded now", "règles de filtre\nchargées", "Filterregeln\njetzt geladen"),
                 Modifier.weight(1f).reveal(seen, 4),
             )
         }
@@ -129,31 +129,31 @@ fun HomeStats() {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("%.1f%%".format(rate), style = display(30), color = Palette.onAccent, modifier = Modifier.weight(1f))
-            Text(tr("block rate,\nall time", "taux de blocage,\ndepuis le début"), color = Palette.onAccent, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium)
+            Text(tr("block rate,\nall time", "taux de blocage,\ndepuis le début", "Blockquote,\ninsgesamt"), color = Palette.onAccent, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium)
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Tile(
-                "≈ " + bytes(counted((s.allBlocked * BYTES_PER_BLOCK).toDouble(), seen).toLong()), tr("data not downloaded\nestimate", "données non téléchargées\nestimation"),
+                "≈ " + bytes(counted((s.allBlocked * BYTES_PER_BLOCK).toDouble(), seen).toLong()), tr("data not downloaded\nestimate", "données non téléchargées\nestimation", "nicht geladene Daten\nSchätzung"),
                 Modifier.weight(1f).reveal(seen, 6),
             )
             Uptime(startedAt, Modifier.weight(1f).reveal(seen, 7))
         }
 
-        Kicker(tr("Activity", "Activité"), Modifier.padding(top = 28.dp).onSeen(chartSeen).reveal(chartSeen.value))
+        Kicker(tr("Activity", "Activité", "Aktivität"), Modifier.padding(top = 28.dp).onSeen(chartSeen).reveal(chartSeen.value))
         Spacer(Modifier.height(10.dp))
         var week by rememberSaveable { mutableStateOf(false) }
         Row(Modifier.reveal(chartSeen.value, 1), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Chip(tr("24 hours", "24 heures"), !week) { week = false }
-            Chip(tr("7 days", "7 jours"), week) { week = true }
+            Chip(tr("24 hours", "24 heures", "24 Stunden"), !week) { week = false }
+            Chip(tr("7 days", "7 jours", "7 Tage"), week) { week = true }
         }
         Spacer(Modifier.height(14.dp))
         Box(Modifier.reveal(chartSeen.value, 2)) { ActivityChart(s, week, chartSeen.value) }
 
-        Kicker(tr("Top blocked", "Les plus bloqués"), Modifier.padding(top = 28.dp).onSeen(topSeen).reveal(topSeen.value))
+        Kicker(tr("Top blocked", "Les plus bloqués", "Am meisten blockiert"), Modifier.padding(top = 28.dp).onSeen(topSeen).reveal(topSeen.value))
         Spacer(Modifier.height(10.dp))
         if (s.top.isEmpty()) {
-            Text(tr("Nothing blocked yet.", "Rien de bloqué pour l'instant."), color = Palette.faint, fontSize = 14.sp)
+            Text(tr("Nothing blocked yet.", "Rien de bloqué pour l'instant.", "Noch nichts blockiert."), color = Palette.faint, fontSize = 14.sp)
         } else {
             val max = s.top.first().second.coerceAtLeast(1)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -179,7 +179,7 @@ private fun Uptime(startedAt: Long, modifier: Modifier) {
     LaunchedEffect(startedAt) {
         while (startedAt > 0) { now = System.currentTimeMillis(); delay(30_000) }
     }
-    Tile(if (startedAt > 0) duration(now - startedAt, isFrench()) else tr("off", "arrêté"), tr("on without a break", "actif sans interruption"), modifier)
+    Tile(if (startedAt > 0) duration(now - startedAt, lang()) else tr("off", "arrêté", "aus"), tr("on without a break", "actif sans interruption", "ohne Unterbrechung aktiv"), modifier)
 }
 
 @Composable
@@ -244,9 +244,9 @@ private fun ActivityChart(s: StatsSnapshot, week: Boolean, seen: Boolean) {
 
     Column(Modifier.fillMaxWidth().clip(blockShape).background(Palette.card2).padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Legend(soft, tr("Queries", "Requêtes") + " " + compact(totalQ.toLong()))
+            Legend(soft, tr("Queries", "Requêtes", "Anfragen") + " " + compact(totalQ.toLong()))
             Spacer(Modifier.width(16.dp))
-            Legend(accent, tr("Blocked", "Bloquées") + " " + compact(totalB.toLong()))
+            Legend(accent, tr("Blocked", "Bloquées", "Blockiert") + " " + compact(totalB.toLong()))
         }
         Spacer(Modifier.height(12.dp))
         Canvas(Modifier.fillMaxWidth().height(150.dp)) {
@@ -312,12 +312,12 @@ private fun bytes(b: Long): String = when {
     else -> trim("%.1f".format(b / 1e9)) + " GB"
 }
 
-private fun duration(ms: Long, fr: Boolean): String {
+private fun duration(ms: Long, lang: String): String {
     val m = ms / 60_000
     return when {
-        m < 1 -> if (fr) "à l'instant" else "just now"
+        m < 1 -> when (lang) { "fr" -> "à l'instant"; "de" -> "gerade eben"; else -> "just now" }
         m < 60 -> "$m min"
         m < 1440 -> "${m / 60} h ${m % 60} min"
-        else -> "${m / 1440} ${if (fr) "j" else "d"} ${(m % 1440) / 60} h"
+        else -> "${m / 1440} ${when (lang) { "fr" -> "j"; "de" -> "T"; else -> "d" }} ${(m % 1440) / 60} h"
     }
 }

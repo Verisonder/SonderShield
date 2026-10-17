@@ -48,6 +48,17 @@ object Catalog {
             "https://small.oisd.nl/",
             "Ads only, very low false positives.",
         ),
+        // Page rules (element hiding, scriptlets): used by HTTPS filtering, switched on with it.
+        BlockList(
+            "easylist", "EasyList",
+            "https://easylist.to/easylist/easylist.txt",
+            "The main ad list for browsers. Hides ad spaces in pages when HTTPS filtering is on.",
+        ),
+        BlockList(
+            "ublock", "uBlock Origin filters",
+            "https://ublockorigin.github.io/uAssets/filters/filters.min.txt",
+            "Fixes for anti-adblock walls and stubborn ads (scriptlets). For HTTPS filtering.",
+        ),
         // Regional: ad networks of one language area. On by default for the phone's languages.
         BlockList(
             "liste-fr", "Liste FR",
@@ -80,6 +91,9 @@ object Catalog {
             "Portuguese ad networks and trackers.", langs = setOf("pt"),
         ),
     )
+
+    /** Switched on together with HTTPS filtering. */
+    val pageListIds = setOf("easylist", "ublock")
 
     val defaultIds: Set<String> = lists.filter { it.defaultOn }.map { it.id }.toSet()
 

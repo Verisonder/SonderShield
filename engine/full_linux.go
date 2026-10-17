@@ -32,6 +32,7 @@ import (
 // WireGuard). DNS, on any server address, is answered by the filter.
 
 type fullRunner struct {
+	proxy  *httpsProxy
 	s      *stack.Stack
 	cancel context.CancelFunc
 	out    outbound
@@ -58,6 +59,7 @@ func (e *Engine) StartFull(fd int, mtu int) error {
 	s.SetTransportProtocolOption(tcp.ProtocolNumber, &sack)
 	ctx, cancel := context.WithCancel(context.Background())
 	r := &fullRunner{s: s, cancel: cancel, out: out, fd: fd}
+	r.proxy = newHTTPSProxy(e, out, e.testTLS)
 	tcpFwd := tcp.NewForwarder(s, 0, 4096, func(req *tcp.ForwarderRequest) { e.onTCP(ctx, r, req) })
 	s.SetTransportProtocolHandler(tcp.ProtocolNumber, tcpFwd.HandlePacket)
 	udpFwd := udp.NewForwarder(s, func(req *udp.ForwarderRequest) { e.onUDP(ctx, r, req) })
@@ -94,6 +96,7 @@ func (e *Engine) StartFull(fd int, mtu int) error {
 
 func (r *fullRunner) stop() {
 	r.cancel()
+	r.proxy.close()
 	r.s.Close()
 	r.out.Close()
 	r.wg.Wait()
@@ -126,6 +129,10 @@ func (e *Engine) onTCP(ctx context.Context, r *fullRunner, req *tcp.ForwarderReq
 			e.serveDNSOverTCP(ctx, app, uid)
 			return
 		}
+		if m := e.mitmFor(uid); m != nil && dstPort == 443 {
+			r.proxy.serve(ctx, m, app, dst.String(), uid, func() { e.conns.Add(1) })
+			return
+		}
 		dctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		up, err := r.out.DialContext(dctx, "tcp", net.JoinHostPort(dst.String(), strconv.Itoa(dstPort)))
 		cancel()
@@ -134,33 +141,8 @@ func (e *Engine) onTCP(ctx context.Context, r *fullRunner, req *tcp.ForwarderReq
 		}
 		defer up.Close()
 		e.conns.Add(1)
-		relayTCP(app, up)
+		relay(app, up)
 	}()
-}
-
-// relayTCP copies both ways and passes half-closes along.
-func relayTCP(a *gonet.TCPConn, b net.Conn) {
-	done := make(chan struct{}, 2)
-	go func() {
-		io.Copy(b, a)
-		if c, ok := b.(interface{ CloseWrite() error }); ok {
-			c.CloseWrite()
-		}
-		done <- struct{}{}
-	}()
-	go func() {
-		io.Copy(a, b)
-		a.CloseWrite()
-		done <- struct{}{}
-	}()
-	<-done
-	// Give the other direction a moment to finish its last bytes.
-	t := time.NewTimer(5 * time.Second)
-	select {
-	case <-done:
-	case <-t.C:
-	}
-	t.Stop()
 }
 
 func (e *Engine) serveDNSOverTCP(ctx context.Context, c *gonet.TCPConn, uid int) {
@@ -188,13 +170,16 @@ func (e *Engine) serveDNSOverTCP(ctx context.Context, c *gonet.TCPConn, uid int)
 func (e *Engine) onUDP(ctx context.Context, r *fullRunner, req *udp.ForwarderRequest) {
 	id := req.ID()
 	src, srcPort, dst, dstPort := flowAddrs(id)
+	uid := e.appFor(17, src, srcPort, dst, dstPort)
+	if dstPort == 443 && e.mitmFor(uid) != nil {
+		return // no QUIC for filtered apps: they fall back to TCP, which can be filtered
+	}
 	var wq waiter.Queue
 	ep, terr := req.CreateEndpoint(&wq)
 	if terr != nil {
 		return
 	}
 	app := gonet.NewUDPConn(&wq, ep)
-	uid := e.appFor(17, src, srcPort, dst, dstPort)
 
 	r.wg.Add(1)
 	go func() {

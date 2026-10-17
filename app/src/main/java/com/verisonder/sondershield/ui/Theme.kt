@@ -58,9 +58,10 @@ data class ShieldColors(
     val dark: Boolean,
 )
 
-enum class ThemeMode(val id: String, val label: String, val fr: String) {
-    Default("default", "Default", "Par défaut"), Light("light", "Light", "Clair"),
-    You("you", "Material You", "Material You");
+enum class ThemeMode(val id: String, val label: String, val fr: String, val de: String) {
+    Default("default", "Default", "Par défaut", "Standard"), Light("light", "Light", "Clair", "Hell"),
+    System("system", "System", "Système", "System"),
+    You("you", "Material You", "Material You", "Material You");
 
     companion object {
         /** Unknown ids, including the old "oled" (now the default), fall back to Default. */
@@ -206,6 +207,8 @@ private fun ShieldColors.withAccent(a: Color) = copy(
 fun colorsFor(mode: ThemeMode, accent: Color = Electric): ShieldColors = when (mode) {
     ThemeMode.Default -> DefaultColors.withAccent(accent)
     ThemeMode.Light -> LightColors.withAccent(accent)
+    // Follows the phone's dark mode: the black default at night, light by day.
+    ThemeMode.System -> if (isSystemInDarkTheme()) DefaultColors.withAccent(accent) else LightColors.withAccent(accent)
     ThemeMode.You -> if (Build.VERSION.SDK_INT >= 31) {
         val ctx = LocalContext.current
         val dark = isSystemInDarkTheme()
@@ -246,6 +249,7 @@ object Icons {
     val close = icon("close", "M6 6l12 12", "M18 6L6 18")
     val trash = icon("trash", "M4 7h16", "M9 7V4h6v3", "M6 7l1 13h10l1-13")
     val chevron = icon("chevron", "M9 6l6 6-6 6")
+    val check = icon("check", "M5 12.5l4.5 4.5L19 7")
 }
 
 /**

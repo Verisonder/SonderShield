@@ -85,63 +85,68 @@ fun OnboardingScreen(onAllowVpn: () -> Unit, onDone: () -> Unit) {
             Column(Modifier.fillMaxSize().padding(horizontal = Gutter)) {
                 when (s) {
                     0 -> Page(
-                        kicker = tr("Welcome", "Bienvenue"),
-                        title = tr("Ads stop here.", "Les pubs s'arrêtent ici."),
+                        kicker = tr("Welcome", "Bienvenue", "Willkommen"),
+                        title = tr("Ads stop here.", "Les pubs s'arrêtent ici.", "Werbung endet hier."),
                         text = tr(
                             "SonderShield blocks ads, trackers and malware in every app on this phone. No root, no account, and nothing leaves your phone.",
                             "SonderShield bloque les pubs, les traqueurs et les malwares dans toutes les applis de ce téléphone. Sans root, sans compte, et rien ne quitte votre téléphone.",
+                            "SonderShield blockiert Werbung, Tracker und Malware in jeder App auf diesem Handy. Ohne Root, ohne Konto, und nichts verlässt dein Handy.",
                         ),
                         lit = true,
                     )
                     1 -> {
                         val on = phase != Phase.OFF
                         Page(
-                            kicker = tr("Step 1 · VPN", "Étape 1 · VPN"),
-                            title = tr("Allow the VPN.", "Autorisez le VPN."),
+                            kicker = tr("Step 1 · VPN", "Étape 1 · VPN", "Schritt 1 · VPN"),
+                            title = tr("Allow the VPN.", "Autorisez le VPN.", "VPN erlauben."),
                             text = tr(
                                 "Android asks before an app can filter traffic. SonderShield's VPN only carries DNS and stays on your phone: your browsing doesn't go through any server.",
                                 "Android demande avant qu'une appli filtre le trafic. Le VPN de SonderShield ne transporte que le DNS et reste sur votre téléphone : votre navigation ne passe par aucun serveur.",
+                                "Android fragt, bevor eine App Datenverkehr filtern darf. Das VPN von SonderShield trägt nur DNS und bleibt auf deinem Handy: Dein Surfen läuft über keinen Server.",
                             ),
                             lit = on,
                         ) {
-                            if (on) Done(tr("Protection is on", "Protection activée"))
-                            else PillButton(tr("Allow and turn on", "Autoriser et activer"), onClick = onAllowVpn)
+                            if (on) Done(tr("Protection is on", "Protection activée", "Schutz ist an"))
+                            else PillButton(tr("Allow and turn on", "Autoriser et activer", "Erlauben und einschalten"), onClick = onAllowVpn)
                         }
                         // Move on by itself once the VPN came up.
                         LaunchedEffect(on) { if (on && step == 1) { delay(900); step = 2 } }
                     }
                     2 -> Page(
-                        kicker = tr("Step 2 · Battery", "Étape 2 · Batterie"),
-                        title = tr("Keep it running.", "Gardez-le actif."),
+                        kicker = tr("Step 2 · Battery", "Étape 2 · Batterie", "Schritt 2 · Akku"),
+                        title = tr("Keep it running.", "Gardez-le actif.", "Laufen lassen."),
                         text = tr(
                             "HyperOS and other Android versions stop apps in the background to save battery. Set Battery saver to No restrictions for SonderShield, and turn on Autostart if your phone has it.",
                             "HyperOS et d'autres versions d'Android arrêtent les applis en arrière-plan pour économiser la batterie. Réglez l'économiseur de batterie sur Aucune restriction pour SonderShield, et activez le démarrage automatique si votre téléphone le propose.",
+                            "HyperOS und andere Android-Versionen beenden Apps im Hintergrund, um Akku zu sparen. Stelle den Energiesparmodus für SonderShield auf Keine Einschränkungen und schalte Autostart ein, falls dein Handy es hat.",
                         ),
                         lit = true,
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            PillButton(tr("Battery settings", "Batterie")) { openAppDetails(ctx) }
-                            if (hasAutostart(ctx)) PillButton(tr("Autostart", "Démarrage auto"), filled = false) { openAutostart(ctx) }
+                            PillButton(tr("Battery settings", "Batterie", "Akku-Einstellungen")) { openAppDetails(ctx) }
+                            if (hasAutostart(ctx)) PillButton(tr("Autostart", "Démarrage auto", "Autostart"), filled = false) { openAutostart(ctx) }
                         }
                     }
                     else -> {
                         var host by remember { mutableStateOf(privateDnsHostname(ctx)) }
                         LaunchedEffect(Unit) { while (true) { delay(2000); host = privateDnsHostname(ctx) } }
                         Page(
-                            kicker = tr("Step 3 · Private DNS", "Étape 3 · DNS privé"),
-                            title = if (host == null) tr("All set.", "C'est prêt.") else tr("One last thing.", "Une dernière chose."),
+                            kicker = tr("Step 3 · Private DNS", "Étape 3 · DNS privé", "Schritt 3 · Privates DNS"),
+                            title = if (host == null) tr("All set.", "C'est prêt.", "Alles bereit.") else tr("One last thing.", "Une dernière chose.", "Eine letzte Sache."),
                             text = if (host == null) tr(
                                 "Private DNS isn't forcing a provider, so SonderShield sees every lookup. You can change lists, rules and colours any time in Settings.",
                                 "Le DNS privé n'impose pas de fournisseur, donc SonderShield voit chaque requête. Vous pouvez changer les listes, les règles et les couleurs à tout moment dans Paramètres.",
+                                "Privates DNS erzwingt keinen Anbieter, also sieht SonderShield jede Anfrage. Listen, Regeln und Farben kannst du jederzeit in den Einstellungen ändern.",
                             ) else tr(
                                 "Private DNS is set to $host. Android sends DNS straight there and nothing gets blocked. Set it to Automatic or Off.",
                                 "Le DNS privé est réglé sur $host. Android envoie le DNS directement là-bas et rien n'est bloqué. Réglez-le sur Automatique ou Désactivé.",
+                                "Privates DNS ist auf $host gestellt. Android schickt DNS direkt dorthin und nichts wird blockiert. Stelle es auf Automatisch oder Aus.",
                             ),
                             lit = host == null,
                         ) {
-                            if (host != null) PillButton(tr("Open settings", "Ouvrir les réglages")) {
+                            if (host != null) PillButton(tr("Open settings", "Ouvrir les réglages", "Einstellungen öffnen")) {
                                 ctx.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                            } else Done(tr("Nothing bypasses SonderShield", "Rien ne contourne SonderShield"))
+                            } else Done(tr("Nothing bypasses SonderShield", "Rien ne contourne SonderShield", "Nichts umgeht SonderShield"))
                         }
                     }
                 }
@@ -149,10 +154,10 @@ fun OnboardingScreen(onAllowVpn: () -> Unit, onDone: () -> Unit) {
         }
         // Bottom: back / skip on the left, next / finish on the right.
         Row(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (step > 0) PillButton(tr("Back", "Retour"), filled = false) { step-- }
-            else PillButton(tr("Skip", "Passer"), filled = false, onClick = onDone)
+            if (step > 0) PillButton(tr("Back", "Retour", "Zurück"), filled = false) { step-- }
+            else PillButton(tr("Skip", "Passer", "Überspringen"), filled = false, onClick = onDone)
             Spacer(Modifier.weight(1f))
-            PillButton(if (step == last) tr("Start", "Commencer") else tr("Next", "Suivant")) {
+            PillButton(if (step == last) tr("Start", "Commencer", "Starten") else tr("Next", "Suivant", "Weiter")) {
                 if (step == last) onDone() else step++
             }
         }

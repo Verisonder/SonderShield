@@ -5,6 +5,7 @@ package shield
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"net"
 	"path/filepath"
@@ -33,6 +34,8 @@ type Engine struct {
 	lis  atomic.Pointer[listenerBox]
 	apps atomic.Pointer[resolverBox]
 	uids uidCache
+	cos  atomic.Pointer[cosmetics] // page rules from the lists (HTTPS filtering)
+	mitm atomic.Pointer[mitmConfig]
 
 	listBlock, listAllow domainSet // last loaded lists, reused when only rules change
 	listNames            []string
@@ -45,7 +48,8 @@ type Engine struct {
 	conns          atomic.Int64 // full tunnel: connections made
 
 	wg      atomic.Pointer[wgConfig]
-	testOut outbound // tests only: where full-tunnel connections go
+	testOut outbound    // tests only: where full-tunnel connections go
+	testTLS *tls.Config // tests only: upstream TLS for HTTPS filtering
 
 	runMu sync.Mutex
 	run   runner
@@ -74,6 +78,7 @@ func NewEngine() *Engine {
 // ("stevenblack.txt" -> "stevenblack"); blocks it causes report "list:<name>".
 func (e *Engine) SetLists(paths string) (int, error) {
 	block, allow := domainSet{}, domainSet{}
+	cos := newCosmetics()
 	names := []string{""} // index 0: unnamed
 	total := 0
 	var errs []string
@@ -88,12 +93,14 @@ func (e *Engine) SetLists(paths string) (int, error) {
 			src = uint16(len(names))
 			names = append(names, name)
 		}
-		n, err := loadListFile(p, block, allow, src)
+		n, err := loadListFile(p, block, allow, src, cos)
 		total += n
 		if err != nil {
 			errs = append(errs, err.Error())
 		}
 	}
+	cos.finish()
+	e.cos.Store(cos)
 	e.mu.Lock()
 	e.listBlock, e.listAllow, e.listNames = block, allow, names
 	e.mu.Unlock()
@@ -106,7 +113,7 @@ func (e *Engine) SetLists(paths string) (int, error) {
 
 // CountList reads one list file and returns its entry count without loading it.
 func CountList(path string) (int, error) {
-	return loadListFile(path, domainSet{}, domainSet{}, 0)
+	return loadListFile(path, domainSet{}, domainSet{}, 0, nil)
 }
 
 // SetRules sets your own rules, one domain per line. Allow wins over block.
@@ -205,6 +212,12 @@ func (e *Engine) resolve(ctx context.Context, query []byte, uid int) ([]byte, bo
 	}
 	start := time.Now()
 	e.total.Add(1)
+	if q.qtype == typeHTTPS && e.mitm.Load() != nil {
+		// No HTTPS records while filtering: they carry ECH keys, which would hide the
+		// site's name from the filter.
+		e.notify(q, verdictAllowed, "https-rr", 0, uid)
+		return blockedReply(query, q), true
+	}
 	blocked, reason, _ := e.filt.Load().decide(q.name)
 	if blocked {
 		e.blocked.Add(1)

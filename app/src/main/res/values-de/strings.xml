@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_name">Schutzstatus</string>
+    <string name="note_title">Geschützt</string>
+    <string name="note_text">%1$d heute blockiert</string>
+    <string name="note_stop">Ausschalten</string>
+    <string name="tile_on">An</string>
+    <string name="tile_off">Aus</string>
+    <string name="widget_description">Ob der Schutz an ist und wie viel Werbung heute blockiert wurde. Tippen zum Umschalten.</string>
+</resources>

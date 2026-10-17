@@ -16,6 +16,12 @@
         </intent>
         <!-- Xiaomi's autostart page, offered during setup when it exists. -->
         <package android:name="com.miui.securitycenter" />
+        <!-- Browsers, for picking which apps HTTPS filtering opens. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
     </queries>
 
     <application

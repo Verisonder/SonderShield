@@ -17,6 +17,7 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.verisonder.sondershield.R
 import com.verisonder.sondershield.core.Phase
+import com.verisonder.sondershield.core.Root
 import com.verisonder.sondershield.core.ShieldState
 import com.verisonder.sondershield.data.ListStore
 import com.verisonder.sondershield.data.Prefs
@@ -67,6 +68,9 @@ class ShieldVpnService : VpnService() {
             }
         }
 
+        /** The VPN permission dialog is still needed (never in root mode, which has no VPN). */
+        fun needsConsent(context: Context): Boolean = !Prefs(context).rootMode && prepare(context) != null
+
         fun restartIfOn(context: Context) {
             if (ShieldState.phase.value != Phase.OFF) {
                 context.startService(Intent(context, ShieldVpnService::class.java).setAction(ACTION_RESTART))
@@ -75,6 +79,8 @@ class ShieldVpnService : VpnService() {
     }
 
     private val lock = Mutex()
+    /** Root mode's iptables redirect is installed and must come out on stop. */
+    @Volatile private var rootRules = false
     private var counterJob: Job? = null
 
     override fun onCreate() {
@@ -117,7 +123,15 @@ class ShieldVpnService : VpnService() {
         ShieldState.applyConfig()
 
         val prefs = Prefs(this)
-        val full = prefs.fullTunnel
+        if (rootRules) {
+            Root.clear()
+            rootRules = false
+        }
+        if (prefs.rootMode) {
+            bringUpRoot(prefs)
+            return
+        }
+        val full = prefs.tunnelFull
         val b = Builder()
             .setSession(getString(R.string.app_name))
             .setMtu(MTU)
@@ -146,11 +160,11 @@ class ShieldVpnService : VpnService() {
         val pfd = try {
             b.establish()
         } catch (e: Exception) {
-            null.also { ShieldState.problem.value = trc(this, "Could not start the VPN: ", "Impossible de démarrer le VPN : ") + e.message }
+            null.also { ShieldState.problem.value = trc(this, "Could not start the VPN: ", "Impossible de démarrer le VPN : ", "VPN konnte nicht gestartet werden: ") + e.message }
         }
         if (pfd == null) {
             if (ShieldState.problem.value == null) {
-                ShieldState.problem.value = trc(this, "VPN permission missing. Open SonderShield and turn it on.", "Autorisation VPN manquante. Ouvrez SonderShield et activez-le.")
+                ShieldState.problem.value = trc(this, "VPN permission missing. Open SonderShield and turn it on.", "Autorisation VPN manquante. Ouvrez SonderShield et activez-le.", "VPN-Berechtigung fehlt. Öffne SonderShield und schalte es ein.")
             }
             prefs.wantOn = false
             teardown()
@@ -160,11 +174,38 @@ class ShieldVpnService : VpnService() {
             val fd = pfd.detachFd().toLong()
             if (full) ShieldState.engine.startFull(fd, MTU.toLong()) else ShieldState.engine.start(fd)
         } catch (e: Exception) {
-            ShieldState.problem.value = trc(this, "Engine failed to start: ", "Le moteur n'a pas démarré : ") + e.message
+            ShieldState.problem.value = trc(this, "Engine failed to start: ", "Le moteur n'a pas démarré : ", "Die Engine ist nicht gestartet: ") + e.message
             prefs.wantOn = false
             teardown()
             return
         }
+        started()
+    }
+
+    /** Root mode: the engine serves DNS on loopback; iptables sends the phone's DNS there. */
+    private fun bringUpRoot(prefs: Prefs) {
+        try {
+            ShieldState.engine.startLocal(Root.PORT.toLong())
+        } catch (e: Exception) {
+            ShieldState.problem.value = trc(this, "Engine failed to start: ", "Le moteur n'a pas démarré : ", "Die Engine ist nicht gestartet: ") + e.message
+            prefs.wantOn = false
+            teardown()
+            return
+        }
+        val bypass = prefs.bypassApps.mapNotNull { runCatching { packageManager.getApplicationInfo(it, 0).uid }.getOrNull() }
+        val (code, out) = Root.apply(android.os.Process.myUid(), bypass)
+        if (code != 0) {
+            Root.clear()
+            ShieldState.problem.value = trc(this, "Root mode failed: ", "Le mode root a échoué : ", "Root-Modus fehlgeschlagen: ") + out.trim().lines().lastOrNull().orEmpty().ifEmpty { "su refused" }
+            prefs.wantOn = false
+            teardown()
+            return
+        }
+        rootRules = true
+        started()
+    }
+
+    private fun started() {
         ShieldState.phase.value = Phase.ON
         if (ShieldState.startedAt.value == 0L) ShieldState.startedAt.value = System.currentTimeMillis()
         ShieldState.startPublishing()
@@ -185,6 +226,10 @@ class ShieldVpnService : VpnService() {
 
     private fun teardown() {
         counterJob?.cancel()
+        if (rootRules) {
+            Root.clear()
+            rootRules = false
+        }
         ShieldState.engine.stop()
         ShieldState.stopPublishing()
         ShieldState.phase.value = Phase.OFF
@@ -196,13 +241,17 @@ class ShieldVpnService : VpnService() {
 
     /** Another VPN took over, or the user revoked us in Settings. */
     override fun onRevoke() {
-        ShieldState.problem.value = trc(this, "Another VPN took over, or SonderShield was turned off in Settings.", "Un autre VPN a pris la main, ou SonderShield a été désactivé dans les réglages.")
+        ShieldState.problem.value = trc(this, "Another VPN took over, or SonderShield was turned off in Settings.", "Un autre VPN a pris la main, ou SonderShield a été désactivé dans les réglages.", "Ein anderes VPN hat übernommen, oder SonderShield wurde in den Einstellungen ausgeschaltet.")
         Prefs(this).wantOn = false
         ShieldState.scope.launch { lock.withLock { teardown() } }
     }
 
     override fun onDestroy() {
         counterJob?.cancel()
+        if (rootRules) {
+            Root.clear()
+            rootRules = false
+        }
         if (ShieldState.phase.value != Phase.OFF) {
             ShieldState.engine.stop()
             ShieldState.stopPublishing()

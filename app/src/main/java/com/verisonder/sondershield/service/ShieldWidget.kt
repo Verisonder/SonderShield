@@ -6,7 +6,6 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.net.VpnService
 import android.widget.RemoteViews
 import com.verisonder.sondershield.R
 import com.verisonder.sondershield.core.Phase
@@ -45,15 +44,15 @@ class ShieldWidget : AppWidgetProvider() {
             v.setTextViewText(
                 R.id.widget_state,
                 when (ShieldState.phase.value) {
-                    Phase.ON -> trc(ctx, "Protected", "Protégé")
-                    Phase.STARTING -> trc(ctx, "Starting…", "Démarrage…")
-                    Phase.OFF -> trc(ctx, "Off", "Désactivé")
+                    Phase.ON -> trc(ctx, "Protected", "Protégé", "Geschützt")
+                    Phase.STARTING -> trc(ctx, "Starting…", "Démarrage…", "Startet…")
+                    Phase.OFF -> trc(ctx, "Off", "Désactivé", "Aus")
                 },
             )
             v.setTextViewText(
                 R.id.widget_count,
-                if (on) trc(ctx, "%,d blocked today".format(blocked), "%,d bloqués aujourd'hui".format(blocked))
-                else trc(ctx, "Tap to turn on", "Touchez pour activer"),
+                if (on) trc(ctx, "%,d blocked today".format(blocked), "%,d bloqués aujourd'hui".format(blocked), "%,d heute blockiert".format(blocked))
+                else trc(ctx, "Tap to turn on", "Touchez pour activer", "Tippen zum Einschalten"),
             )
             v.setOnClickPendingIntent(R.id.widget_root, tapIntent(ctx, on))
             mgr.updateAppWidget(ids, v)
@@ -66,7 +65,7 @@ class ShieldWidget : AppWidgetProvider() {
                 on -> PendingIntent.getService(
                     ctx, 20, Intent(ctx, ShieldVpnService::class.java).setAction(ShieldVpnService.ACTION_STOP), flags,
                 )
-                VpnService.prepare(ctx) != null -> PendingIntent.getActivity(
+                ShieldVpnService.needsConsent(ctx) -> PendingIntent.getActivity(
                     ctx, 21, Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         .putExtra(MainActivity.EXTRA_TURN_ON, true), flags,
                 )

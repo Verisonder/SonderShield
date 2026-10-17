@@ -89,13 +89,14 @@ fun AppsScreen() {
 
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(
-            tr("Apps", "Applis"), kicker = tr("Bypass", "Exceptions"),
+            tr("Apps", "Applis", "Apps"), kicker = tr("Bypass", "Exceptions", "Ausnahmen"),
             sub = tr(
                 "Apps switched on here skip SonderShield, so their ads aren't blocked. Use it for an app that breaks.",
                 "Les applis activées ici contournent SonderShield : leurs pubs ne sont pas bloquées. Utile pour une appli qui ne marche plus.",
+                "Hier eingeschaltete Apps umgehen SonderShield, ihre Werbung wird also nicht blockiert. Nützlich für eine App, die nicht mehr geht.",
             ),
         )
-        Field(query, { query = it }, tr("Search apps", "Rechercher une appli"), Modifier.fillMaxWidth().padding(horizontal = Gutter).padding(top = 10.dp), leading = Icons.search)
+        Field(query, { query = it }, tr("Search apps", "Rechercher une appli", "Apps suchen"), Modifier.fillMaxWidth().padding(horizontal = Gutter).padding(top = 10.dp), leading = Icons.search)
         val list = apps
         if (list == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Palette.accent) }
@@ -106,7 +107,7 @@ fun AppsScreen() {
             .sortedBy { if (it.pkg in bypass) 0 else 1 }
         if (bypass.isNotEmpty() && query.isBlank()) {
             Text(
-                tr("${bypass.size} bypassing", "${bypass.size} en exception"), color = Palette.accentText, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp,
+                tr("${bypass.size} bypassing", "${bypass.size} en exception", "${bypass.size} ausgenommen"), color = Palette.accentText, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp,
                 modifier = Modifier.padding(horizontal = Gutter).padding(top = 14.dp),
             )
         }

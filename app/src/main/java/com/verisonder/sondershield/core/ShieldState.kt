@@ -57,6 +57,8 @@ object ShieldState {
     val accent = MutableStateFlow(0xFF3B82FF.toInt())
     /** All-time numbers, hourly history and top blocked domains for Home. */
     val stats = MutableStateFlow(StatsSnapshot())
+    /** Bumped when the app comes back to the front (re-check things set in system Settings). */
+    val resumed = MutableStateFlow(0)
     /** When protection last came on (ms), 0 while off. */
     val startedAt = MutableStateFlow(0L)
     private var store: Stats? = null
@@ -122,14 +124,21 @@ object ShieldState {
             try {
                 engine.setUpstream(prefs.upstreamSpec())
             } catch (e: Exception) {
-                problem.value = com.verisonder.sondershield.ui.trc(app, "DNS server setting is invalid: ${e.message}. Using Cloudflare.", "Réglage du serveur DNS invalide : ${e.message}. Cloudflare est utilisé.")
+                problem.value = com.verisonder.sondershield.ui.trc(app, "DNS server setting is invalid: ${e.message}. Using Cloudflare.", "Réglage du serveur DNS invalide : ${e.message}. Cloudflare est utilisé.", "DNS-Server-Einstellung ungültig: ${e.message}. Cloudflare wird verwendet.")
                 engine.setUpstream(Upstreams.byId(Upstreams.DEFAULT)!!.spec)
             }
             try {
-                engine.setWireGuard(if (prefs.fullTunnel && prefs.wgOn) prefs.wgConfig else "")
+                if (prefs.httpsOn && prefs.caPem.isEmpty()) prefs.caPem = shield.Shield.generateCA()
+                val on = prefs.httpsOn && prefs.tunnelFull
+                engine.setHTTPS(if (on) prefs.caPem else "", if (on) Https.uids(app, prefs.httpsApps.orEmpty()) else "", prefs.httpsSkip)
+            } catch (e: Exception) {
+                problem.value = com.verisonder.sondershield.ui.trc(app, "HTTPS filtering could not start: ${e.message}", "Le filtrage HTTPS n'a pas démarré : ${e.message}", "HTTPS-Filterung konnte nicht starten: ${e.message}")
+            }
+            try {
+                engine.setWireGuard(if (prefs.tunnelFull && prefs.wgOn) prefs.wgConfig else "")
             } catch (e: Exception) {
                 engine.setWireGuard("")
-                problem.value = com.verisonder.sondershield.ui.trc(app, "WireGuard config is invalid: ${e.message}. Going out directly.", "Configuration WireGuard invalide : ${e.message}. Connexion directe.")
+                problem.value = com.verisonder.sondershield.ui.trc(app, "WireGuard config is invalid: ${e.message}. Going out directly.", "Configuration WireGuard invalide : ${e.message}. Connexion directe.", "WireGuard-Konfiguration ungültig: ${e.message}. Direkte Verbindung.")
             }
             try {
                 engine.setLists(ListStore(app).enabledPaths())

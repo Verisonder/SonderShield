@@ -367,13 +367,18 @@ fun IconPill(icon: ImageVector, description: String, onClick: () -> Unit) {
 fun Long.grouped(): String = "%,d".format(this)
 fun Int.grouped(): String = "%,d".format(this)
 
-fun ago(ms: Long, fr: Boolean = false): String {
-    if (ms <= 0) return if (fr) "jamais" else "never"
+fun ago(ms: Long, lang: String = "en"): String {
+    if (ms <= 0) return when (lang) { "fr" -> "jamais"; "de" -> "nie"; else -> "never" }
     val s = (System.currentTimeMillis() - ms) / 1000
+    fun x(n: Long, unitEn: String, unitFr: String, unitDe: String) = when (lang) {
+        "fr" -> "il y a $n $unitFr"
+        "de" -> "vor $n $unitDe"
+        else -> "$n $unitEn ago"
+    }
     return when {
-        s < 60 -> if (fr) "à l'instant" else "just now"
-        s < 3600 -> if (fr) "il y a ${s / 60} min" else "${s / 60} min ago"
-        s < 86400 -> if (fr) "il y a ${s / 3600} h" else "${s / 3600} h ago"
-        else -> if (fr) "il y a ${s / 86400} j" else "${s / 86400} d ago"
+        s < 60 -> when (lang) { "fr" -> "à l'instant"; "de" -> "gerade eben"; else -> "just now" }
+        s < 3600 -> x(s / 60, "min", "min", "Min.")
+        s < 86400 -> x(s / 3600, "h", "h", "Std.")
+        else -> x(s / 86400, "d", "j", "T.")
     }
 }

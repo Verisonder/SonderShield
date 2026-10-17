@@ -51,7 +51,7 @@ fun RulesScreen() {
     fun add() {
         val d = input.trim().lowercase().removePrefix("https://").removePrefix("http://").substringBefore('/')
         if (!Regex("^(\\*\\.)?[a-z0-9_-]+(\\.[a-z0-9_-]+)+$").matches(d)) {
-            error = trc(ctx, "Enter a domain like ads.example.com", "Entrez un domaine comme ads.example.com")
+            error = trc(ctx, "Enter a domain like ads.example.com", "Entrez un domaine comme ads.example.com", "Gib eine Domain wie ads.example.com ein")
             return
         }
         error = null
@@ -68,26 +68,26 @@ fun RulesScreen() {
 
     LazyColumn(Modifier.fillMaxSize()) {
         item {
-            ScreenHeader(tr("Rules", "Règles"), kicker = tr("Yours win", "Les vôtres passent d'abord"))
+            ScreenHeader(tr("Rules", "Règles", "Regeln"), kicker = tr("Yours win", "Les vôtres passent d'abord", "Deine gewinnen"))
             ChipRow(Modifier.padding(top = 4.dp)) {
-                Chip(tr("Block", "Bloquer"), !allowTab) { allowTab = false }
-                Chip(tr("Allow", "Autoriser"), allowTab) { allowTab = true }
+                Chip(tr("Block", "Bloquer", "Blockieren"), !allowTab) { allowTab = false }
+                Chip(tr("Allow", "Autoriser", "Erlauben"), allowTab) { allowTab = true }
             }
             Text(
-                if (allowTab) tr("Always allowed, even when a list blocks them. Covers subdomains.", "Toujours autorisés, même si une liste les bloque. Inclut les sous-domaines.")
-                else tr("Always blocked. Covers subdomains: example.com also blocks ads.example.com.", "Toujours bloqués. Inclut les sous-domaines : example.com bloque aussi ads.example.com."),
+                if (allowTab) tr("Always allowed, even when a list blocks them. Covers subdomains.", "Toujours autorisés, même si une liste les bloque. Inclut les sous-domaines.", "Immer erlaubt, auch wenn eine Liste sie blockiert. Gilt für Subdomains.")
+                else tr("Always blocked. Covers subdomains: example.com also blocks ads.example.com.", "Toujours bloqués. Inclut les sous-domaines : example.com bloque aussi ads.example.com.", "Immer blockiert. Gilt für Subdomains: example.com blockiert auch ads.example.com."),
                 color = Palette.dim, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(horizontal = Gutter, vertical = 8.dp),
             )
             Row(Modifier.padding(horizontal = Gutter), verticalAlignment = Alignment.CenterVertically) {
-                Field(input, { input = it; error = null }, tr("Add a domain", "Ajouter un domaine"), Modifier.weight(1f), keyboard = KeyboardType.Uri, onDone = ::add)
+                Field(input, { input = it; error = null }, tr("Add a domain", "Ajouter un domaine", "Domain hinzufügen"), Modifier.weight(1f), keyboard = KeyboardType.Uri, onDone = ::add)
                 Spacer(Modifier.width(8.dp))
-                PillButton(tr("Add", "Ajouter"), onClick = ::add)
+                PillButton(tr("Add", "Ajouter", "Hinzufügen"), onClick = ::add)
             }
             error?.let { Text(it, color = Palette.warn, fontSize = 12.sp, modifier = Modifier.padding(horizontal = Gutter, vertical = 6.dp)) }
 
             // Check what happens to a domain, and why.
-            Section(1, tr("Test a domain", "Tester un domaine"), first = true) {
-                Field(test, { test = it }, tr("e.g. graph.facebook.com", "ex. graph.facebook.com"), Modifier.fillMaxWidth(), keyboard = KeyboardType.Uri)
+            Section(1, tr("Test a domain", "Tester un domaine", "Domain testen"), first = true) {
+                Field(test, { test = it }, tr("e.g. graph.facebook.com", "ex. graph.facebook.com", "z. B. graph.facebook.com"), Modifier.fillMaxWidth(), keyboard = KeyboardType.Uri)
                 if (test.isNotBlank()) {
                     val r = ShieldState.engine.check(test.trim()).split('|')
                     val verdict = r.getOrElse(0) { "" }
@@ -97,15 +97,15 @@ fun RulesScreen() {
                     Block(Modifier.padding(top = 8.dp), color = if (blockedNow) Palette.accent else Palette.panel) {
                         Text(
                             when (verdict) {
-                                "blocked" -> tr("Blocked", "Bloqué")
-                                "allowed" -> tr("Allowed", "Autorisé")
-                                else -> tr("Not a valid domain", "Domaine invalide")
+                                "blocked" -> tr("Blocked", "Bloqué", "Blockiert")
+                                "allowed" -> tr("Allowed", "Autorisé", "Erlaubt")
+                                else -> tr("Not a valid domain", "Domaine invalide", "Keine gültige Domain")
                             },
                             style = display(18), color = if (blockedNow) Palette.onAccent else Palette.text,
                         )
                         if (verdict == "blocked" || verdict == "allowed") {
                             Text(
-                                if (reason.isNotEmpty()) tr("by ", "par ") + reasonLabel(ctx, reason) + " · $match" else tr("No list or rule matches it.", "Aucune liste ni règle ne le concerne."),
+                                if (reason.isNotEmpty()) tr("by ", "par ", "durch ") + reasonLabel(ctx, reason) + " · $match" else tr("No list or rule matches it.", "Aucune liste ni règle ne le concerne.", "Keine Liste und keine Regel passt."),
                                 color = if (blockedNow) Palette.onAccent else Palette.dim, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp),
                             )
                         }
@@ -113,16 +113,16 @@ fun RulesScreen() {
                 }
             }
 
-            Section(2, if (allowTab) tr("Allowed", "Autorisés") + " (${rules.size})" else tr("Blocked", "Bloqués") + " (${rules.size})") {
+            Section(2, if (allowTab) tr("Allowed", "Autorisés", "Erlaubt") + " (${rules.size})" else tr("Blocked", "Bloqués", "Blockiert") + " (${rules.size})") {
                 if (rules.isEmpty()) {
-                    Text(tr("No rules yet. You can also add them from the Log.", "Aucune règle. Vous pouvez aussi en ajouter depuis le Journal."), color = Palette.faint, fontSize = 13.sp, modifier = Modifier.padding(bottom = 16.dp))
+                    Text(tr("No rules yet. You can also add them from the Log.", "Aucune règle. Vous pouvez aussi en ajouter depuis le Journal.", "Noch keine Regeln. Du kannst sie auch im Protokoll hinzufügen."), color = Palette.faint, fontSize = 13.sp, modifier = Modifier.padding(bottom = 16.dp))
                 }
             }
         }
         items(rules) { r ->
             Box(Modifier.padding(horizontal = Gutter)) {
-                OptionCard(r, if (allowTab) tr("always allowed", "toujours autorisé") else tr("always blocked", "toujours bloqué")) {
-                    IconPill(Icons.close, tr("Remove", "Retirer") + " $r") {
+                OptionCard(r, if (allowTab) tr("always allowed", "toujours autorisé", "immer erlaubt") else tr("always blocked", "toujours bloqué", "immer blockiert")) {
+                    IconPill(Icons.close, tr("Remove", "Retirer", "Entfernen") + " $r") {
                         if (allowTab) allow = removeLine(allow, r) else block = removeLine(block, r)
                         save()
                     }

@@ -3,7 +3,6 @@ package com.verisonder.sondershield.service
 import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
-import android.net.VpnService
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
@@ -25,7 +24,7 @@ class ShieldTile : TileService() {
         super.onClick()
         if (ShieldState.phase.value != Phase.OFF) {
             ShieldVpnService.stop(this)
-        } else if (VpnService.prepare(this) != null) {
+        } else if (ShieldVpnService.needsConsent(this)) {
             // First time: the VPN permission dialog needs an activity.
             openApp()
         } else {

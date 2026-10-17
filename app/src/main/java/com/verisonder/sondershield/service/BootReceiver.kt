@@ -3,7 +3,6 @@ package com.verisonder.sondershield.service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.net.VpnService
 import com.verisonder.sondershield.data.Prefs
 
 /** Turns protection back on after a reboot or an app update, if it was on before. */
@@ -16,7 +15,7 @@ class BootReceiver : BroadcastReceiver() {
         val prefs = Prefs(context)
         val wanted = prefs.wantOn && (prefs.startOnBoot || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED)
         // prepare() is null only while the user's VPN consent still stands.
-        if (wanted && VpnService.prepare(context) == null) {
+        if (wanted && !ShieldVpnService.needsConsent(context)) {
             ShieldVpnService.start(context)
         }
     }

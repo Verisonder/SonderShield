@@ -92,6 +92,34 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("wg.on", false)
         set(v) = sp.edit().putBoolean("wg.on", v).apply()
 
+    /** Root mode: no VPN; iptables sends DNS to the engine's local server. */
+    var rootMode: Boolean
+        get() = sp.getBoolean("root", false)
+        set(v) = sp.edit().putBoolean("root", v).apply()
+
+    /** HTTPS filtering in the chosen apps (needs the full tunnel and the CA installed). */
+    var httpsOn: Boolean
+        get() = sp.getBoolean("https.on", false)
+        set(v) = sp.edit().putBoolean("https.on", v).apply()
+
+    /** SonderShield's CA, certificate and key as PEM. Made once, kept out of backups. */
+    var caPem: String
+        get() = sp.getString("https.ca", "") ?: ""
+        set(v) = sp.edit().putString("https.ca", v).apply()
+
+    /** Apps whose HTTPS is filtered; null until the user (or the first switch-on) picks. */
+    var httpsApps: Set<String>?
+        get() = sp.getStringSet("https.apps", null)?.toSet()
+        set(v) = sp.edit().putStringSet("https.apps", v).apply()
+
+    /** Your own never-filter domains, one per line. */
+    var httpsSkip: String
+        get() = sp.getString("https.skip", "") ?: ""
+        set(v) = sp.edit().putString("https.skip", v).apply()
+
+    /** The tunnel carries everything (full tunnel or HTTPS filtering), not only DNS. */
+    val tunnelFull: Boolean get() = !rootMode && (fullTunnel || httpsOn)
+
     var startOnBoot: Boolean
         get() = sp.getBoolean("boot", true)
         set(v) = sp.edit().putBoolean("boot", v).apply()

@@ -82,18 +82,19 @@ func (f *filter) decide(name string) (bool, string, string) {
 // parseList reads hosts files ("0.0.0.0 host"), AdBlock-style DNS rules
 // ("||host^", "@@||host^") and plain domain lists ("host", "*.host"), and adds to
 // block and allow. Rules that can't be expressed per domain are skipped.
-func parseList(r io.Reader, block, allow domainSet, src uint16) (int, error) {
+func parseList(r io.Reader, block, allow domainSet, src uint16, cos *cosmetics) (int, error) {
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 64*1024), 1024*1024)
 	n := 0
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
-		if line == "" || line[0] == '#' || line[0] == '!' || line[0] == '[' {
+		if line == "" || line[0] == '!' || line[0] == '[' || (line[0] == '#' && !genericCosmetic(line)) {
 			continue
 		}
 		if i := strings.IndexByte(line, '#'); i >= 0 {
-			if strings.Contains(line, "##") || strings.Contains(line, "#@#") || strings.Contains(line, "#$#") || strings.Contains(line, "#%#") {
-				continue // cosmetic rule, not DNS
+			if strings.Contains(line, "##") || strings.Contains(line, "#@#") || strings.Contains(line, "#$#") || strings.Contains(line, "#%#") || strings.Contains(line, "#@$#") || strings.Contains(line, "#@%#") {
+				cos.parseCosmetic(line) // page rule for HTTPS filtering, not DNS
+				continue
 			}
 			line = strings.TrimSpace(line[:i])
 		}
@@ -108,6 +109,12 @@ func parseList(r io.Reader, block, allow domainSet, src uint16) (int, error) {
 		if strings.HasPrefix(line, "||") {
 			line = line[2:]
 			if i := strings.IndexByte(line, '$'); i >= 0 {
+				if isAllow && hideException(line[i+1:]) {
+					if d, ok := cleanDomain(strings.TrimSuffix(strings.TrimSuffix(line[:i], "|"), "^")); ok && cos != nil {
+						cos.noHide[d] = src
+					}
+					continue
+				}
 				if !okModifiers(line[i+1:]) {
 					continue
 				}
@@ -165,13 +172,34 @@ func parseRules(text string) domainSet {
 	return s
 }
 
-func loadListFile(path string, block, allow domainSet, src uint16) (int, error) {
+// genericCosmetic: a page rule for every site ("##.ad"), not a "#" comment.
+func genericCosmetic(line string) bool {
+	for _, p := range []string{"##", "#@#", "#%#", "#$#", "#@%#", "#@$#"} {
+		if strings.HasPrefix(line, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// hideException: "$elemhide", "$generichide" and friends: no element hiding on that site.
+func hideException(m string) bool {
+	for _, p := range strings.Split(m, ",") {
+		switch strings.TrimSpace(p) {
+		case "elemhide", "ehide", "generichide", "ghide", "document", "doc":
+			return true
+		}
+	}
+	return false
+}
+
+func loadListFile(path string, block, allow domainSet, src uint16, cos *cosmetics) (int, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, err
 	}
 	defer f.Close()
-	return parseList(f, block, allow, src)
+	return parseList(f, block, allow, src, cos)
 }
 
 func okModifiers(m string) bool {

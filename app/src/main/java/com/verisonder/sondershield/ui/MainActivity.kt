@@ -78,8 +78,9 @@ import androidx.core.content.ContextCompat
 import com.verisonder.sondershield.core.ShieldState
 import com.verisonder.sondershield.service.ShieldVpnService
 
-enum class Tab(val label: String, val fr: String) {
-    Home("Home", "Accueil"), Log("Log", "Journal"), Rules("Rules", "Règles"), Apps("Apps", "Applis"), Settings("Settings", "Réglages")
+enum class Tab(val label: String, val fr: String, val de: String) {
+    Home("Home", "Accueil", "Start"), Log("Log", "Journal", "Protokoll"), Rules("Rules", "Règles", "Regeln"),
+    Apps("Apps", "Applis", "Apps"), Settings("Settings", "Réglages", "Einstellungen")
 }
 
 class MainActivity : ComponentActivity() {
@@ -92,7 +93,7 @@ class MainActivity : ComponentActivity() {
         if (r.resultCode == Activity.RESULT_OK) {
             ShieldVpnService.start(this)
         } else {
-            ShieldState.problem.value = trc(this, "VPN permission was not given. SonderShield needs it to filter DNS on this phone.", "L'autorisation VPN n'a pas été donnée. SonderShield en a besoin pour filtrer le DNS sur ce téléphone.")
+            ShieldState.problem.value = trc(this, "VPN permission was not given. SonderShield needs it to filter DNS on this phone.", "L'autorisation VPN n'a pas été donnée. SonderShield en a besoin pour filtrer le DNS sur ce téléphone.", "Die VPN-Berechtigung wurde nicht erteilt. SonderShield braucht sie, um DNS auf diesem Handy zu filtern.")
         }
     }
 
@@ -165,6 +166,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        ShieldState.resumed.value++
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.getBooleanExtra(EXTRA_TURN_ON, false)) turnOn()
@@ -180,7 +186,7 @@ class MainActivity : ComponentActivity() {
         ) {
             notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        val consent = VpnService.prepare(this)
+        val consent = if (com.verisonder.sondershield.data.Prefs(this).rootMode) null else VpnService.prepare(this)
         if (consent != null) vpnConsent.launch(consent) else ShieldVpnService.start(this)
     }
 }
@@ -199,7 +205,7 @@ private fun BottomBar(current: Tab, onPick: (Tab) -> Unit) {
         ) {
             for (t in Tab.entries) {
                 val on = t == current
-                val name = if (isFrench()) t.fr else t.label
+                val name = when (lang()) { "fr" -> t.fr; "de" -> t.de; else -> t.label }
                 // The picked tab widens into a pill and its name slides out next to the icon.
                 val weight by animateFloatAsState(if (on) 1.8f else 1f, spring(dampingRatio = 0.7f, stiffness = 500f), label = "w")
                 val pill by animateColorAsState(if (on) Palette.accent else Color.Transparent, tween(220), label = "pill")

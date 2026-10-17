@@ -22,7 +22,9 @@ object Backup {
             put("upstream", p.upstreamId); put("customUpstream", p.customUpstream)
             put("blockRules", p.blockRules); put("allowRules", p.allowRules)
             put("bypass", JSONArray(p.bypassApps.toList()))
-            put("ipv6", p.ipv6); put("fullTunnel", p.fullTunnel); put("boot", p.startOnBoot); put("updateHours", p.updateHours)
+            put("ipv6", p.ipv6); put("fullTunnel", p.fullTunnel); put("root", p.rootMode); put("httpsOn", p.httpsOn); put("httpsSkip", p.httpsSkip)
+            p.httpsApps?.let { put("httpsApps", JSONArray(it.toList())) }
+            put("boot", p.startOnBoot); put("updateHours", p.updateHours)
             put("theme", p.theme); put("accent", p.accent)
         }
         ctx.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(o.toString(2).toByteArray()) }
@@ -46,6 +48,10 @@ object Backup {
         o.optJSONArray("bypass")?.let { a -> p.bypassApps = (0 until a.length()).map { a.getString(it) }.toSet() }
         if (o.has("ipv6")) p.ipv6 = o.getBoolean("ipv6")
         if (o.has("fullTunnel")) p.fullTunnel = o.getBoolean("fullTunnel")
+        if (o.has("root")) p.rootMode = o.getBoolean("root")
+        if (o.has("httpsOn")) p.httpsOn = o.getBoolean("httpsOn")
+        if (o.has("httpsSkip")) p.httpsSkip = o.getString("httpsSkip")
+        o.optJSONArray("httpsApps")?.let { a -> p.httpsApps = (0 until a.length()).map { a.getString(it) }.toSet() }
         if (o.has("boot")) p.startOnBoot = o.getBoolean("boot")
         if (o.has("updateHours")) p.updateHours = o.getInt("updateHours")
         if (o.has("theme")) p.theme = o.getString("theme")

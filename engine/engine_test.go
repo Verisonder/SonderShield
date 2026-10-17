@@ -73,7 +73,7 @@ bad domain with spaces
 
 func TestParseList(t *testing.T) {
 	block, allow := domainSet{}, domainSet{}
-	n, err := parseList(strings.NewReader(sampleList), block, allow, 1)
+	n, err := parseList(strings.NewReader(sampleList), block, allow, 1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
