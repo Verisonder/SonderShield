@@ -25,6 +25,8 @@ data class LogEntry(
     val verdict: Int,
     val reason: String,
     val ms: Int,
+    /** The app that asked, -1 when unknown. */
+    val uid: Int = -1,
 ) {
     val typeName: String get() = when (qtype) {
         1 -> "A"; 28 -> "AAAA"; 65 -> "HTTPS"; 64 -> "SVCB"; 5 -> "CNAME"; 12 -> "PTR"
@@ -66,8 +68,8 @@ object ShieldState {
     private var publisher: Job? = null
 
     private val listener = object : shield.Listener {
-        override fun onQuery(domain: String?, qtype: Long, verdict: Long, reason: String?, ms: Long) {
-            val e = LogEntry(System.currentTimeMillis(), domain.orEmpty(), qtype.toInt(), verdict.toInt(), reason.orEmpty(), ms.toInt())
+        override fun onQuery(domain: String?, qtype: Long, verdict: Long, reason: String?, ms: Long, uid: Long) {
+            val e = LogEntry(System.currentTimeMillis(), domain.orEmpty(), qtype.toInt(), verdict.toInt(), reason.orEmpty(), ms.toInt(), uid.toInt())
             synchronized(ring) {
                 ring.addFirst(e)
                 if (ring.size > LOG_MAX) ring.removeLast()
@@ -80,11 +82,30 @@ object ShieldState {
         }
     }
 
+    /** Which app owns a connection inside the tunnel (Android 10+). */
+    private val resolver = object : shield.AppResolver {
+        override fun uid(proto: Long, srcIP: String?, srcPort: Long, dstIP: String?, dstPort: Long): Long {
+            if (android.os.Build.VERSION.SDK_INT < 29 || srcIP == null || dstIP == null) return -1
+            val cm = app.getSystemService(android.net.ConnectivityManager::class.java) ?: return -1
+            return try {
+                // Literal addresses: no DNS lookup happens here.
+                cm.getConnectionOwnerUid(
+                    proto.toInt(),
+                    java.net.InetSocketAddress(java.net.InetAddress.getByName(srcIP), srcPort.toInt()),
+                    java.net.InetSocketAddress(java.net.InetAddress.getByName(dstIP), dstPort.toInt()),
+                ).toLong()
+            } catch (_: Exception) {
+                -1
+            }
+        }
+    }
+
     fun init(context: Context) {
         if (::app.isInitialized) return
         app = context.applicationContext
         com.verisonder.sondershield.data.CrashLog.install(app)
         engine.setListener(listener)
+        engine.setAppResolver(resolver)
         today.value = Prefs(app).todayCounts()
         theme.value = Prefs(app).theme
         accent.value = Prefs(app).accent
@@ -103,6 +124,12 @@ object ShieldState {
             } catch (e: Exception) {
                 problem.value = com.verisonder.sondershield.ui.trc(app, "DNS server setting is invalid: ${e.message}. Using Cloudflare.", "Réglage du serveur DNS invalide : ${e.message}. Cloudflare est utilisé.")
                 engine.setUpstream(Upstreams.byId(Upstreams.DEFAULT)!!.spec)
+            }
+            try {
+                engine.setWireGuard(if (prefs.fullTunnel && prefs.wgOn) prefs.wgConfig else "")
+            } catch (e: Exception) {
+                engine.setWireGuard("")
+                problem.value = com.verisonder.sondershield.ui.trc(app, "WireGuard config is invalid: ${e.message}. Going out directly.", "Configuration WireGuard invalide : ${e.message}. Connexion directe.")
             }
             try {
                 engine.setLists(ListStore(app).enabledPaths())

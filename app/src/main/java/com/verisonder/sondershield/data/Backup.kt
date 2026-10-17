@@ -22,7 +22,7 @@ object Backup {
             put("upstream", p.upstreamId); put("customUpstream", p.customUpstream)
             put("blockRules", p.blockRules); put("allowRules", p.allowRules)
             put("bypass", JSONArray(p.bypassApps.toList()))
-            put("ipv6", p.ipv6); put("boot", p.startOnBoot); put("updateHours", p.updateHours)
+            put("ipv6", p.ipv6); put("fullTunnel", p.fullTunnel); put("boot", p.startOnBoot); put("updateHours", p.updateHours)
             put("theme", p.theme); put("accent", p.accent)
         }
         ctx.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(o.toString(2).toByteArray()) }
@@ -45,6 +45,7 @@ object Backup {
         if (o.has("allowRules")) p.allowRules = o.getString("allowRules")
         o.optJSONArray("bypass")?.let { a -> p.bypassApps = (0 until a.length()).map { a.getString(it) }.toSet() }
         if (o.has("ipv6")) p.ipv6 = o.getBoolean("ipv6")
+        if (o.has("fullTunnel")) p.fullTunnel = o.getBoolean("fullTunnel")
         if (o.has("boot")) p.startOnBoot = o.getBoolean("boot")
         if (o.has("updateHours")) p.updateHours = o.getInt("updateHours")
         if (o.has("theme")) p.theme = o.getString("theme")
@@ -54,10 +55,10 @@ object Backup {
     fun exportLog(ctx: Context, uri: Uri, log: List<LogEntry>) {
         val f = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
         ctx.contentResolver.openOutputStream(uri, "wt")!!.bufferedWriter().use { w ->
-            w.write("time,domain,type,result,reason,ms\n")
+            w.write("time,domain,type,result,reason,ms,app\n")
             for (e in log.asReversed()) {
                 val result = when (e.verdict) { 1 -> "blocked"; 2 -> "failed"; else -> "allowed" }
-                w.write("${f.format(Date(e.time))},${e.domain},${e.typeName},$result,\"${e.reason.replace("\"", "'")}\",${e.ms}\n")
+                w.write("${f.format(Date(e.time))},${e.domain},${e.typeName},$result,\"${e.reason.replace("\"", "'")}\",${e.ms},${com.verisonder.sondershield.core.AppNames.label(ctx, e.uid).orEmpty().replace(",", " ")}\n")
             }
         }
     }

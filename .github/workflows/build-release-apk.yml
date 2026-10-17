@@ -68,8 +68,11 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.24"
           cache: false
+      - name: Resolve engine dependencies
+        shell: bash
+        run: cd engine && go mod tidy
       - name: Build the engine
         shell: bash
         run: tools/build_engine.sh 2>&1 | tee engine.log

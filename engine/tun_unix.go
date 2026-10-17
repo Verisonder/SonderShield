@@ -10,7 +10,7 @@ import (
 	"syscall"
 )
 
-type runner struct {
+type dnsRunner struct {
 	f      *os.File
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -30,7 +30,7 @@ func (e *Engine) Start(fd int) error {
 		return errors.New("bad tunnel descriptor")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	r := &runner{f: f, cancel: cancel}
+	r := &dnsRunner{f: f, cancel: cancel}
 	e.runMu.Lock()
 	e.run = r
 	e.runMu.Unlock()
@@ -39,7 +39,7 @@ func (e *Engine) Start(fd int) error {
 	return nil
 }
 
-func (e *Engine) loop(ctx context.Context, r *runner) {
+func (e *Engine) loop(ctx context.Context, r *dnsRunner) {
 	defer r.wg.Done()
 	sem := make(chan struct{}, 256)
 	for {
@@ -67,7 +67,7 @@ func (e *Engine) loop(ctx context.Context, r *runner) {
 	}
 }
 
-func (r *runner) stop() {
+func (r *dnsRunner) stop() {
 	r.cancel()
 	r.f.Close()
 	r.wg.Wait()

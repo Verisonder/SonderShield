@@ -30,9 +30,12 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * The tunnel. Only DNS is routed into it: the device's resolver is pointed at a
+ * The tunnel. By default only DNS is routed into it: the device's resolver is pointed at a
  * virtual address inside the tunnel and every other packet keeps its normal path, so
  * there is no speed cost and nothing else is touched.
+ *
+ * Full-tunnel mode routes everything in; the engine re-makes each connection from this
+ * app (excluded from its own VPN), directly or through WireGuard.
  */
 class ShieldVpnService : VpnService() {
 
@@ -49,6 +52,7 @@ class ShieldVpnService : VpnService() {
         const val V4_DNS = "10.111.222.53"
         const val V6_ADDR = "fd00:5d5d::1"
         const val V6_DNS = "fd00:5d5d::53"
+        private const val MTU = 1500
 
         fun start(context: Context) {
             Prefs(context).wantOn = true
@@ -113,14 +117,21 @@ class ShieldVpnService : VpnService() {
         ShieldState.applyConfig()
 
         val prefs = Prefs(this)
+        val full = prefs.fullTunnel
         val b = Builder()
             .setSession(getString(R.string.app_name))
-            .setMtu(1500)
+            .setMtu(MTU)
             .addAddress(V4_ADDR, 24)
             .addDnsServer(V4_DNS)
-            .addRoute(V4_DNS, 32)
-        if (prefs.ipv6) {
-            b.addAddress(V6_ADDR, 64).addDnsServer(V6_DNS).addRoute(V6_DNS, 128)
+        if (full) {
+            // Everything in, IPv6 included (else it would leak around a WireGuard server).
+            b.addRoute("0.0.0.0", 0).addAddress(V6_ADDR, 64).addRoute("::", 0)
+            if (prefs.ipv6) b.addDnsServer(V6_DNS)
+            // The engine's own connections must go out on the real network.
+            b.addDisallowedApplication(packageName)
+        } else {
+            b.addRoute(V4_DNS, 32)
+            if (prefs.ipv6) b.addAddress(V6_ADDR, 64).addDnsServer(V6_DNS).addRoute(V6_DNS, 128)
         }
         for (pkg in prefs.bypassApps) {
             try {
@@ -146,7 +157,8 @@ class ShieldVpnService : VpnService() {
             return
         }
         try {
-            ShieldState.engine.start(pfd.detachFd().toLong())
+            val fd = pfd.detachFd().toLong()
+            if (full) ShieldState.engine.startFull(fd, MTU.toLong()) else ShieldState.engine.start(fd)
         } catch (e: Exception) {
             ShieldState.problem.value = trc(this, "Engine failed to start: ", "Le moteur n'a pas démarré : ") + e.message
             prefs.wantOn = false

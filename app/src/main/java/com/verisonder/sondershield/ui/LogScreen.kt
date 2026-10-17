@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.verisonder.sondershield.core.AppNames
 import com.verisonder.sondershield.core.LogEntry
 import com.verisonder.sondershield.core.Phase
 import com.verisonder.sondershield.core.ShieldState
@@ -58,7 +59,7 @@ fun LogScreen() {
     val shown = remember(log, query, filter) {
         log.asSequence()
             .filter { filter == 0 || (filter == 1 && it.verdict == 1) || (filter == 2 && it.verdict != 1) }
-            .filter { query.isBlank() || it.domain.contains(query.trim(), ignoreCase = true) }
+            .filter { query.isBlank() || it.domain.contains(query.trim(), ignoreCase = true) || AppNames.label(ctx, it.uid)?.contains(query.trim(), ignoreCase = true) == true }
             .take(1000).toList()
     }
     val blockedCount = remember(log) { log.count { it.verdict == 1 } }
@@ -70,7 +71,7 @@ fun LogScreen() {
         ) {
             if (log.isNotEmpty()) IconPill(Icons.trash, tr("Clear log", "Vider le journal")) { ShieldState.clearLog() }
         }
-        Field(query, { query = it }, tr("Search domains", "Rechercher un domaine"), Modifier.fillMaxWidth().padding(horizontal = Gutter).padding(top = 10.dp), leading = Icons.search)
+        Field(query, { query = it }, tr("Search domains or apps", "Rechercher un domaine ou une appli"), Modifier.fillMaxWidth().padding(horizontal = Gutter).padding(top = 10.dp), leading = Icons.search)
         ChipRow(Modifier.padding(top = 6.dp, bottom = 4.dp)) {
             Chip(tr("All", "Tout"), filter == 0) { filter = 0 }
             Chip(tr("Blocked", "Bloqués"), filter == 1) { filter = 1 }
@@ -108,6 +109,7 @@ fun LogScreen() {
                         color = if (e.verdict == 1) Palette.accentText else Palette.dim, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                     )
                     Text("${e.typeName} · ${time(e.time)}${if (e.ms > 0) " · ${e.ms} ms" else ""}", color = Palette.faint, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+                    AppNames.label(ctx, e.uid)?.let { Text(tr("Asked by ", "Demandé par ") + it, color = Palette.dim, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp)) }
                     if (e.verdict == 1 && isListReason(e.reason)) {
                         Text(tr("Allowing it adds an allow rule, which wins over every list.", "L'autoriser ajoute une règle d'autorisation, qui passe avant toutes les listes."), color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
                     }
@@ -146,6 +148,7 @@ fun LogScreen() {
 private fun LogRow(e: LogEntry, onClick: () -> Unit) {
     val ctx = LocalContext.current
     val blocked = e.verdict == 1
+    val appName = remember(e.uid) { AppNames.label(ctx, e.uid) }
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             // The bar on the left: accent for blocked, amber for failed, grey otherwise.
@@ -158,7 +161,8 @@ private fun LogRow(e: LogEntry, onClick: () -> Unit) {
                 Text(e.domain, color = Palette.text, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     buildString {
-                        append(e.typeName); append(" · "); append(time(e.time))
+                        append(time(e.time))
+                        if (appName != null) { append(" · "); append(appName) } else { append(" · "); append(e.typeName) }
                         if (blocked) { append(" · "); append(reasonLabel(ctx, e.reason)) }
                     },
                     color = Palette.faint, fontSize = 12.sp, maxLines = 1,

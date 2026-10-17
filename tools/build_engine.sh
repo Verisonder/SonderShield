@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds app/libs/engine.aar from engine/ with gomobile.
-# Needs Go 1.23+ and the Android NDK (ANDROID_NDK_HOME, or ANDROID_HOME/ndk/<version>).
+# Needs Go 1.24+ (run "go mod tidy" in engine/ first) and the Android NDK (ANDROID_NDK_HOME, or ANDROID_HOME/ndk/<version>).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -22,7 +22,7 @@ gomobile init
 
 cd engine
 # gomobile bind needs golang.org/x/mobile in the module; added here, not committed,
-# so the engine itself keeps no dependencies.
+# so the engine module only lists what it uses itself.
 cp go.mod go.mod.bak
 [ -f go.sum ] && cp go.sum go.sum.bak
 trap 'mv go.mod.bak go.mod; if [ -f go.sum.bak ]; then mv go.sum.bak go.sum; else rm -f go.sum; fi' EXIT

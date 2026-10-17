@@ -109,6 +109,9 @@ private fun SettingsContent(onReload: () -> Unit) {
     var hours by remember { mutableIntStateOf(prefs.updateHours) }
     var ipv6 by remember { mutableStateOf(prefs.ipv6) }
     var boot by remember { mutableStateOf(prefs.startOnBoot) }
+    var full by remember { mutableStateOf(prefs.fullTunnel) }
+    var wgName by remember { mutableStateOf(prefs.wgName) }
+    var wgOn by remember { mutableStateOf(prefs.wgOn) }
     var addList by remember { mutableStateOf(false) }
     var confirmReset by remember { mutableStateOf(false) }
     var tick by remember { mutableIntStateOf(0) } // re-read list metadata
@@ -259,8 +262,62 @@ private fun SettingsContent(onReload: () -> Unit) {
             ) { Icon(Icons.chevron, null, tint = Palette.faint, modifier = Modifier.size(18.dp)) }
         }
 
-        // 05 Theme
-        Section(5, tr("Theme", "Thème")) {
+        // 05 Tunnel
+        Section(5, tr("Tunnel", "Tunnel")) {
+            val importWg = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                if (uri == null) return@rememberLauncherForActivityResult
+                val text = runCatching { readSmallText(ctx, uri) }.getOrNull()
+                val problem = if (text == null) trc(ctx, "Could not read the file", "Impossible de lire le fichier") else shield.Shield.checkWireGuard(text)
+                if (!problem.isNullOrEmpty()) {
+                    toast(ctx, trc(ctx, "Not a usable WireGuard config: ", "Configuration WireGuard inutilisable : ") + problem)
+                } else {
+                    prefs.wgConfig = text!!
+                    prefs.wgName = displayName(ctx, uri)?.removeSuffix(".conf") ?: "WireGuard"
+                    prefs.wgOn = true
+                    wgName = prefs.wgName; wgOn = true
+                    ShieldVpnService.restartIfOn(ctx)
+                }
+            }
+            ToggleCard(
+                tr("Full tunnel", "Tunnel complet"),
+                tr(
+                    "Send all traffic through SonderShield, not only DNS. Needed for WireGuard. Uses a little more battery.",
+                    "Fait passer tout le trafic par SonderShield, pas seulement le DNS. Nécessaire pour WireGuard. Consomme un peu plus de batterie.",
+                ),
+                full,
+            ) {
+                full = it; prefs.fullTunnel = it
+                ShieldVpnService.restartIfOn(ctx)
+            }
+            AnimatedVisibility(full, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+                Column {
+                    if (wgName.isEmpty()) {
+                        OptionCard(
+                            tr("Import WireGuard config", "Importer une config WireGuard"),
+                            tr("A .conf file from your VPN provider or your own server. Traffic then leaves through it, still filtered.", "Un fichier .conf de votre fournisseur VPN ou de votre serveur. Le trafic sort alors par lui, toujours filtré."),
+                            onClick = { importWg.launch(arrayOf("*/*")) },
+                        ) { Icon(Icons.chevron, null, tint = Palette.faint, modifier = Modifier.size(18.dp)) }
+                    } else {
+                        ToggleCard(
+                            "WireGuard · $wgName",
+                            if (wgOn) tr("Traffic goes out through this server.", "Le trafic sort par ce serveur.") else tr("Off: traffic goes out directly.", "Désactivé : le trafic sort directement."),
+                            wgOn,
+                        ) {
+                            wgOn = it; prefs.wgOn = it
+                            ShieldVpnService.restartIfOn(ctx)
+                        }
+                        OptionCard(tr("Remove WireGuard config", "Supprimer la config WireGuard"), wgName, onClick = {
+                            prefs.wgConfig = ""; prefs.wgName = ""; prefs.wgOn = false
+                            wgName = ""; wgOn = false
+                            ShieldVpnService.restartIfOn(ctx)
+                        }) { Icon(Icons.trash, null, tint = Palette.faint, modifier = Modifier.size(18.dp)) }
+                    }
+                }
+            }
+        }
+
+        // 06 Theme
+        Section(6, tr("Theme", "Thème")) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (m in ThemeMode.entries) {
                     if (m == ThemeMode.You && !ThemeMode.youAvailable) continue
@@ -277,8 +334,8 @@ private fun SettingsContent(onReload: () -> Unit) {
             }
         }
 
-        // 06 Backup and logs
-        Section(6, tr("Backup and logs", "Sauvegarde et journaux")) {
+        // 07 Backup and logs
+        Section(7, tr("Backup and logs", "Sauvegarde et journaux")) {
             val exportSettings = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
                 if (uri != null) toast(ctx, runCatching { Backup.export(ctx, uri) }.exceptionOrNull()?.message
                     ?: trc(ctx, "Settings saved", "Paramètres enregistrés"))
@@ -338,16 +395,16 @@ private fun SettingsContent(onReload: () -> Unit) {
             }
         }
 
-        // 07 Statistics
-        Section(7, tr("Statistics", "Statistiques")) {
+        // 08 Statistics
+        Section(8, tr("Statistics", "Statistiques")) {
             OptionCard(tr("Blocked in total", "Bloqués au total"), ShieldState.stats.collectAsState().value.allBlocked.grouped())
             OptionCard(tr("Reset counters", "Remettre à zéro"), tr("Today and all-time go back to zero. The log stays.", "Aujourd'hui et le total repartent de zéro. Le journal reste."), onClick = { confirmReset = true }) {
                 Icon(Icons.chevron, null, tint = Palette.faint, modifier = Modifier.size(18.dp))
             }
         }
 
-        // 08 About
-        Section(8, tr("About", "À propos")) {
+        // 09 About
+        Section(9, tr("About", "À propos")) {
             Block {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Logo(30.dp, lit = true)
@@ -530,6 +587,30 @@ private fun hueOf(c: Color): Float {
     android.graphics.Color.colorToHSV(c.toArgb(), hsv)
     return hsv[0]
 }
+
+/** A config file is a few hundred bytes; refuse anything that isn't. */
+private fun readSmallText(ctx: android.content.Context, uri: Uri): String? =
+    ctx.contentResolver.openInputStream(uri)?.use { s ->
+        val b = s.readNBytesCompat(64 * 1024 + 1)
+        if (b.size > 64 * 1024) null else b.decodeToString()
+    }
+
+private fun java.io.InputStream.readNBytesCompat(max: Int): ByteArray {
+    val out = java.io.ByteArrayOutputStream()
+    val buf = ByteArray(8192)
+    while (out.size() < max) {
+        val n = read(buf, 0, minOf(buf.size, max - out.size()))
+        if (n < 0) break
+        out.write(buf, 0, n)
+    }
+    return out.toByteArray()
+}
+
+private fun displayName(ctx: android.content.Context, uri: Uri): String? = runCatching {
+    ctx.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+        if (c.moveToFirst()) c.getString(0) else null
+    }
+}.getOrNull()
 
 private fun toast(ctx: android.content.Context, text: String) =
     android.widget.Toast.makeText(ctx, text, android.widget.Toast.LENGTH_SHORT).show()

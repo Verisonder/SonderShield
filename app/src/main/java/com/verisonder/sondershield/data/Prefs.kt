@@ -73,6 +73,25 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("ipv6", true)
         set(v) = sp.edit().putBoolean("ipv6", v).apply()
 
+    /** Route all traffic through the engine, not only DNS (needed for WireGuard). */
+    var fullTunnel: Boolean
+        get() = sp.getBoolean("tunnel.full", false)
+        set(v) = sp.edit().putBoolean("tunnel.full", v).apply()
+
+    /** Imported WireGuard config (wg-quick text), "" for none. Kept out of backups: it holds a private key. */
+    var wgConfig: String
+        get() = sp.getString("wg.config", "") ?: ""
+        set(v) = sp.edit().putString("wg.config", v).apply()
+
+    var wgName: String
+        get() = sp.getString("wg.name", "") ?: ""
+        set(v) = sp.edit().putString("wg.name", v).apply()
+
+    /** Send full-tunnel traffic through the imported WireGuard server. */
+    var wgOn: Boolean
+        get() = sp.getBoolean("wg.on", false)
+        set(v) = sp.edit().putBoolean("wg.on", v).apply()
+
     var startOnBoot: Boolean
         get() = sp.getBoolean("boot", true)
         set(v) = sp.edit().putBoolean("boot", v).apply()
