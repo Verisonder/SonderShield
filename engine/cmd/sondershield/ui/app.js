@@ -635,7 +635,7 @@ function renderRules() {
 }
 
 // ---- Firewall ----
-let programs = null;
+let programs = null; // running apps (Firewall)
 async function renderApps() {
   const p = $('#page-apps');
   const kill = state.kill;
@@ -650,9 +650,9 @@ async function renderApps() {
     <div class="sub" style="margin-bottom:12px">Cut off outbound traffic to an IP address or range, or to a port, for every app. Applies while protection is on.</div>
     <div class="row" style="margin-bottom:12px"><button class="pill" id="addnet">Add a block</button></div>
     <div id="netlist"></div>
-    <div class="seclabel" style="margin-top:28px"><span class="t">RUNNING APPS</span></div>
-    <div class="row" style="margin:0 0 12px"><button class="pill" id="refreshprog">Refresh running apps</button></div>
-    <div id="proglist"><div class="empty">Loading running apps…</div></div>`;
+    <div class="seclabel" style="margin-top:28px"><span class="t">APPS</span></div>
+    <div class="connbar"><input class="field" id="appsearch" placeholder="Search apps…" value="${escapeAttr(appSearch)}"><button class="pill" id="refreshprog">Refresh</button></div>
+    <div id="proglist"><div class="empty">Loading apps…</div></div>`;
   $('#addnet').onclick = addNetBlock;
   drawNetBlocks();
   $('#killbtn').onclick = async () => {
@@ -661,9 +661,13 @@ async function renderApps() {
     await api('killswitch?on=' + (on ? '1' : '0'), { method: 'POST' });
     await poll(); renderApps();
   };
-  $('#refreshprog').onclick = async () => { programs = await api('programs'); drawPrograms(); };
-  if (!programs) programs = await api('programs');
-  drawPrograms();
+  $('#appsearch').oninput = e => { appSearch = e.target.value; drawPrograms(); };
+  const load = async () => {
+    [programs, appHist] = await Promise.all([api('programs'), api('history').catch(() => [])]);
+    drawPrograms();
+  };
+  $('#refreshprog').onclick = load;
+  if (!programs) await load(); else { drawPrograms(); load(); }
 }
 function drawNetBlocks() {
   const box = $('#netlist'); if (!box) return;
@@ -701,25 +705,91 @@ async function addNetBlock() {
   cfg.netBlocks = [...(cfg.netBlocks || []), { kind, value: r[0].trim(), note: r[1] || '' }];
   await postConfig(cfg); drawNetBlocks();
 }
+// ---- Apps (Firewall) ----
+// Every app SonderShield knows about: running now, seen in the history, or with a rule.
+// Shown as tiles with the program's own icon (a coloured letter when it has none).
+let appSearch = '', appHist = null;
+const MODE_INFO = {
+  allow: ['Allow', 'Normal internet access.'],
+  block: ['Block all', 'No internet at all, in or out.'],
+  in: ['No incoming', 'Can connect out, but nothing can connect in to it.'],
+  lan: ['No LAN', 'Internet works, but no access to devices on your network.'],
+};
+const baseName = p => (p || '').split(/[\\/]/).pop().replace(/\.exe$/i, '');
+function ruleOf(path) { return (cfg.appRules || []).find(x => x.path.toLowerCase() === (path || '').toLowerCase()); }
+function modeOf(path) { const r = ruleOf(path); return r && r.mode !== 'allow' ? (r.mode || 'block') : ''; }
+function appIconHTML(path, name, big) {
+  const n = (name || '?').trim();
+  const letter = esc(n.charAt(0).toUpperCase() || '?');
+  let h = 7; for (const c of n) h = (h * 31 + c.charCodeAt(0)) % 360;
+  const img = path ? `<img src="/api/icon?t=${token}&p=${encodeURIComponent(path)}" alt="" onerror="iconFail(this)">` : letter;
+  return `<span class="appic ${path ? '' : 'letter'} ${big ? 'big' : ''}" style="--h:${h}" data-l="${letter}">${img}</span>`;
+}
+window.iconFail = img => { const sp = img.parentNode; sp.classList.add('letter'); sp.textContent = sp.dataset.l; };
+function knownApps() {
+  const map = new Map();
+  const add = (path, name, running) => {
+    if (!path) return;
+    const k = path.toLowerCase();
+    const e = map.get(k) || { path, name: name || baseName(path), running: false };
+    e.running = e.running || running;
+    map.set(k, e);
+  };
+  (programs || []).forEach(p => add(p.path, p.name, true));
+  (appHist || []).forEach(h => add(h.path, h.app, false));
+  (cfg.appRules || []).forEach(r => add(r.path, baseName(r.path), false));
+  return [...map.values()];
+}
+function appTile(e) {
+  const m = modeOf(e.path);
+  return `<button class="apptile ${m ? 'ruled' : ''}" data-path="${escapeAttr(e.path)}" title="${escapeAttr(e.path)}">
+    ${appIconHTML(e.path, e.name)}
+    <span class="apname">${esc(e.name)}</span>
+    ${m ? `<span class="apmode">${MODE_INFO[m][0]}</span>` : ''}
+    ${e.running ? '<span class="adot" title="Running"></span>' : ''}
+  </button>`;
+}
 function drawPrograms() {
   const box = $('#proglist');
-  if (!programs || !programs.length) { box.innerHTML = `<div class="empty">No apps found. (On Linux this list is empty.)</div>`; return; }
-  const modeOf = p => { const r = (cfg.appRules || []).find(x => x.path === p); return r ? (r.mode || 'block') : ''; };
-  const MODES = [['', 'Allow'], ['block', 'Block all'], ['in', 'No incoming'], ['lan', 'No LAN']];
-  const sorted = [...programs].sort((a, b) => (modeOf(b.path) ? 1 : 0) - (modeOf(a.path) ? 1 : 0) || a.name.localeCompare(b.name));
-  box.innerHTML = sorted.map(pr => {
-    const m = modeOf(pr.path);
-    const chips = MODES.map(([v, l]) => `<button class="chip sm ${m === v ? (v ? 'active warnon' : 'active') : ''}" data-mode="${v}" data-path="${escapeAttr(pr.path)}">${l}</button>`).join('');
-    return `<div class="card approw ${m ? 'ruled' : ''}"><div class="row"><div class="grow">
-      <div class="ctitle">${esc(pr.name)}</div><div class="cfaint">${esc(pr.path)}</div></div>
-      <div class="modechips">${chips}</div></div></div>`;
-  }).join('');
-  box.querySelectorAll('.chip[data-mode]').forEach(c => c.onclick = async () => {
-    const path = c.dataset.path, mode = c.dataset.mode;
-    let rules = (cfg.appRules || []).filter(x => x.path !== path);
-    if (mode) rules.push({ path, mode });
-    cfg.appRules = rules; await postConfig(cfg); drawPrograms();
-  });
+  if (!box) return;
+  const q = appSearch.trim().toLowerCase();
+  let apps = knownApps();
+  if (q) apps = apps.filter(e => e.name.toLowerCase().includes(q) || e.path.toLowerCase().includes(q));
+  if (!apps.length) { box.innerHTML = `<div class="empty">${q ? 'Nothing matches.' : 'No apps found yet. (On Linux this list is empty.)'}</div>`; return; }
+  const byName = (a, b) => a.name.localeCompare(b.name);
+  const active = apps.filter(e => e.running).sort(byName);
+  const edited = apps.filter(e => { const r = ruleOf(e.path); return r && r.edited; })
+    .sort((a, b) => ruleOf(b.path).edited - ruleOf(a.path).edited).slice(0, 8);
+  const sec = (title, list) => list.length ? `<div class="appsec">${title}</div><div class="appgrid">${list.map(appTile).join('')}</div>` : '';
+  box.innerHTML = sec('Active', active) + sec('Recently edited', edited) + sec('All', [...apps].sort(byName));
+  box.querySelectorAll('.apptile').forEach(t => t.onclick = () => openApp(t.dataset.path));
+}
+function openApp(path) {
+  const e = knownApps().find(x => x.path.toLowerCase() === path.toLowerCase()) || { path, name: baseName(path), running: false };
+  const bg = el('div', 'modal-bg');
+  const draw = () => {
+    const m = modeOf(path) || 'allow';
+    bg.innerHTML = `<div class="modal appmodal" role="dialog">
+      <div class="apphead">${appIconHTML(path, e.name, true)}<div class="grow"><h3>${esc(e.name)}</h3>
+        <div class="cfaint">${e.running ? 'Running now' : 'Not running'}</div></div></div>
+      <div class="cfaint apppath">${esc(path)}</div>
+      <div class="picks">${Object.entries(MODE_INFO).map(([v, [t, d]]) => `
+        <div class="pick ${m === v ? 'sel' : ''}" data-m="${v}"><div class="grow"><div class="ctitle">${t}</div><div class="csub">${d}</div></div><div class="radio"></div></div>`).join('')}</div>
+      <div class="cfaint" style="margin-top:10px">Rules apply while protection is on. Uses Windows Firewall.</div>
+      <div class="actions"><button class="pill" data-a="close">Close</button></div>
+    </div>`;
+    bg.querySelector('[data-a=close]').onclick = () => bg.remove();
+    bg.querySelectorAll('.pick[data-m]').forEach(r => r.onclick = async () => {
+      const rules = (cfg.appRules || []).filter(x => x.path.toLowerCase() !== path.toLowerCase());
+      rules.push({ path, mode: r.dataset.m, edited: Date.now() });
+      cfg.appRules = rules;
+      await postConfig(cfg);
+      draw(); drawPrograms();
+    });
+  };
+  draw();
+  bg.onclick = ev => { if (ev.target === bg) bg.remove(); };
+  document.body.appendChild(bg);
 }
 
 

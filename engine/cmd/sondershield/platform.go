@@ -55,6 +55,8 @@ type platform interface {
 	rawNetCounters() []NetCounter
 	// connCounts: how many outbound connections are open, and across how many apps.
 	connCounts() (conns int, apps int)
+	// appIcon: the program's icon as a PNG (nil if it has none or isn't readable).
+	appIcon(path string) []byte
 }
 
 // Conn is one outbound connection the computer currently has open.

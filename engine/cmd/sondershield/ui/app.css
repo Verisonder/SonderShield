@@ -341,3 +341,24 @@ svg.chart.draw .plot { animation: sweep 1s cubic-bezier(.4,0,.2,1); }
 .histsub { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
 .histapp { color: var(--dim); font-size: 12px; font-weight: 600; }
 .histcount { color: var(--faint); font-size: 11px; background: var(--card); border-radius: 999px; padding: 1px 7px; }
+
+/* Firewall app tiles */
+.appsec { color: var(--faint); font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin: 18px 2px 10px; }
+.appgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.apptile { display: flex; align-items: center; gap: 12px; background: var(--panel); border: 1px solid transparent; border-radius: 14px; padding: 12px 14px; color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: background .15s, transform .12s; min-width: 0; }
+.apptile:hover { background: var(--card); }
+.apptile:active { transform: scale(.98); }
+.apptile.ruled { border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.appic { width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.appic img { width: 32px; height: 32px; object-fit: contain; }
+.appic.letter { background: hsl(var(--h) 55% 42%); color: #fff; font-weight: 800; font-size: 15px; border-radius: 50%; }
+.appic.big { width: 48px; height: 48px; }
+.appic.big img { width: 48px; height: 48px; }
+.appic.big.letter { font-size: 21px; }
+.apname { flex: 1; min-width: 0; font-weight: 700; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apmode { font-size: 11px; font-weight: 700; color: var(--warn); white-space: nowrap; }
+.adot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.appmodal { max-width: 520px; }
+.apphead { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+.apphead h3 { margin: 0; }
+.apppath { word-break: break-all; margin-bottom: 14px; }

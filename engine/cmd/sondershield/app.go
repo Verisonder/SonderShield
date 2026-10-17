@@ -291,3 +291,28 @@ func (m *dataMeter) totals() (uint64, uint64) {
 	defer m.mu.Unlock()
 	return m.in, m.out
 }
+
+// Program icons, read once per path and kept for the session (nil results too, so a
+// program without an icon isn't asked again and again).
+var (
+	iconMu    sync.Mutex
+	iconCache = map[string][]byte{}
+)
+
+func (a *App) icon(path string) []byte {
+	if path == "" || !strings.HasSuffix(strings.ToLower(path), ".exe") {
+		return nil
+	}
+	key := strings.ToLower(path)
+	iconMu.Lock()
+	if b, ok := iconCache[key]; ok {
+		iconMu.Unlock()
+		return b
+	}
+	iconMu.Unlock()
+	b := a.plat.appIcon(path)
+	iconMu.Lock()
+	iconCache[key] = b
+	iconMu.Unlock()
+	return b
+}

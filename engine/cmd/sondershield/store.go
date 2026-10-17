@@ -32,8 +32,9 @@ type Config struct {
 // AppRule is how one app is firewalled: Mode is "block" (no internet), "in" (block
 // incoming only) or "lan" (no local-network access).
 type AppRule struct {
-	Path string `json:"path"`
-	Mode string `json:"mode"`
+	Path   string `json:"path"`
+	Mode   string `json:"mode"`
+	Edited int64  `json:"edited"` // ms; for "Recently edited"
 }
 
 type customList struct {

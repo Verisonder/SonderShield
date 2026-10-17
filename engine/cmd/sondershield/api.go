@@ -133,6 +133,15 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, s.a.connections())
 	case "history":
 		writeJSON(w, s.a.hist.list())
+	case "icon":
+		png := s.a.icon(r.URL.Query().Get("p"))
+		if png == nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Cache-Control", "max-age=86400")
+		w.Write(png)
 	case "diag":
 		writeJSON(w, s.a.diag())
 	case "killswitch":

@@ -95,6 +95,8 @@ func (p *windowsPlatform) setAppRules(rules []AppRule) error {
 			continue
 		}
 		switch r.Mode {
+		case "allow": // remembered as edited, but no rule
+			continue
 		case "in": // block only incoming connections to this app
 			block("in", r.Path)
 		case "lan": // block this app from the local network, in and out
