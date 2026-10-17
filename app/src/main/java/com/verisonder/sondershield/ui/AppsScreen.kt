@@ -121,7 +121,7 @@ fun AppsScreen() {
                     Switch(
                         checked = on, onCheckedChange = { flip() },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Palette.bg, checkedTrackColor = Palette.warn,
+                            checkedThumbColor = Palette.card, checkedTrackColor = Palette.warn,
                             uncheckedThumbColor = Palette.dim, uncheckedTrackColor = Palette.cardHi, uncheckedBorderColor = Palette.line,
                         ),
                     )

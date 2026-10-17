@@ -47,6 +47,8 @@ object ShieldState {
     val log = MutableStateFlow<List<LogEntry>>(emptyList())
     /** Bumped when list files or their metadata change, so the lists screen re-reads. */
     val listsVersion = MutableStateFlow(0)
+    /** Theme id from Settings; the activity recolours when it changes. */
+    val theme = MutableStateFlow("default")
 
     private const val LOG_MAX = 2000
     private val ring = ArrayDeque<LogEntry>()
@@ -70,6 +72,7 @@ object ShieldState {
         app = context.applicationContext
         engine.setListener(listener)
         today.value = Prefs(app).todayCounts()
+        theme.value = Prefs(app).theme
     }
 
     /** Pushes rules, upstream and list files from settings into the engine. */

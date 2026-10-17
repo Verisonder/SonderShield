@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -95,6 +96,25 @@ fun SettingsScreen() {
 
     Column(Modifier.verticalScroll(rememberScrollState())) {
         ScreenTitle("Settings")
+
+        // --- Theme ---
+        SectionLabel("Theme")
+        val themeId by ShieldState.theme.collectAsState()
+        ChipRow(Modifier.horizontalScroll(rememberScrollState())) {
+            for (m in ThemeMode.entries) {
+                if (m == ThemeMode.You && !ThemeMode.youAvailable) continue
+                Chip(m.label, ThemeMode.of(themeId) == m) {
+                    prefs.theme = m.id
+                    ShieldState.theme.value = m.id
+                }
+            }
+        }
+        if (ThemeMode.of(themeId) == ThemeMode.You) {
+            Text(
+                "Colours from your wallpaper, light or dark with the system.",
+                color = Palette.dim, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 22.dp, vertical = 4.dp),
+            )
+        }
 
         // --- DNS server ---
         SectionLabel("DNS server")
@@ -295,6 +315,6 @@ private fun radioColors() = RadioButtonDefaults.colors(selectedColor = Palette.a
 
 @Composable
 private fun switchColors() = SwitchDefaults.colors(
-    checkedThumbColor = Palette.bg, checkedTrackColor = Palette.accent,
+    checkedThumbColor = Palette.onAccent, checkedTrackColor = Palette.accent,
     uncheckedThumbColor = Palette.dim, uncheckedTrackColor = Palette.cardHi, uncheckedBorderColor = Palette.line,
 )

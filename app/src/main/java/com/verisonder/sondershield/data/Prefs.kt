@@ -65,6 +65,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("boot", true)
         set(v) = sp.edit().putBoolean("boot", v).apply()
 
+    /** default, light, oled, you */
+    var theme: String
+        get() = sp.getString("theme", "default") ?: "default"
+        set(v) = sp.edit().putString("theme", v).apply()
+
     /** 0 = never. */
     var updateHours: Int
         get() = sp.getInt("update.hours", 24)

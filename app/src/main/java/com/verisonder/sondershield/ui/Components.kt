@@ -101,7 +101,7 @@ fun SwitchRow(title: String, sub: String?, checked: Boolean, enabled: Boolean = 
             Switch(
                 checked = checked, onCheckedChange = onChange, enabled = enabled,
                 colors = SwitchDefaults.colors(
-                    checkedThumbColor = Palette.bg, checkedTrackColor = Palette.accent,
+                    checkedThumbColor = Palette.onAccent, checkedTrackColor = Palette.accent,
                     uncheckedThumbColor = Palette.dim, uncheckedTrackColor = Palette.cardHi, uncheckedBorderColor = Palette.line,
                 ),
             )

@@ -157,7 +157,7 @@ private fun ShieldButton(phase: Phase, onClick: () -> Unit) {
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(if (on) Icons.shieldCheck else Icons.shield, "Toggle protection", tint = ring, modifier = Modifier.size(64.dp))
+            Icon(Icons.logo, "Toggle protection", tint = ring, modifier = Modifier.size(70.dp))
         }
     }
 }
