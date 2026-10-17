@@ -33,6 +33,7 @@ type App struct {
 	eng   *shield.Engine
 	data  *dataMeter
 	hist  *connHistory
+	tl    *timeline
 
 	mu        sync.Mutex
 	cfg       Config
@@ -63,6 +64,7 @@ func newApp(plat platform) *App {
 		eng:   shield.NewEngine(),
 		data:  newDataMeter(),
 		hist:  newConnHistory(3000),
+		tl:    &timeline{},
 	}
 	lang, country := systemLocale()
 	a.cfg = defaultConfig(lang, country)

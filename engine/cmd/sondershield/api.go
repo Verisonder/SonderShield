@@ -133,6 +133,8 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, s.a.connections())
 	case "history":
 		writeJSON(w, s.a.hist.list())
+	case "timeline":
+		writeJSON(w, s.a.tl.list())
 	case "icon":
 		png := s.a.icon(r.URL.Query().Get("p"))
 		if png == nil {

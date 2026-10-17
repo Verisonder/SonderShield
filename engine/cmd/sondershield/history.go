@@ -92,3 +92,47 @@ func (h *connHistory) list() []histEntry {
 	sort.Slice(out, func(i, j int) bool { return out[i].LastSeen > out[j].LastSeen })
 	return out
 }
+
+// timeline samples, every 5 seconds while protection is on, how many connections are open
+// and how many lookups were blocked since the last sample. One hour is kept (720 samples),
+// for the chart on the Connections page.
+type tlSample struct {
+	T       int64 `json:"t"`
+	Conns   int   `json:"conns"`
+	Blocked int   `json:"blocked"`
+}
+
+type timeline struct {
+	mu       sync.Mutex
+	s        []tlSample
+	lastBlk  int64
+	haveLast bool
+}
+
+const timelineMax = 720
+
+func (t *timeline) reset() {
+	t.mu.Lock()
+	t.s, t.haveLast = nil, false
+	t.mu.Unlock()
+}
+
+func (t *timeline) add(conns int, blockedTotal int64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	d := 0
+	if t.haveLast && blockedTotal >= t.lastBlk {
+		d = int(blockedTotal - t.lastBlk)
+	}
+	t.lastBlk, t.haveLast = blockedTotal, true
+	t.s = append(t.s, tlSample{T: time.Now().UnixMilli(), Conns: conns, Blocked: d})
+	if len(t.s) > timelineMax {
+		t.s = append([]tlSample(nil), t.s[len(t.s)-timelineMax:]...)
+	}
+}
+
+func (t *timeline) list() []tlSample {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return append([]tlSample{}, t.s...)
+}

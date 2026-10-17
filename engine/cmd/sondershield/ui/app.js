@@ -72,6 +72,7 @@ async function poll() {
       if (logs.length > 2000) logs.length = 2000;
       if (tab === 'filter' && filterView === 'log') drawLog();
     }
+    if (tab === 'conns') { tl = await api('timeline').catch(() => tl); drawConnChart(); }
     if (tab === 'conns' && connView2 === 'live' && !connPaused) { conns = await api('connections'); if (!connOpen.size) drawConns(); }
     else if (tab === 'conns' && connView2 === 'history') { hist = await api('history'); drawConns(); }
   } catch (e) { /* server starting or gone */ }
@@ -435,7 +436,9 @@ function renderConns() {
       <div class="cgrp"><span class="clabel">Group</span>${chips('g', connGroup, [['app', 'App'], ['site', 'Site'], ['none', 'None']])}</div>
       <div class="cgrp"><span class="clabel">Sort</span>${chips('s', connSort, live ? [['most', 'Most'], ['name', 'Name']] : [['recent', 'Recent'], ['most', 'Most seen'], ['name', 'Name']])}</div>
     </div>
+    <div class="chartcard connchart" id="connchart"></div>
     <div id="connlist"><div class="empty">Reading…</div></div>`;
+  connChartKey = ''; drawConnChart();
   $('#cv-live').onclick = () => { connView2 = 'live'; connOpen.clear(); renderConns(); poll(); };
   $('#cv-hist').onclick = () => { connView2 = 'history'; connOpen.clear(); renderConns(); poll(); };
   $('#connsearch').oninput = e => { connSearch = e.target.value; drawConns(); };
@@ -444,6 +447,54 @@ function renderConns() {
   p.querySelectorAll('[data-g]').forEach(c => c.onclick = () => { connGroup = c.dataset.g; renderConns(); });
   p.querySelectorAll('[data-s]').forEach(c => c.onclick = () => { connSort = c.dataset.s; renderConns(); });
   drawConns();
+}
+
+// Connections over time (open connections, and lookups blocked in each 5-second step),
+// like Portmaster's activity chart. Redrawn only when a new sample arrives.
+let tl = null, connRange = 10, connChartKey = '';
+function drawConnChart() {
+  const box = $('#connchart');
+  if (!box) return;
+  const last = tl && tl.length ? tl[tl.length - 1].t : 0;
+  const key = connRange + '|' + last + '|' + (tl ? tl.length : 0);
+  if (key === connChartKey) return;
+  connChartKey = key;
+  const now = Date.now(), from = now - connRange * 60000;
+  const pts = (tl || []).filter(p => p.t >= from);
+  const blockedSum = pts.reduce((n, p) => n + p.blocked, 0);
+  const openNow = pts.length ? pts[pts.length - 1].conns : 0;
+  const head = `<div class="cchead"><span class="ccttl">Activity</span>
+    <span class="legend"><span><i class="sq acc"></i>Open connections ${openNow}</span><span><i class="sq warnsq"></i>Blocked lookups ${fmt(blockedSum)}</span></span>
+    <span class="ccrange"><button class="chip sm ${connRange === 10 ? 'active' : ''}" data-r="10">10 min</button><button class="chip sm ${connRange === 60 ? 'active' : ''}" data-r="60">1 hour</button></span></div>`;
+  let body;
+  if (pts.length < 2) {
+    body = '<div class="empty" style="padding:26px 0 14px">The chart fills in while protection is on.</div>';
+  } else {
+    const W = 1000, H = 150;
+    const max = Math.max(1, ...pts.map(p => Math.max(p.conns, p.blocked)));
+    const xy = (p, v) => [(p.t - from) / (now - from) * W, H - H * 0.9 * v / max];
+    const path = k => {
+      const ps = pts.map(p => xy(p, p[k]));
+      let d = `M${ps[0][0].toFixed(1)} ${ps[0][1].toFixed(1)}`;
+      for (let i = 1; i < ps.length; i++) { const a = ps[i - 1], b = ps[i], mx = (a[0] + b[0]) / 2; d += `C${mx.toFixed(1)} ${a[1].toFixed(1)} ${mx.toFixed(1)} ${b[1].toFixed(1)} ${b[0].toFixed(1)} ${b[1].toFixed(1)}`; }
+      return d;
+    };
+    const x0 = xy(pts[0], 0)[0].toFixed(1), x1 = xy(pts[pts.length - 1], 0)[0].toFixed(1);
+    const close = `L${x1} ${H}L${x0} ${H}Z`;
+    const c = path('conns'), b = path('blocked');
+    body = `<svg class="chart cchart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="cgc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".32"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient>
+        <linearGradient id="cgb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--warn)" stop-opacity=".3"/><stop offset="1" stop-color="var(--warn)" stop-opacity="0"/></linearGradient>
+      </defs>
+      ${[0, 1, 2, 3].map(i => `<line x1="0" x2="${W}" y1="${H * i / 3}" y2="${H * i / 3}" class="grid"/>`).join('')}
+      <path d="${c}${close}" fill="url(#cgc)"/><path d="${b}${close}" fill="url(#cgb)"/>
+      <path d="${c}" class="lb"/><path d="${b}" class="lw"/>
+    </svg>
+    <div class="axis"><span>${connRange === 10 ? '10 min ago' : '1 hour ago'}</span><span>${connRange === 10 ? '5 min ago' : '30 min ago'}</span><span>now</span></div>`;
+  }
+  box.innerHTML = head + body;
+  box.querySelectorAll('[data-r]').forEach(c => c.onclick = () => { connRange = +c.dataset.r; connChartKey = ''; drawConnChart(); });
 }
 
 function timeAgo(ms) {

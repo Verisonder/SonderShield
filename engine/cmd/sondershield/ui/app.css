@@ -390,3 +390,13 @@ svg.chart.draw .plot { animation: sweep 1s cubic-bezier(.4,0,.2,1); }
 .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
 .dacts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .dacts .pill { height: 34px; padding: 0 14px; font-size: 12.5px; }
+
+/* Connections activity chart */
+.connchart { margin-bottom: 14px; padding: 16px 20px 12px; }
+.cchead { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 10px; }
+.cchead .legend { margin: 0; }
+.ccttl { color: var(--faint); font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+.ccrange { margin-left: auto; display: flex; gap: 6px; }
+.sq.warnsq { background: var(--warn); }
+svg.cchart { height: 150px; }
+svg.chart .lw { fill: none; stroke: var(--warn); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linecap: round; }
