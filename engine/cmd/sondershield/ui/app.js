@@ -77,8 +77,10 @@ async function poll() {
 }
 
 function applyTheme() {
-  const t = cfg.theme === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'default' : 'light') : cfg.theme;
+  // System follows Windows: the soft grey dark (like the phone's System theme) or light.
+  const t = cfg.theme === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'soft' : 'light') : cfg.theme;
   document.documentElement.classList.toggle('light', t === 'light');
+  document.documentElement.classList.toggle('soft', t === 'soft');
   document.documentElement.style.setProperty('--accent', '#' + (cfg.accent & 0xffffff).toString(16).padStart(6, '0'));
 }
 
