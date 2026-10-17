@@ -45,6 +45,7 @@ type Engine struct {
 	mu                   sync.Mutex // guards the four sets above
 
 	cache *cache
+	ipn   *ipNames // ip -> hostname, for the Windows connection monitor
 
 	total, blocked atomic.Int64
 	conns          atomic.Int64 // full tunnel: connections made
@@ -65,6 +66,7 @@ type resolverBox struct{ r AppResolver }
 func NewEngine() *Engine {
 	e := &Engine{
 		cache:     newCache(4096),
+		ipn:       newIPNames(8192, 10*time.Minute),
 		listBlock: domainSet{}, listAllow: domainSet{},
 		userBlock: domainSet{}, userAllow: domainSet{},
 	}
@@ -135,6 +137,9 @@ func (e *Engine) rebuild() {
 }
 
 // DomainCount is the number of distinct blocked domains loaded from lists.
+// RecentName returns the hostname most recently resolved to ip, or "" if unknown.
+func (e *Engine) RecentName(ip string) string { return e.ipn.lookup(ip, time.Now()) }
+
 func (e *Engine) DomainCount() int {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -247,6 +252,7 @@ func (e *Engine) resolve(ctx context.Context, query []byte, uid int) ([]byte, bo
 	if c := e.cache.get(key, start); c != nil {
 		r := append([]byte(nil), c...)
 		setID(r, q.id)
+		e.ipn.record(q.name, r, start)
 		e.notify(q, verdictAllowed, "cached", 0, uid)
 		return r, true
 	}
@@ -260,6 +266,7 @@ func (e *Engine) resolve(ctx context.Context, query []byte, uid int) ([]byte, bo
 	}
 	setID(resp, q.id)
 	e.cache.put(key, append([]byte(nil), resp...), minTTL(resp), time.Now())
+	e.ipn.record(q.name, resp, time.Now())
 	e.notify(q, verdictAllowed, reason, ms, uid)
 	return resp, true
 }
