@@ -183,6 +183,10 @@ type stateView struct {
 	Config    Config    `json:"config"`
 	Mode      string    `json:"mode"`
 	Kill      bool      `json:"kill"`
+	DataIn    uint64    `json:"dataIn"`
+	DataOut   uint64    `json:"dataOut"`
+	Conns     int       `json:"conns"`
+	Apps      int       `json:"apps"`
 }
 
 func (s *server) state() stateView {
@@ -192,11 +196,18 @@ func (s *server) state() stateView {
 	cfg := a.cfg
 	a.mu.Unlock()
 	sv := a.stats.view(time.Now())
-	return stateView{
+	out := stateView{
 		On: on, Active: a.active(), Problem: problem, Domains: int(a.eng.DomainCount()),
 		StartedAt: started, Stats: sv, Today: sv.Today, Config: cfg, Mode: mode,
 		Kill: a.plat.killSwitchOn(),
 	}
+	if on {
+		a.data.sample(a.plat.rawNetCounters())
+		din, dout := a.data.totals()
+		conns, apps := a.plat.connCounts()
+		out.DataIn, out.DataOut, out.Conns, out.Apps = din, dout, conns, apps
+	}
+	return out
 }
 
 type listView struct {

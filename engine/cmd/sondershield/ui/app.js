@@ -64,7 +64,7 @@ async function poll() {
     renderStatus();
     // Only Home follows live numbers; other pages redraw when you change something there
     // (redrawing them every second closed menus and lost your place).
-    const key = JSON.stringify([state.on, state.active, state.problem, state.domains, state.today, state.stats.blocked, state.stats.threats, cfg.theme, cfg.accent]);
+    const key = JSON.stringify([state.on, state.active, state.problem, state.domains, state.today, state.stats.blocked, state.stats.threats, state.dataIn, state.dataOut, state.conns, state.apps, cfg.theme, cfg.accent]);
     if (tab === 'home' && !busy && key !== homeKey) { homeKey = key; renderHome(); }
     const newLogs = await api('log?after=' + lastLogSeq);
     if (newLogs && newLogs.length) {
@@ -186,6 +186,10 @@ function renderHome() {
             <div class="rate rv" style="--d:5"><div class="num" data-k="ar" data-f="p"></div><div class="lbl">block rate,\nall time</div></div>
             <div class="tile rv" style="--d:6"><div class="num" data-k="mb" data-f="b"></div><div class="lbl">data not downloaded\nestimate</div></div>
             <div class="tile rv" style="--d:7"><div class="num" id="uptime"></div><div class="lbl">on without a break</div></div>
+            <div class="tile rv" style="--d:8"><div class="num" data-k="din" data-f="y"></div><div class="lbl">data received\nthis session</div></div>
+            <div class="tile rv" style="--d:9"><div class="num" data-k="dout" data-f="y"></div><div class="lbl">data sent\nthis session</div></div>
+            <div class="tile rv" style="--d:10"><div class="num" data-k="conns"></div><div class="lbl">active\nconnections</div></div>
+            <div class="tile rv" style="--d:11"><div class="num" data-k="apps"></div><div class="lbl">active apps\ntalking out</div></div>
           </div>
         </div>
       </div>
@@ -227,6 +231,12 @@ function renderHome() {
     countTo(n('mb'), s.blocked * BYTES_PER_BLOCK);
   }
   $('#uptime').textContent = state.startedAt ? duration(Date.now() - state.startedAt) : 'off';
+  if (seenAll) {
+    countTo(n('din'), state.dataIn || 0);
+    countTo(n('dout'), state.dataOut || 0);
+    countTo(n('conns'), state.conns || 0);
+    countTo(n('apps'), state.apps || 0);
+  }
   if (seenChart) drawChart(false);
   if (seenTop) drawTop();
 }
@@ -242,6 +252,7 @@ function numFmt(node) {
   if (f === 'c') return compact;
   if (f === 'p' || node.dataset.k === 'r') return v => v.toFixed(1) + '%';
   if (f === 'b') return v => '≈ ' + bytes(v);
+  if (f === 'y') return v => bytes(v);
   return v => fmt(Math.round(v));
 }
 function duration(ms) {

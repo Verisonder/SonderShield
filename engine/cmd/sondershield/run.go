@@ -17,6 +17,8 @@ func (a *App) start() error {
 	a.problem = ""
 	a.mu.Unlock()
 
+	a.data.reset()
+	a.data.sample(a.plat.rawNetCounters())
 	a.applyConfig()
 	a.eng.SetOutsideInterface(a.plat.outsideInterfaces())
 	// First choice: a DNS server on this PC (127.0.0.1:53). When something else already
@@ -126,6 +128,7 @@ func (a *App) background(ctx context.Context) {
 			return
 		case <-save.C:
 			a.saveStats()
+			a.data.sample(a.plat.rawNetCounters())
 		case <-update.C:
 			c := a.config()
 			if c.UpdateHours > 0 && time.Since(lastUpdate) >= time.Duration(c.UpdateHours)*time.Hour {

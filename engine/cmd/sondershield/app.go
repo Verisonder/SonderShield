@@ -31,6 +31,7 @@ type App struct {
 	lists *listStore
 	stats *stats
 	eng   *shield.Engine
+	data  *dataMeter
 
 	mu        sync.Mutex
 	cfg       Config
@@ -59,6 +60,7 @@ func newApp(plat platform) *App {
 		lists: newListStore(plat.dataDir(), st),
 		stats: newStats(),
 		eng:   shield.NewEngine(),
+		data:  newDataMeter(),
 	}
 	lang, country := systemLocale()
 	a.cfg = defaultConfig(lang, country)
@@ -243,4 +245,47 @@ func isPrivateIP(s string) bool {
 		return true
 	}
 	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified()
+}
+
+// dataMeter totals bytes in/out across all adapters for this protection session. The OS
+// counters are 32-bit and wrap at 4 GB, so we accumulate deltas (uint32 subtraction wraps
+// correctly) into 64-bit totals. A counter reset (adapter reconnect) looks like a giant
+// delta, so anything over 8 GB in one sample is treated as a reset and skipped.
+type dataMeter struct {
+	mu      sync.Mutex
+	last    map[uint32][2]uint32
+	in, out uint64
+}
+
+func newDataMeter() *dataMeter { return &dataMeter{last: map[uint32][2]uint32{}} }
+
+func (m *dataMeter) reset() {
+	m.mu.Lock()
+	m.last = map[uint32][2]uint32{}
+	m.in, m.out = 0, 0
+	m.mu.Unlock()
+}
+
+const dataResetGuard = 8 << 30
+
+func (m *dataMeter) sample(cs []NetCounter) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, c := range cs {
+		if prev, ok := m.last[c.Index]; ok {
+			if din := c.In - prev[0]; uint64(din) < dataResetGuard {
+				m.in += uint64(din)
+			}
+			if dout := c.Out - prev[1]; uint64(dout) < dataResetGuard {
+				m.out += uint64(dout)
+			}
+		}
+		m.last[c.Index] = [2]uint32{c.In, c.Out}
+	}
+}
+
+func (m *dataMeter) totals() (uint64, uint64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.in, m.out
 }

@@ -50,6 +50,11 @@ type platform interface {
 	// currentDNS reports, per active adapter, the DNS servers Windows is really using right
 	// now. Used by the diagnostic to show whether Windows is actually pointed at us.
 	currentDNS() []AdapterDNS
+	// rawNetCounters: per-adapter byte counters (32-bit, wrap) for the whole machine, so the
+	// app can total data sent/received this session.
+	rawNetCounters() []NetCounter
+	// connCounts: how many outbound connections are open, and across how many apps.
+	connCounts() (conns int, apps int)
 }
 
 // Conn is one outbound connection the computer currently has open.
@@ -63,6 +68,13 @@ type Conn struct {
 	LocalPort  int    `json:"localPort"`
 	RemoteAddr string `json:"remoteAddr"`
 	RemotePort int    `json:"remotePort"`
+}
+
+// NetCounter is one adapter's running byte totals (since boot; 32-bit, so they wrap).
+type NetCounter struct {
+	Index uint32
+	In    uint32
+	Out   uint32
 }
 
 // AdapterDNS is one network adapter and the DNS servers Windows currently uses on it.
