@@ -52,6 +52,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.verisonder.sondershield.data.DataUsage
 import com.verisonder.sondershield.data.Prefs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -87,7 +90,11 @@ private data class MonitorData(
     val todayWifi: DataUsage.Usage,
     val cycleMobile: Long,
     val week: List<DayUsage>,
+    val full: Boolean = false, // plan period and week are in, not just today
 )
+
+// The last numbers shown, so coming back to the tab is instant (fresh ones replace them).
+private var lastMonitor: MonitorData? = null
 
 @Composable
 fun DataMonitorScreen() {
@@ -146,9 +153,19 @@ fun DataMonitorScreen() {
         return
     }
 
-    var data by remember { mutableStateOf<MonitorData?>(null) }
+    var data by remember { mutableStateOf(lastMonitor) }
     LaunchedEffect(refresh, prefs.planMode, prefs.planStartMillis, prefs.planEndMillis, prefs.planTotalBytes) {
-        data = withContext(Dispatchers.IO) { computeMonitor(ctx, prefs) }
+        // Today first (two quick reads) so the cards show straight away...
+        val now = System.currentTimeMillis()
+        val today = withContext(Dispatchers.IO) {
+            val s0 = DataUsage.startOfToday()
+            DataUsage.mobile(ctx, s0, now) to DataUsage.wifi(ctx, s0, now)
+        }
+        data = (data ?: MonitorData(today.first, today.second, 0L, emptyList())).copy(todayMobile = today.first, todayWifi = today.second)
+        // ...then the plan period and the seven days, read all at once.
+        val all = withContext(Dispatchers.IO) { computeRest(ctx, prefs, today.first, today.second) }
+        data = all
+        lastMonitor = all
     }
     val d = data
     var editing by rememberSaveable { mutableStateOf(false) }
@@ -164,10 +181,10 @@ fun DataMonitorScreen() {
             Column(Modifier.padding(horizontal = Gutter).padding(top = 14.dp)) {
                 Kicker(tr("Today", "Aujourd'hui", "Heute"), Modifier.onSeen(todaySeen).reveal(todaySeen.value))
                 Spacer(Modifier.height(12.dp))
-                val seen = todaySeen.value && loaded
+                val seen = todaySeen.value
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    UsageCard(Icons.signal, Palette.accent, tr("mobile data", "données mobiles", "mobile Daten"), d?.todayMobile, seen, 1, Modifier.weight(1f))
-                    UsageCard(Icons.wifi, WifiGreen, "Wi-Fi", d?.todayWifi, seen, 2, Modifier.weight(1f))
+                    UsageCard(Icons.signal, Palette.accent, tr("mobile data", "données mobiles", "mobile Daten"), d?.todayMobile, seen, loaded, 1, Modifier.weight(1f))
+                    UsageCard(Icons.wifi, WifiGreen, "Wi-Fi", d?.todayWifi, seen, loaded, 2, Modifier.weight(1f))
                 }
             }
         }
@@ -180,7 +197,7 @@ fun DataMonitorScreen() {
                         PlanSetup(prefs, onDone = { editing = false; refresh++ }, onCancel = { editing = false })
                     }
                 } else {
-                    PlanSummary(prefs, d?.cycleMobile ?: 0L, planSeen.value && loaded) { editing = true }
+                    PlanSummary(prefs, d?.cycleMobile ?: 0L, planSeen.value, d?.full == true) { editing = true }
                 }
             }
         }
@@ -189,7 +206,7 @@ fun DataMonitorScreen() {
                 Kicker(tr("This week", "Cette semaine", "Diese Woche"), Modifier.onSeen(weekSeen).reveal(weekSeen.value))
                 Spacer(Modifier.height(12.dp))
                 val week = d?.week
-                if (week != null) Box(Modifier.reveal(weekSeen.value, 1)) { WeekChart(week, weekSeen.value) }
+                if (!week.isNullOrEmpty()) Box(Modifier.reveal(weekSeen.value, 1)) { WeekChart(week, weekSeen.value) }
                 else Text(tr("Reading…", "Lecture…", "Wird gelesen…"), color = Palette.faint, fontSize = 13.sp)
             }
         }
@@ -198,10 +215,12 @@ fun DataMonitorScreen() {
 
 /** One of the two Today tiles, styled like Home's stat tiles: accent number that counts up. */
 @Composable
-private fun UsageCard(icon: ImageVector, tint: Color, label: String, u: DataUsage.Usage?, seen: Boolean, order: Int, modifier: Modifier) {
-    val total = counted((u?.total ?: 0L).toDouble(), seen).toLong()
-    val tx = counted((u?.tx ?: 0L).toDouble(), seen).toLong()
-    val rx = counted((u?.rx ?: 0L).toDouble(), seen).toLong()
+private fun UsageCard(icon: ImageVector, tint: Color, label: String, u: DataUsage.Usage?, seen: Boolean, ready: Boolean, order: Int, modifier: Modifier) {
+    // The card slides in as soon as it's on screen; its numbers count up once they've arrived.
+    val count = seen && ready
+    val total = counted((u?.total ?: 0L).toDouble(), count).toLong()
+    val tx = counted((u?.tx ?: 0L).toDouble(), count).toLong()
+    val rx = counted((u?.rx ?: 0L).toDouble(), count).toLong()
     Column(modifier.reveal(seen, order).clip(blockShape).background(Palette.card2).padding(horizontal = 16.dp, vertical = 14.dp)) {
         Box(Modifier.size(30.dp).clip(CircleShape).background(tint.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
             Icon(icon, null, tint = tint, modifier = Modifier.size(17.dp))
@@ -224,7 +243,7 @@ private fun UsageCard(icon: ImageVector, tint: Color, label: String, u: DataUsag
 
 /** Plan at a glance: the filled accent block (like Home's block rate), a bar that fills in, tiles. */
 @Composable
-private fun PlanSummary(prefs: Prefs, usedBytes: Long, seen: Boolean, onEdit: () -> Unit) {
+private fun PlanSummary(prefs: Prefs, usedBytes: Long, seen: Boolean, ready: Boolean, onEdit: () -> Unit) {
     val now = System.currentTimeMillis()
     val (_, end) = planPeriod(prefs, now)
     val total = prefs.planTotalBytes
@@ -241,11 +260,11 @@ private fun PlanSummary(prefs: Prefs, usedBytes: Long, seen: Boolean, onEdit: ()
         else -> tr("resets monthly", "remise à zéro chaque mois", "monatlich zurückgesetzt")
     }
 
-    val remaining = counted(remainingTarget.toDouble(), seen).toLong()
-    val used = counted(usedBytes.toDouble(), seen).toLong()
+    val remaining = counted(remainingTarget.toDouble(), seen && ready).toLong()
+    val used = counted(usedBytes.toDouble(), seen && ready).toLong()
     val grow = remember { Animatable(0f) }
-    LaunchedEffect(seen, frac) {
-        if (seen) { delay(160); grow.animateTo(frac, tween(900, easing = FastOutSlowInEasing)) }
+    LaunchedEffect(seen, ready, frac) {
+        if (seen && ready) { delay(160); grow.animateTo(frac, tween(900, easing = FastOutSlowInEasing)) }
     }
     val low = frac > 0.9f
 
@@ -478,24 +497,24 @@ private fun LegendDot(color: Color, text: String) {
 
 // ---- helpers (no Compose) ----
 
-private fun computeMonitor(ctx: Context, prefs: Prefs): MonitorData {
+/** The plan period and the last seven days, all read at the same time. */
+private suspend fun computeRest(ctx: Context, prefs: Prefs, tm: DataUsage.Usage, tw: DataUsage.Usage): MonitorData = coroutineScope {
     val now = System.currentTimeMillis()
-    val tStart = DataUsage.startOfToday()
-    val tm = DataUsage.mobile(ctx, tStart, now)
-    val tw = DataUsage.wifi(ctx, tStart, now)
-    val cycleMobile = if (prefs.planActive) {
-        val (ps, pe) = planPeriod(prefs, now)
-        if (ps < now) DataUsage.mobile(ctx, ps, minOf(now, pe)).total else 0L
-    } else 0L
-    val fmt = SimpleDateFormat("EEE", Locale.getDefault())
-    val week = (6 downTo 0).map { i ->
-        val s = DataUsage.midnight(i)
-        val e = if (i == 0) now else DataUsage.midnight(i - 1)
-        val m = DataUsage.mobile(ctx, s, e).total
-        val w = DataUsage.wifi(ctx, s, e).total
-        DayUsage(fmt.format(Date(s)), m, w)
+    val cycle = async {
+        if (prefs.planActive) {
+            val (ps, pe) = planPeriod(prefs, now)
+            if (ps < now) DataUsage.mobile(ctx, ps, minOf(now, pe)).total else 0L
+        } else 0L
     }
-    return MonitorData(tm, tw, cycleMobile, week)
+    val fmt = SimpleDateFormat("EEE", Locale.getDefault())
+    val days = (6 downTo 0).map { i ->
+        async {
+            val s = DataUsage.midnight(i)
+            val e = if (i == 0) now else DataUsage.midnight(i - 1)
+            DayUsage(fmt.format(Date(s)), DataUsage.mobile(ctx, s, e).total, DataUsage.wifi(ctx, s, e).total)
+        }
+    }
+    MonitorData(tm, tw, cycle.await(), days.awaitAll(), full = true)
 }
 
 /** The plan's current counting window [start, end) in millis. */
