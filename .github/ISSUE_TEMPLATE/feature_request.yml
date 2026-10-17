@@ -1,0 +1,17 @@
+name: Feature request
+description: An idea for something SonderShield should do.
+title: "[Idea] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you'd like
+      description: What should SonderShield do, and when would you use it?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What problem does it solve for you? Any app that already does it well?

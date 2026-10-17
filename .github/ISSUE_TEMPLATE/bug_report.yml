@@ -1,0 +1,59 @@
+name: Bug report
+description: Something doesn't work, an app or site breaks, or ads get through.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The more of this you fill in, the faster it gets fixed.
+        Tip: Settings › Backup and logs › Last crash has the crash details, if SonderShield crashed.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+      placeholder: "I opened the Example app with protection on and it shows 'No connection'."
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: SonderShield version
+      description: Settings › About.
+      placeholder: "1.0.1"
+    validations:
+      required: true
+  - type: input
+    id: phone
+    attributes:
+      label: Phone and Android version
+      placeholder: "Xiaomi 12T, HyperOS 2, Android 15"
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      description: Settings › Tunnel and HTTPS filtering.
+      multiple: true
+      options:
+        - DNS only (default)
+        - Full tunnel
+        - WireGuard
+        - HTTPS filtering
+        - Root mode
+    validations:
+      required: true
+  - type: textarea
+    id: domains
+    attributes:
+      label: Domains or app involved
+      description: From Filter › Log, if you know which lookup is blocked or allowed. Name the app or website.
+      placeholder: "ads.example.com blocked by AdGuard DNS"
+  - type: textarea
+    id: crash
+    attributes:
+      label: Crash log
+      description: Paste it here if SonderShield crashed (Settings › Backup and logs › Last crash › tap to share).
+      render: text

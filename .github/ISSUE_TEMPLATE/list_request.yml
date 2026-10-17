@@ -1,0 +1,26 @@
+name: Block list suggestion
+description: Suggest a list to add to the built-in lists.
+title: "[List] "
+labels: ["lists"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: List name
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Download URL
+      description: Must be https. Hosts, AdBlock or plain domain format.
+      placeholder: "https://example.org/list.txt"
+    validations:
+      required: true
+  - type: textarea
+    id: about
+    attributes:
+      label: What it blocks
+      description: Ads, trackers, malware, a region or language? Is it kept up to date?
+    validations:
+      required: true

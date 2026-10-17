@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Download the latest version
+    url: https://github.com/Verisonder/SonderShield/releases/latest
+    about: Check that the problem still happens on the newest release before reporting.
