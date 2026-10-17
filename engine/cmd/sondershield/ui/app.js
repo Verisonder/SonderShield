@@ -72,7 +72,8 @@ async function poll() {
       if (logs.length > 2000) logs.length = 2000;
       if (tab === 'filter' && filterView === 'log') drawLog();
     }
-    if (tab === 'conns' && !connPaused) { conns = await api('connections'); drawConns(); }
+    if (tab === 'conns' && connView2 === 'live' && !connPaused) { conns = await api('connections'); drawConns(); }
+    else if (tab === 'conns' && connView2 === 'history') { hist = await api('history'); drawConns(); }
   } catch (e) { /* server starting or gone */ }
 }
 
@@ -378,6 +379,32 @@ async function toggleProtection() {
   }, wait);
 }
 
+function timeAgo(ms) {
+  const s = Math.max(0, (Date.now() - ms) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return Math.floor(s / 86400) + 'd ago';
+}
+function drawHistory(box) {
+  if (!hist) return;
+  const q = connSearch.trim().toLowerCase();
+  let list = hist;
+  if (q) list = hist.filter(e => (e.app || '').toLowerCase().includes(q) || (e.domain || '').toLowerCase().includes(q) || (e.remote || '').includes(q));
+  if (!list.length) {
+    box.innerHTML = `<div class="empty">${hist.length ? 'Nothing matches.' : 'No history yet. It builds up while protection is on.'}</div>`;
+    return;
+  }
+  box.innerHTML = list.slice(0, 500).map(e => `
+    <div class="histrow ${e.blocked ? 'isblocked' : ''}">
+      <div class="histmain">
+        <span class="cdest">${e.domain ? esc(e.domain) : `<span class="cip">${esc(e.remote)}</span>`}${e.direct ? '<span class="cdirect">direct IP</span>' : ''}${e.blocked ? '<span class="cgblocked" style="margin-left:8px">blocked</span>' : ''}</span>
+        <span class="histago">${timeAgo(e.lastSeen)}</span>
+      </div>
+      <div class="histsub"><span class="histapp">${esc(e.app || 'Unknown')}</span><span class="cport">:${e.port}</span>${e.count > 1 ? `<span class="histcount">×${e.count}</span>` : ''}</div>
+    </div>`).join('');
+}
+
 // ---- DNS diagnostic ----
 // Shows whether Windows is really sending its DNS to SonderShield, adapter by adapter,
 // and what to do when it isn't.
@@ -415,23 +442,28 @@ async function showDiag() {
 // Portmaster's network monitor. Built from Windows' own connection table (no driver),
 // with the hostname filled in from what SonderShield resolved. Connections to an IP that
 // was never looked up are flagged "direct IP" — a DNS filter can't see their name.
-let conns = null, connPaused = false, connSearch = '';
+let conns = null, hist = null, connPaused = false, connSearch = '', connView2 = 'live';
 function renderConns() {
   const p = $('#page-conns');
+  const live = connView2 === 'live';
   p.innerHTML = `<div class="kicker">NETWORK</div><h1>Connections</h1>
-    <div class="sub">Every app talking to the internet right now, and where to. Updated live.</div>
+    <div class="subtabs"><button class="chip ${live ? 'active' : ''}" id="cv-live">Live</button><button class="chip ${live ? '' : 'active'}" id="cv-hist">History</button></div>
+    <div class="sub">${live ? 'Every app talking to the internet right now, and where to.' : 'Everything each app has connected to since protection turned on.'}</div>
     <div class="connbar">
       <input class="field" id="connsearch" placeholder="Search app or domain…" value="${escapeAttr(connSearch)}">
-      <button class="pill ${connPaused ? 'filled' : ''}" id="connpause">${connPaused ? 'Resume' : 'Pause'}</button>
+      ${live ? `<button class="pill ${connPaused ? 'filled' : ''}" id="connpause">${connPaused ? 'Resume' : 'Pause'}</button>` : ''}
     </div>
-    <div id="connlist"><div class="empty">Reading connections…</div></div>`;
+    <div id="connlist"><div class="empty">Reading…</div></div>`;
+  $('#cv-live').onclick = () => { connView2 = 'live'; renderConns(); poll(); };
+  $('#cv-hist').onclick = () => { connView2 = 'history'; renderConns(); poll(); };
   $('#connsearch').oninput = e => { connSearch = e.target.value; drawConns(); };
-  $('#connpause').onclick = () => { connPaused = !connPaused; renderConns(); if (!connPaused) poll(); };
+  const pb = $('#connpause'); if (pb) pb.onclick = () => { connPaused = !connPaused; renderConns(); if (!connPaused) poll(); };
   drawConns();
 }
 function drawConns() {
   const box = $('#connlist');
   if (!box) return;
+  if (connView2 === 'history') { drawHistory(box); return; }
   if (!conns) return;
   const q = connSearch.trim().toLowerCase();
   let list = conns;

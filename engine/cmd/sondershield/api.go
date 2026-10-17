@@ -131,6 +131,8 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, s.a.plat.listPrograms())
 	case "connections":
 		writeJSON(w, s.a.connections())
+	case "history":
+		writeJSON(w, s.a.hist.list())
 	case "diag":
 		writeJSON(w, s.a.diag())
 	case "killswitch":
