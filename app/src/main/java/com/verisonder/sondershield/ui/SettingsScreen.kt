@@ -134,36 +134,39 @@ private fun SettingsContent(onReload: () -> Unit) {
     }
 
     Column(Modifier.verticalScroll(rememberScrollState())) {
-        ScreenHeader("Settings")
+        ScreenHeader(tr("Settings", "Réglages"))
 
         // 01 DNS server
-        Section(1, "DNS server", first = true) {
+        Section(1, tr("DNS server", "Serveur DNS"), first = true) {
             for (u in Upstreams.all) {
                 val sel = upstream == u.id
                 OptionCard(
                     u.name.substringBefore(" ("),
-                    u.name.substringAfter("(", "").removeSuffix(")").replaceFirstChar { it.uppercase() } +
+                    upstreamSub(u.name, isFrench()) +
                         if (sel && testResult != null) " · $testResult" else "",
                     selected = sel,
                     onClick = { upstream = u.id; applyUpstream() },
                 )
             }
-            OptionCard("Custom", "Your own server", selected = upstream == Upstreams.CUSTOM, onClick = { upstream = Upstreams.CUSTOM })
+            OptionCard(tr("Custom", "Personnalisé"), tr("Your own server", "Votre propre serveur"), selected = upstream == Upstreams.CUSTOM, onClick = { upstream = Upstreams.CUSTOM })
             if (upstream == Upstreams.CUSTOM) {
-                Field(custom, { custom = it }, "udp 9.9.9.9  or  doh https://host/dns-query 1.2.3.4", Modifier.fillMaxWidth(), keyboard = KeyboardType.Uri, onDone = ::applyUpstream)
+                Field(custom, { custom = it }, tr("udp 9.9.9.9  or  doh https://host/dns-query 1.2.3.4", "udp 9.9.9.9  ou  doh https://hote/dns-query 1.2.3.4"), Modifier.fillMaxWidth(), keyboard = KeyboardType.Uri, onDone = ::applyUpstream)
                 Text(
-                    "DoH needs the server's IP addresses after the URL, so SonderShield can reach it without asking itself.",
+                    tr(
+                        "DoH needs the server's IP addresses after the URL, so SonderShield can reach it without asking itself.",
+                        "Le DoH a besoin des adresses IP du serveur après l'URL, pour que SonderShield le joigne sans se demander à lui-même.",
+                    ),
                     color = Palette.faint, fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(vertical = 6.dp),
                 )
             }
             Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (upstream == Upstreams.CUSTOM) PillButton("Save") { applyUpstream() }
-                PillButton("Test", filled = false) {
-                    testResult = "testing…"
+                if (upstream == Upstreams.CUSTOM) PillButton(tr("Save", "Enregistrer")) { applyUpstream() }
+                PillButton(tr("Test", "Tester"), filled = false) {
+                    testResult = trc(ctx, "testing…", "test…")
                     scope.launch {
                         val spec = if (upstream == Upstreams.CUSTOM) custom.trim() else Upstreams.byId(upstream)!!.spec
                         testResult = withContext(Dispatchers.IO) {
-                            try { "answered in ${ShieldState.engine.testUpstream(spec)} ms" } catch (e: Exception) { "failed: ${e.message}" }
+                            try { trc(ctx, "answered in ", "réponse en ") + "${ShieldState.engine.testUpstream(spec)} ms" } catch (e: Exception) { trc(ctx, "failed: ", "échec : ") + e.message }
                         }
                     }
                 }
@@ -172,9 +175,9 @@ private fun SettingsContent(onReload: () -> Unit) {
         }
 
         // 02 Block lists
-        Section(2, "Block lists") {
+        Section(2, tr("Block lists", "Listes de blocage")) {
             Row(Modifier.padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                PillButton(if (updating) "Updating…" else "Update now", filled = false, enabled = !updating) {
+                PillButton(if (updating) tr("Updating…", "Mise à jour…") else tr("Update now", "Mettre à jour"), filled = false, enabled = !updating) {
                     scope.launch {
                         updating = true
                         val changed = store.updateEnabled(force = true)
@@ -183,7 +186,7 @@ private fun SettingsContent(onReload: () -> Unit) {
                         if (changed && phase == Phase.ON) ShieldState.applyConfig()
                     }
                 }
-                PillButton("Add a list", filled = false) { addList = true }
+                PillButton(tr("Add a list", "Ajouter une liste"), filled = false) { addList = true }
                 if (updating) CircularProgressIndicator(color = Palette.accent, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
             }
             // key(): metadata is read again whenever a download finishes.
@@ -192,10 +195,10 @@ private fun SettingsContent(onReload: () -> Unit) {
                     val on = l.id in enabled
                     val meta = prefs.listMeta(l.id)
                     val status = when {
-                        meta.error.isNotEmpty() -> "Error: ${meta.error}"
-                        meta.updated > 0 -> "${meta.entries.grouped()} entries · ${ago(meta.updated)}"
-                        on -> "Downloads when protection starts"
-                        else -> l.about
+                        meta.error.isNotEmpty() -> tr("Error: ", "Erreur : ") + meta.error
+                        meta.updated > 0 -> "${meta.entries.grouped()} " + tr("entries", "entrées") + " · " + ago(meta.updated, isFrench())
+                        on -> tr("Downloads when protection starts", "Téléchargée au démarrage de la protection")
+                        else -> if (isFrench()) aboutFr(l.id, l.about) else l.about
                     }
                     fun flip(v: Boolean) {
                         enabled = if (v) enabled + l.id else enabled - l.id
@@ -203,7 +206,7 @@ private fun SettingsContent(onReload: () -> Unit) {
                     }
                     OptionCard(l.name, status, onClick = { flip(!on) }, subColor = if (meta.error.isNotEmpty()) Palette.warn else null) {
                         if (l.id.startsWith("custom-")) {
-                            IconPill(Icons.trash, "Remove list") {
+                            IconPill(Icons.trash, tr("Remove list", "Retirer la liste")) {
                                 prefs.customLists = prefs.customLists.filter { it.id != l.id }
                                 store.delete(l.id)
                                 enabled = enabled - l.id
@@ -218,9 +221,9 @@ private fun SettingsContent(onReload: () -> Unit) {
         }
 
         // 03 Updates
-        Section(3, "Update lists automatically") {
+        Section(3, tr("Update lists automatically", "Mise à jour automatique des listes")) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for ((h, label) in listOf(0 to "Off", 12 to "12 h", 24 to "24 h", 48 to "48 h")) {
+                for ((h, label) in listOf(0 to tr("Off", "Non"), 12 to "12 h", 24 to "24 h", 48 to "48 h")) {
                     Chip(label, hours == h) {
                         hours = h
                         prefs.updateHours = h
@@ -228,26 +231,26 @@ private fun SettingsContent(onReload: () -> Unit) {
                     }
                 }
             }
-            Text("On Wi-Fi only, when the battery isn't low.", color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+            Text(tr("On Wi-Fi only, when the battery isn't low.", "En Wi-Fi uniquement, quand la batterie n'est pas faible."), color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
         }
 
         // 04 Connection
-        Section(4, "Connection") {
-            ToggleCard("Start on boot", "Turn protection back on after a restart, if it was on.", boot) {
+        Section(4, tr("Connection", "Connexion")) {
+            ToggleCard(tr("Start on boot", "Démarrer avec le téléphone"), tr("Turn protection back on after a restart, if it was on.", "Réactive la protection après un redémarrage, si elle était active."), boot) {
                 boot = it; prefs.startOnBoot = it
             }
-            ToggleCard("IPv6 DNS", "Also catch DNS sent over IPv6. Turn off only if a network misbehaves.", ipv6) {
+            ToggleCard("DNS IPv6", tr("Also catch DNS sent over IPv6. Turn off only if a network misbehaves.", "Capte aussi le DNS envoyé en IPv6. À désactiver seulement si un réseau pose problème."), ipv6) {
                 ipv6 = it; prefs.ipv6 = it
                 ShieldVpnService.restartIfOn(ctx)
             }
             OptionCard(
-                "Always-on VPN",
-                "Protection that survives everything. Set SonderShield as always-on in VPN settings.",
+                tr("Always-on VPN", "VPN permanent"),
+                tr("Protection that survives everything. Set SonderShield as always-on in VPN settings.", "Une protection qui résiste à tout. Réglez SonderShield en VPN permanent dans les réglages VPN."),
                 onClick = { ctx.startActivity(Intent(Settings.ACTION_VPN_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
             ) { Icon(Icons.chevron, null, tint = Palette.faint, modifier = Modifier.size(18.dp)) }
             OptionCard(
-                "Battery",
-                "On HyperOS set Battery saver to No restrictions, or the system may stop SonderShield.",
+                tr("Battery", "Batterie"),
+                tr("On HyperOS set Battery saver to No restrictions, or the system may stop SonderShield.", "Sur HyperOS, réglez l'économiseur de batterie sur Aucune restriction, sinon le système peut arrêter SonderShield."),
                 onClick = {
                     ctx.startActivity(
                         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -257,18 +260,18 @@ private fun SettingsContent(onReload: () -> Unit) {
         }
 
         // 05 Theme
-        Section(5, "Theme") {
+        Section(5, tr("Theme", "Thème")) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (m in ThemeMode.entries) {
                     if (m == ThemeMode.You && !ThemeMode.youAvailable) continue
-                    Chip(m.label, ThemeMode.of(themeId) == m) {
+                    Chip(if (isFrench()) m.fr else m.label, ThemeMode.of(themeId) == m) {
                         prefs.theme = m.id
                         ShieldState.theme.value = m.id
                     }
                 }
             }
             if (ThemeMode.of(themeId) == ThemeMode.You) {
-                Text("Colours from your wallpaper, light or dark with the system.", color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                Text(tr("Colours from your wallpaper, light or dark with the system.", "Couleurs de votre fond d'écran, clair ou sombre selon le système."), color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
             } else {
                 AccentPicker(prefs)
             }
@@ -284,7 +287,7 @@ private fun SettingsContent(onReload: () -> Unit) {
                 if (uri == null) return@rememberLauncherForActivityResult
                 val err = runCatching { Backup.import(ctx, uri) }.exceptionOrNull()
                 if (err != null) {
-                    toast(ctx, err.message ?: "Import failed")
+                    toast(ctx, if (err is IllegalArgumentException) trc(ctx, "Not a SonderShield backup", "Ce n'est pas une sauvegarde SonderShield") else err.message ?: trc(ctx, "Import failed", "Échec de l'import"))
                 } else {
                     ShieldState.theme.value = prefs.theme
                     ShieldState.accent.value = prefs.accent
@@ -336,34 +339,40 @@ private fun SettingsContent(onReload: () -> Unit) {
         }
 
         // 07 Statistics
-        Section(7, "Statistics") {
-            OptionCard("Blocked in total", prefs.allTimeBlocked.grouped())
-            OptionCard("Reset counters", "Today and all-time go back to zero. The log stays.", onClick = { confirmReset = true }) {
+        Section(7, tr("Statistics", "Statistiques")) {
+            OptionCard(tr("Blocked in total", "Bloqués au total"), ShieldState.stats.collectAsState().value.allBlocked.grouped())
+            OptionCard(tr("Reset counters", "Remettre à zéro"), tr("Today and all-time go back to zero. The log stays.", "Aujourd'hui et le total repartent de zéro. Le journal reste."), onClick = { confirmReset = true }) {
                 Icon(Icons.chevron, null, tint = Palette.faint, modifier = Modifier.size(18.dp))
             }
         }
 
         // 08 About
-        Section(8, "About") {
+        Section(8, tr("About", "À propos")) {
             Block {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Logo(30.dp, lit = true)
                     Spacer(Modifier.width(12.dp))
                     Column {
                         Wordmark(17)
-                        Text("Version ${BuildConfig.VERSION_NAME}", color = Palette.faint, fontSize = 12.sp)
+                        Text(tr("Version ", "Version ") + BuildConfig.VERSION_NAME, color = Palette.faint, fontSize = 12.sp)
                     }
                 }
                 Text(
-                    "By Verisonder. Free and open source under GPL-3.0. Everything stays on this phone: no account, no analytics.",
+                    tr(
+                        "By Verisonder. Free and open source under GPL-3.0. Everything stays on this phone: no account, no analytics.",
+                        "Par Verisonder. Libre et open source sous GPL-3.0. Tout reste sur ce téléphone : pas de compte, pas de statistiques envoyées.",
+                    ),
                     color = Palette.dim, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 12.dp),
                 )
                 Text(
-                    "Block lists by StevenBlack, AdGuard, abuse.ch URLhaus, HaGeZi and OISD, each under its own licence. Fonts: Unbounded and DM Sans (SIL Open Font License).",
+                    tr(
+                        "Block lists by StevenBlack, AdGuard, abuse.ch URLhaus, HaGeZi, OISD and EasyList, each under its own licence. Fonts: Unbounded and DM Sans (SIL Open Font License).",
+                        "Listes par StevenBlack, AdGuard, abuse.ch URLhaus, HaGeZi, OISD et EasyList, chacune sous sa propre licence. Polices : Unbounded et DM Sans (SIL Open Font License).",
+                    ),
                     color = Palette.faint, fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(top = 8.dp),
                 )
                 Spacer(Modifier.height(12.dp))
-                PillButton("Source code", filled = false) {
+                PillButton(tr("Source code", "Code source"), filled = false) {
                     ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Verisonder/SonderShield")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }
             }
@@ -379,16 +388,16 @@ private fun SettingsContent(onReload: () -> Unit) {
             onDismissRequest = { addList = false },
             containerColor = Palette.panel,
             shape = RoundedCornerShape(24.dp),
-            title = { Text("Add a block list", style = display(20), color = Palette.text) },
+            title = { Text(tr("Add a block list", "Ajouter une liste"), style = display(20), color = Palette.text) },
             text = {
                 Column {
-                    Field(name, { name = it }, "Name", Modifier.fillMaxWidth())
+                    Field(name, { name = it }, tr("Name", "Nom"), Modifier.fillMaxWidth())
                     Spacer(Modifier.height(8.dp))
-                    Field(url, { url = it.trim() }, "https://… (hosts, AdBlock or domains)", Modifier.fillMaxWidth(), keyboard = KeyboardType.Uri)
+                    Field(url, { url = it.trim() }, tr("https://… (hosts, AdBlock or domains)", "https://… (hosts, AdBlock ou domaines)"), Modifier.fillMaxWidth(), keyboard = KeyboardType.Uri)
                 }
             },
             confirmButton = {
-                PillButton("Add", enabled = ok) {
+                PillButton(tr("Add", "Ajouter"), enabled = ok) {
                     val l = BlockList("", name.trim().replace("|", " "), url, url)
                     prefs.customLists = prefs.customLists + l
                     lists = prefs.allLists()
@@ -398,7 +407,7 @@ private fun SettingsContent(onReload: () -> Unit) {
                     listsChanged(listOf(added))
                 }
             },
-            dismissButton = { PillButton("Cancel", filled = false) { addList = false } },
+            dismissButton = { PillButton(tr("Cancel", "Annuler"), filled = false) { addList = false } },
         )
     }
 
@@ -407,10 +416,10 @@ private fun SettingsContent(onReload: () -> Unit) {
             onDismissRequest = { confirmReset = false },
             containerColor = Palette.panel,
             shape = RoundedCornerShape(24.dp),
-            title = { Text("Reset counters?", style = display(20), color = Palette.text) },
-            text = { Text("Today's and all-time numbers go back to zero. The log stays.", color = Palette.dim) },
-            confirmButton = { PillButton("Reset") { ShieldState.resetStats(); confirmReset = false } },
-            dismissButton = { PillButton("Cancel", filled = false) { confirmReset = false } },
+            title = { Text(tr("Reset counters?", "Remettre à zéro ?"), style = display(20), color = Palette.text) },
+            text = { Text(tr("Today's and all-time numbers go back to zero. The log stays.", "Les chiffres d'aujourd'hui et le total repartent de zéro. Le journal reste."), color = Palette.dim) },
+            confirmButton = { PillButton(tr("Reset", "Remettre à zéro")) { ShieldState.resetStats(); confirmReset = false } },
+            dismissButton = { PillButton(tr("Cancel", "Annuler"), filled = false) { confirmReset = false } },
         )
     }
 }
@@ -430,7 +439,7 @@ private fun AccentPicker(prefs: Prefs) {
         prefs.accent = argb
         ShieldState.accent.value = argb
     }
-    Text("ACCENT", color = Palette.faint, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, modifier = Modifier.padding(top = 18.dp, bottom = 10.dp))
+    Text(tr("ACCENT", "COULEUR"), color = Palette.faint, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, modifier = Modifier.padding(top = 18.dp, bottom = 10.dp))
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         for ((name, c) in AccentChoices) {
             Swatch(name, fill = Brush.linearGradient(listOf(c, c)), selected = c.toArgb() == current) {
@@ -441,7 +450,7 @@ private fun AccentPicker(prefs: Prefs) {
         // Custom: rainbow until a custom colour is in use, then that colour inside a rainbow ring.
         val rainbow = Brush.sweepGradient((0..6).map { Color.hsv(it * 60f % 360f, 0.85f, 1f) })
         Swatch(
-            "Custom colour", fill = if (isPreset) rainbow else Brush.linearGradient(listOf(Color(current), Color(current))),
+            tr("Custom colour", "Couleur perso"), fill = if (isPreset) rainbow else Brush.linearGradient(listOf(Color(current), Color(current))),
             selected = !isPreset || showCustom, ring = if (isPreset) null else rainbow,
         ) {
             showCustom = !showCustom
@@ -454,7 +463,7 @@ private fun AccentPicker(prefs: Prefs) {
         exit = shrinkVertically(tween(200)) + fadeOut(tween(150)),
     ) {
         Column(Modifier.padding(top = 16.dp)) {
-            Text("Drag to pick any colour", color = Palette.dim, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
+            Text(tr("Drag to pick any colour", "Glissez pour choisir une couleur"), color = Palette.dim, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
             HueBar(hue) { h -> hue = h; pick(Color.hsv(h, 0.85f, 1f)) }
         }
     }
@@ -487,6 +496,7 @@ private fun Swatch(name: String, fill: Brush, selected: Boolean, ring: Brush? = 
 @Composable
 private fun HueBar(hue: Float, onHue: (Float) -> Unit) {
     val thumbBorder = Palette.text
+    val desc = tr("Custom colour", "Couleur perso")
     Canvas(
         Modifier.fillMaxWidth().height(36.dp)
             .pointerInput(Unit) { detectTapGestures { onHue((it.x / size.width).coerceIn(0f, 1f) * 359f) } }
@@ -496,7 +506,7 @@ private fun HueBar(hue: Float, onHue: (Float) -> Unit) {
                     onHue((change.position.x / size.width).coerceIn(0f, 1f) * 359f)
                 }
             }
-            .semantics { contentDescription = "Custom colour" },
+            .semantics { contentDescription = desc },
     ) {
         val thumbR = size.height / 2 - 2.dp.toPx()
         val left = thumbR
@@ -523,3 +533,29 @@ private fun hueOf(c: Color): Float {
 
 private fun toast(ctx: android.content.Context, text: String) =
     android.widget.Toast.makeText(ctx, text, android.widget.Toast.LENGTH_SHORT).show()
+
+/** "Cloudflare (encrypted)" -> "Encrypted" / "Chiffré". */
+private fun upstreamSub(name: String, fr: Boolean): String {
+    val raw = name.substringAfter("(", "").removeSuffix(")")
+    val t = if (!fr) raw else raw
+        .replace("encrypted", "chiffré").replace("plain", "non chiffré").replace("blocks malware", "bloque les malwares")
+    return t.replaceFirstChar { it.uppercase() }
+}
+
+/** French descriptions of the built-in lists. */
+private fun aboutFr(id: String, en: String): String = when (id) {
+    "stevenblack" -> "Pubs et malwares. Le fichier hosts classique."
+    "adguard-dns" -> "Pubs et traqueurs, pensé pour le blocage DNS."
+    "urlhaus" -> "Sites qui diffusent des malwares en ce moment. Petite."
+    "hagezi-pro" -> "Liste plus forte : pubs, traçage et télémétrie. Casse rarement quelque chose."
+    "hagezi-tif" -> "Phishing, arnaques et malwares. Grande."
+    "hagezi-xiaomi" -> "Télémétrie Xiaomi / HyperOS. Peut masquer certaines pubs et thèmes MIUI."
+    "oisd-small" -> "Pubs uniquement, très peu de faux positifs."
+    "liste-fr" -> "Régies pub et traqueurs français."
+    "liste-ar" -> "Régies pub en langue arabe. Petite."
+    "easylist-de" -> "Régies pub et traqueurs allemands."
+    "easylist-es" -> "Régies pub et traqueurs espagnols."
+    "easylist-it" -> "Régies pub et traqueurs italiens."
+    "easylist-pt" -> "Régies pub et traqueurs portugais."
+    else -> en
+}

@@ -367,13 +367,13 @@ fun IconPill(icon: ImageVector, description: String, onClick: () -> Unit) {
 fun Long.grouped(): String = "%,d".format(this)
 fun Int.grouped(): String = "%,d".format(this)
 
-fun ago(ms: Long): String {
-    if (ms <= 0) return "never"
+fun ago(ms: Long, fr: Boolean = false): String {
+    if (ms <= 0) return if (fr) "jamais" else "never"
     val s = (System.currentTimeMillis() - ms) / 1000
     return when {
-        s < 60 -> "just now"
-        s < 3600 -> "${s / 60} min ago"
-        s < 86400 -> "${s / 3600} h ago"
-        else -> "${s / 86400} d ago"
+        s < 60 -> if (fr) "à l'instant" else "just now"
+        s < 3600 -> if (fr) "il y a ${s / 60} min" else "${s / 60} min ago"
+        s < 86400 -> if (fr) "il y a ${s / 3600} h" else "${s / 3600} h ago"
+        else -> if (fr) "il y a ${s / 86400} j" else "${s / 86400} d ago"
     }
 }

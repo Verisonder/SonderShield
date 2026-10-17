@@ -21,6 +21,7 @@ import com.verisonder.sondershield.core.ShieldState
 import com.verisonder.sondershield.data.ListStore
 import com.verisonder.sondershield.data.Prefs
 import com.verisonder.sondershield.ui.MainActivity
+import com.verisonder.sondershield.ui.trc
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -134,11 +135,11 @@ class ShieldVpnService : VpnService() {
         val pfd = try {
             b.establish()
         } catch (e: Exception) {
-            null.also { ShieldState.problem.value = "Could not start the VPN: ${e.message}" }
+            null.also { ShieldState.problem.value = trc(this, "Could not start the VPN: ", "Impossible de démarrer le VPN : ") + e.message }
         }
         if (pfd == null) {
             if (ShieldState.problem.value == null) {
-                ShieldState.problem.value = "VPN permission missing. Open SonderShield and turn it on."
+                ShieldState.problem.value = trc(this, "VPN permission missing. Open SonderShield and turn it on.", "Autorisation VPN manquante. Ouvrez SonderShield et activez-le.")
             }
             prefs.wantOn = false
             teardown()
@@ -147,7 +148,7 @@ class ShieldVpnService : VpnService() {
         try {
             ShieldState.engine.start(pfd.detachFd().toLong())
         } catch (e: Exception) {
-            ShieldState.problem.value = "Engine failed to start: ${e.message}"
+            ShieldState.problem.value = trc(this, "Engine failed to start: ", "Le moteur n'a pas démarré : ") + e.message
             prefs.wantOn = false
             teardown()
             return
@@ -183,7 +184,7 @@ class ShieldVpnService : VpnService() {
 
     /** Another VPN took over, or the user revoked us in Settings. */
     override fun onRevoke() {
-        ShieldState.problem.value = "Another VPN took over, or SonderShield was turned off in Settings."
+        ShieldState.problem.value = trc(this, "Another VPN took over, or SonderShield was turned off in Settings.", "Un autre VPN a pris la main, ou SonderShield a été désactivé dans les réglages.")
         Prefs(this).wantOn = false
         ShieldState.scope.launch { lock.withLock { teardown() } }
     }

@@ -58,8 +58,9 @@ data class ShieldColors(
     val dark: Boolean,
 )
 
-enum class ThemeMode(val id: String, val label: String) {
-    Default("default", "Default"), Light("light", "Light"), Oled("oled", "OLED"), You("you", "Material You");
+enum class ThemeMode(val id: String, val label: String, val fr: String) {
+    Default("default", "Default", "Par défaut"), Light("light", "Light", "Clair"), Oled("oled", "OLED", "OLED"),
+    You("you", "Material You", "Material You");
 
     companion object {
         fun of(id: String?) = entries.firstOrNull { it.id == id } ?: Default

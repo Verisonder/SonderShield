@@ -65,21 +65,21 @@ fun LogScreen() {
 
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(
-            "Log", kicker = if (phase == Phase.OFF) "Paused" else "Live",
-            sub = "${log.size.grouped()} latest queries · ${blockedCount.grouped()} blocked",
+            tr("Log", "Journal"), kicker = if (phase == Phase.OFF) tr("Paused", "En pause") else tr("Live", "En direct"),
+            sub = tr("${log.size.grouped()} latest queries · ${blockedCount.grouped()} blocked", "${log.size.grouped()} dernières requêtes · ${blockedCount.grouped()} bloquées"),
         ) {
-            if (log.isNotEmpty()) IconPill(Icons.trash, "Clear log") { ShieldState.clearLog() }
+            if (log.isNotEmpty()) IconPill(Icons.trash, tr("Clear log", "Vider le journal")) { ShieldState.clearLog() }
         }
-        Field(query, { query = it }, "Search domains", Modifier.fillMaxWidth().padding(horizontal = Gutter).padding(top = 10.dp), leading = Icons.search)
+        Field(query, { query = it }, tr("Search domains", "Rechercher un domaine"), Modifier.fillMaxWidth().padding(horizontal = Gutter).padding(top = 10.dp), leading = Icons.search)
         ChipRow(Modifier.padding(top = 6.dp, bottom = 4.dp)) {
-            Chip("All", filter == 0) { filter = 0 }
-            Chip("Blocked", filter == 1) { filter = 1 }
-            Chip("Allowed", filter == 2) { filter = 2 }
+            Chip(tr("All", "Tout"), filter == 0) { filter = 0 }
+            Chip(tr("Blocked", "Bloqués"), filter == 1) { filter = 1 }
+            Chip(tr("Allowed", "Autorisés"), filter == 2) { filter = 2 }
         }
         if (shown.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    if (phase == Phase.OFF) "Turn protection on to see DNS queries here." else "Nothing yet. Open an app or a website.",
+                    if (phase == Phase.OFF) tr("Turn protection on to see DNS queries here.", "Activez la protection pour voir les requêtes DNS ici.") else tr("Nothing yet. Open an app or a website.", "Rien pour l'instant. Ouvrez une appli ou un site."),
                     color = Palette.faint, fontSize = 14.sp, textAlign = TextAlign.Center,
                 )
             }
@@ -100,36 +100,40 @@ fun LogScreen() {
             text = {
                 Column {
                     Text(
-                        when (e.verdict) { 1 -> "Blocked by ${reasonLabel(ctx, e.reason)}"; 2 -> "Failed: ${e.reason}"; else -> if (e.reason.isNotEmpty()) "Allowed (${e.reason})" else "Allowed" },
+                        when (e.verdict) {
+                            1 -> tr("Blocked by ", "Bloqué par ") + reasonLabel(ctx, e.reason)
+                            2 -> tr("Failed: ", "Échec : ") + e.reason
+                            else -> tr("Allowed", "Autorisé") + if (e.reason.isNotEmpty()) " (${e.reason})" else ""
+                        },
                         color = if (e.verdict == 1) Palette.accentText else Palette.dim, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                     )
                     Text("${e.typeName} · ${time(e.time)}${if (e.ms > 0) " · ${e.ms} ms" else ""}", color = Palette.faint, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
                     if (e.verdict == 1 && isListReason(e.reason)) {
-                        Text("Allowing it adds an allow rule, which wins over every list.", color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+                        Text(tr("Allowing it adds an allow rule, which wins over every list.", "L'autoriser ajoute une règle d'autorisation, qui passe avant toutes les listes."), color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
                     }
                 }
             },
             confirmButton = {
                 if (e.verdict == 1) {
-                    PillButton("Allow") {
+                    PillButton(tr("Allow", "Autoriser")) {
                         prefs.allowRules = addLine(prefs.allowRules, e.domain)
                         prefs.blockRules = removeLine(prefs.blockRules, e.domain)
                         ShieldState.applyRules()
                         picked = null
-                        Toast.makeText(ctx, "Allowed ${e.domain}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(ctx, trc(ctx, "Allowed ", "Autorisé : ") + e.domain, Toast.LENGTH_SHORT).show()
                     }
                 } else {
-                    PillButton("Block") {
+                    PillButton(tr("Block", "Bloquer")) {
                         prefs.blockRules = addLine(prefs.blockRules, e.domain)
                         prefs.allowRules = removeLine(prefs.allowRules, e.domain)
                         ShieldState.applyRules()
                         picked = null
-                        Toast.makeText(ctx, "Blocked ${e.domain}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(ctx, trc(ctx, "Blocked ", "Bloqué : ") + e.domain, Toast.LENGTH_SHORT).show()
                     }
                 }
             },
             dismissButton = {
-                PillButton("Copy", filled = false) {
+                PillButton(tr("Copy", "Copier"), filled = false) {
                     ctx.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("domain", e.domain))
                     picked = null
                 }
@@ -163,11 +167,11 @@ private fun LogRow(e: LogEntry, onClick: () -> Unit) {
             Spacer(Modifier.width(10.dp))
             when {
                 blocked -> Text(
-                    "BLOCKED", color = Palette.onAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+                    tr("BLOCKED", "BLOQUÉ"), color = Palette.onAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
                     modifier = Modifier.clip(CircleShape).background(Palette.accent).padding(horizontal = 9.dp, vertical = 5.dp),
                 )
                 else -> Text(
-                    when { e.verdict == 2 -> "failed"; e.reason == "cached" -> "cached"; else -> "${e.ms} ms" },
+                    when { e.verdict == 2 -> tr("failed", "échec"); e.reason == "cached" -> tr("cached", "en cache"); else -> "${e.ms} ms" },
                     color = if (e.verdict == 2) Palette.warn else Palette.faint, fontSize = 11.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.clip(CircleShape).border(1.5.dp, Palette.line, CircleShape).padding(horizontal = 9.dp, vertical = 4.dp),
                 )

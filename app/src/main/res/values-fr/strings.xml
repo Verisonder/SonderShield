@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_name">État de la protection</string>
+    <string name="note_title">Protégé</string>
+    <string name="note_text">%1$d bloqués aujourd\'hui</string>
+    <string name="note_stop">Désactiver</string>
+    <string name="tile_on">Activé</string>
+    <string name="tile_off">Désactivé</string>
+    <string name="widget_description">Protection activée ou non, et pubs bloquées aujourd\'hui. Touchez pour basculer.</string>
+</resources>

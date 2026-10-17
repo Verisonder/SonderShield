@@ -103,7 +103,7 @@ fun HomeScreen(onToggle: () -> Unit) {
             Logo(26.dp, lit = on)
             Spacer(Modifier.width(10.dp))
             Box(Modifier.weight(1f)) { Wordmark() }
-            val up = Upstreams.byId(prefs.upstreamId)?.name?.substringBefore(" (") ?: "Custom"
+            val up = Upstreams.byId(prefs.upstreamId)?.name?.substringBefore(" (") ?: tr("Custom", "Perso")
             Text(
                 up, color = Palette.text, fontSize = 12.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.clip(CircleShape).border(1.5.dp, Palette.line, CircleShape).padding(horizontal = 12.dp, vertical = 6.dp),
@@ -113,7 +113,7 @@ fun HomeScreen(onToggle: () -> Unit) {
         // Hero: the headline rolls over when the state changes.
         Column(Modifier.padding(horizontal = Gutter).padding(top = 14.dp)) {
             val kickerColor by animateColorAsState(if (on) Palette.accentText else Palette.faint, tween(400), label = "kicker")
-            Kicker("DNS filter · every app", color = kickerColor)
+            Kicker(tr("DNS filter · every app", "Filtre DNS · toutes les applis"), color = kickerColor)
             AnimatedContent(
                 targetState = phase,
                 transitionSpec = {
@@ -123,14 +123,21 @@ fun HomeScreen(onToggle: () -> Unit) {
                 label = "headline",
             ) { p ->
                 Text(
-                    when (p) { Phase.ON -> "Ads stop here."; Phase.STARTING -> "Starting up…"; Phase.OFF -> "Ads get through." },
+                    when (p) {
+                        Phase.ON -> tr("Ads stop here.", "Pubs bloquées.")
+                        Phase.STARTING -> tr("Starting up…", "Démarrage…")
+                        Phase.OFF -> tr("Ads get through.", "Pubs autorisées.")
+                    },
                     style = display(34), color = Palette.text, maxLines = 1, softWrap = false,
                     modifier = Modifier.padding(top = 8.dp, bottom = 6.dp),
                 )
             }
             Text(
-                if (on) "Every app asks SonderShield first. ${if (domains > 0) domains.grouped() else "Thousands of"} ad and tracker domains get nothing back."
-                else "Tap the shield to block ads and trackers in every app on this phone.",
+                if (on) tr(
+                    "Every app asks SonderShield first. ${if (domains > 0) domains.grouped() else "Thousands of"} ad and tracker domains get nothing back.",
+                    "Chaque appli passe d'abord par SonderShield. ${if (domains > 0) domains.grouped() else "Des milliers de"} domaines de pubs et de traqueurs ne reçoivent rien.",
+                )
+                else tr("Tap the shield to block ads and trackers in every app on this phone.", "Touchez le bouclier pour bloquer pubs et traqueurs dans toutes les applis de ce téléphone."),
                 color = Palette.dim, fontSize = 15.sp, lineHeight = 21.sp, maxLines = 2,
             )
         }
@@ -149,25 +156,28 @@ fun HomeScreen(onToggle: () -> Unit) {
         }
         Swoosh(blade = swooshColor, below = Palette.panel, progress = sweep.value)
         Column(Modifier.fillMaxWidth().background(Palette.panel).padding(horizontal = Gutter).padding(top = 4.dp, bottom = 16.dp)) {
-            Kicker("Today")
+            Kicker(tr("Today", "Aujourd'hui"))
             Spacer(Modifier.height(12.dp))
             val (total, blocked) = today
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                LadderStep(total.toDouble(), { it.toLong().grouped() }, "DNS queries\ntoday", 0, onPanel = true)
-                LadderStep(blocked.toDouble(), { it.toLong().grouped() }, "ads and trackers\nblocked today", 1, onPanel = true)
+                LadderStep(total.toDouble(), { it.toLong().grouped() }, tr("DNS queries\ntoday", "requêtes DNS\naujourd'hui"), 0, onPanel = true)
+                LadderStep(blocked.toDouble(), { it.toLong().grouped() }, tr("ads and trackers\nblocked today", "pubs et traqueurs\nbloqués aujourd'hui"), 1, onPanel = true)
                 LadderStep(
                     if (total > 0) blocked * 100.0 / total else 0.0, { "%.1f%%".format(it) },
-                    "of everything your\napps asked for", 2, onPanel = true,
+                    tr("of everything your\napps asked for", "de tout ce que vos\napplis ont demandé"), 2, onPanel = true,
                 )
             }
 
             problem?.let { p ->
-                Notice(p, "Tap to dismiss") { ShieldState.problem.value = null }
+                Notice(p, tr("Tap to dismiss", "Touchez pour fermer")) { ShieldState.problem.value = null }
             }
             if (strictDns != null && on) {
                 Notice(
-                    "Private DNS is set to $strictDns, which skips SonderShield. Set it to Automatic or Off.",
-                    "Open settings",
+                    tr(
+                        "Private DNS is set to $strictDns, which skips SonderShield. Set it to Automatic or Off.",
+                        "Le DNS privé est réglé sur $strictDns, ce qui contourne SonderShield. Réglez-le sur Automatique ou Désactivé.",
+                    ),
+                    tr("Open settings", "Ouvrir les réglages"),
                 ) { ctx.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             }
             ScrollHint(visible = scroll.value < 8)
@@ -188,7 +198,7 @@ private fun ScrollHint(visible: Boolean) {
         Modifier.fillMaxWidth().padding(top = 10.dp).graphicsLayer { this.alpha = alpha; translationY = dy.dp.toPx() },
         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("MORE", color = Palette.faint, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+        Text(tr("MORE", "PLUS"), color = Palette.faint, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
         Spacer(Modifier.width(6.dp))
         Icon(Icons.chevron, null, tint = Palette.faint, modifier = Modifier.size(14.dp).graphicsLayer { rotationZ = 90f })
     }
@@ -259,6 +269,8 @@ private fun BigToggle(phase: Phase, logo: Dp, onClick: () -> Unit) {
     val rock by breathe.animateFloat(-1f, 1f, infiniteRepeatable(tween(420), RepeatMode.Reverse), label = "rock")
     val glowAlpha by animateFloatAsState(if (on) 1f else 0f, tween(500), label = "glowAlpha")
 
+    val descOn = tr("Protection on. Tap to turn off.", "Protection activée. Touchez pour désactiver.")
+    val descOff = tr("Protection off. Tap to turn on.", "Protection désactivée. Touchez pour activer.")
     // Only the shield itself is the button (a circle the logo's size), so taps beside it
     // or on the label don't toggle protection by accident.
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -287,7 +299,7 @@ private fun BigToggle(phase: Phase, logo: Dp, onClick: () -> Unit) {
                 modifier = Modifier
                     .clip(CircleShape)
                     .clickable(interactionSource = press, indication = null, onClick = guardedClick)
-                    .semantics { role = Role.Switch; contentDescription = if (on) "Protection on. Tap to turn off." else "Protection off. Tap to turn on." }
+                    .semantics { role = Role.Switch; contentDescription = if (on) descOn else descOff }
                     .graphicsLayer {
                     scaleX = pressScale; scaleY = pressScale
                     rotationZ = if (phase == Phase.STARTING) rock * 4f else 0f
@@ -300,7 +312,11 @@ private fun BigToggle(phase: Phase, logo: Dp, onClick: () -> Unit) {
             label = "state",
         ) { p ->
             Text(
-                when (p) { Phase.STARTING -> "STARTING"; Phase.ON -> "PROTECTION ON"; Phase.OFF -> "PROTECTION OFF" },
+                when (p) {
+                    Phase.STARTING -> tr("STARTING", "DÉMARRAGE")
+                    Phase.ON -> tr("PROTECTION ON", "PROTECTION ACTIVÉE")
+                    Phase.OFF -> tr("PROTECTION OFF", "PROTECTION DÉSACTIVÉE")
+                },
                 color = if (p != Phase.OFF) Palette.accentText else Palette.faint, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp,
             )
         }

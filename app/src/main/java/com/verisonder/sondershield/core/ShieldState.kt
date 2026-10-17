@@ -101,7 +101,7 @@ object ShieldState {
             try {
                 engine.setUpstream(prefs.upstreamSpec())
             } catch (e: Exception) {
-                problem.value = "DNS server setting is invalid: ${e.message}. Using Cloudflare."
+                problem.value = com.verisonder.sondershield.ui.trc(app, "DNS server setting is invalid: ${e.message}. Using Cloudflare.", "Réglage du serveur DNS invalide : ${e.message}. Cloudflare est utilisé.")
                 engine.setUpstream(Upstreams.byId(Upstreams.DEFAULT)!!.spec)
             }
             try {

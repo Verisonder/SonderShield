@@ -106,18 +106,18 @@ fun HomeStats() {
     val topSeen = remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxWidth().background(Palette.panel).padding(horizontal = Gutter).padding(bottom = 28.dp)) {
-        Kicker("All time", Modifier.padding(top = 10.dp).onSeen(allSeen).reveal(allSeen.value))
+        Kicker(tr("All time", "Depuis le début"), Modifier.padding(top = 10.dp).onSeen(allSeen).reveal(allSeen.value))
         Spacer(Modifier.height(12.dp))
         val seen = allSeen.value
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Tile(compact(counted(s.allTotal.toDouble(), seen).toLong()), "DNS queries", Modifier.weight(1f).reveal(seen, 1))
-            Tile(compact(counted(s.allBlocked.toDouble(), seen).toLong()), "blocked", Modifier.weight(1f).reveal(seen, 2))
+            Tile(compact(counted(s.allTotal.toDouble(), seen).toLong()), tr("DNS queries", "requêtes DNS"), Modifier.weight(1f).reveal(seen, 1))
+            Tile(compact(counted(s.allBlocked.toDouble(), seen).toLong()), tr("blocked", "bloquées"), Modifier.weight(1f).reveal(seen, 2))
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Tile(compact(counted(s.allThreats.toDouble(), seen).toLong()), "threats blocked\nmalware and phishing", Modifier.weight(1f).reveal(seen, 3))
+            Tile(compact(counted(s.allThreats.toDouble(), seen).toLong()), tr("threats blocked\nmalware and phishing", "menaces bloquées\nmalwares et phishing"), Modifier.weight(1f).reveal(seen, 3))
             Tile(
-                if (domains > 0) compact(counted(domains.toDouble(), seen).toLong()) else "–", "filter rules\nloaded now",
+                if (domains > 0) compact(counted(domains.toDouble(), seen).toLong()) else "–", tr("filter rules\nloaded now", "règles de filtre\nchargées"),
                 Modifier.weight(1f).reveal(seen, 4),
             )
         }
@@ -129,31 +129,31 @@ fun HomeStats() {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("%.1f%%".format(rate), style = display(30), color = Palette.onAccent, modifier = Modifier.weight(1f))
-            Text("block rate,\nall time", color = Palette.onAccent, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium)
+            Text(tr("block rate,\nall time", "taux de blocage,\ndepuis le début"), color = Palette.onAccent, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium)
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Tile(
-                "≈ " + bytes(counted((s.allBlocked * BYTES_PER_BLOCK).toDouble(), seen).toLong()), "data not downloaded\nestimate",
+                "≈ " + bytes(counted((s.allBlocked * BYTES_PER_BLOCK).toDouble(), seen).toLong()), tr("data not downloaded\nestimate", "données non téléchargées\nestimation"),
                 Modifier.weight(1f).reveal(seen, 6),
             )
             Uptime(startedAt, Modifier.weight(1f).reveal(seen, 7))
         }
 
-        Kicker("Activity", Modifier.padding(top = 28.dp).onSeen(chartSeen).reveal(chartSeen.value))
+        Kicker(tr("Activity", "Activité"), Modifier.padding(top = 28.dp).onSeen(chartSeen).reveal(chartSeen.value))
         Spacer(Modifier.height(10.dp))
         var week by rememberSaveable { mutableStateOf(false) }
         Row(Modifier.reveal(chartSeen.value, 1), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Chip("24 hours", !week) { week = false }
-            Chip("7 days", week) { week = true }
+            Chip(tr("24 hours", "24 heures"), !week) { week = false }
+            Chip(tr("7 days", "7 jours"), week) { week = true }
         }
         Spacer(Modifier.height(14.dp))
         Box(Modifier.reveal(chartSeen.value, 2)) { ActivityChart(s, week, chartSeen.value) }
 
-        Kicker("Top blocked", Modifier.padding(top = 28.dp).onSeen(topSeen).reveal(topSeen.value))
+        Kicker(tr("Top blocked", "Les plus bloqués"), Modifier.padding(top = 28.dp).onSeen(topSeen).reveal(topSeen.value))
         Spacer(Modifier.height(10.dp))
         if (s.top.isEmpty()) {
-            Text("Nothing blocked yet.", color = Palette.faint, fontSize = 14.sp)
+            Text(tr("Nothing blocked yet.", "Rien de bloqué pour l'instant."), color = Palette.faint, fontSize = 14.sp)
         } else {
             val max = s.top.first().second.coerceAtLeast(1)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -179,7 +179,7 @@ private fun Uptime(startedAt: Long, modifier: Modifier) {
     LaunchedEffect(startedAt) {
         while (startedAt > 0) { now = System.currentTimeMillis(); delay(30_000) }
     }
-    Tile(if (startedAt > 0) duration(now - startedAt) else "off", "on without a break", modifier)
+    Tile(if (startedAt > 0) duration(now - startedAt, isFrench()) else tr("off", "arrêté"), tr("on without a break", "actif sans interruption"), modifier)
 }
 
 @Composable
@@ -244,9 +244,9 @@ private fun ActivityChart(s: StatsSnapshot, week: Boolean, seen: Boolean) {
 
     Column(Modifier.fillMaxWidth().clip(blockShape).background(Palette.card2).padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Legend(soft, "Queries ${compact(totalQ.toLong())}")
+            Legend(soft, tr("Queries", "Requêtes") + " " + compact(totalQ.toLong()))
             Spacer(Modifier.width(16.dp))
-            Legend(accent, "Blocked ${compact(totalB.toLong())}")
+            Legend(accent, tr("Blocked", "Bloquées") + " " + compact(totalB.toLong()))
         }
         Spacer(Modifier.height(12.dp))
         Canvas(Modifier.fillMaxWidth().height(150.dp)) {
@@ -312,12 +312,12 @@ private fun bytes(b: Long): String = when {
     else -> trim("%.1f".format(b / 1e9)) + " GB"
 }
 
-private fun duration(ms: Long): String {
+private fun duration(ms: Long, fr: Boolean): String {
     val m = ms / 60_000
     return when {
-        m < 1 -> "just now"
+        m < 1 -> if (fr) "à l'instant" else "just now"
         m < 60 -> "$m min"
         m < 1440 -> "${m / 60} h ${m % 60} min"
-        else -> "${m / 1440} d ${(m % 1440) / 60} h"
+        else -> "${m / 1440} ${if (fr) "j" else "d"} ${(m % 1440) / 60} h"
     }
 }
