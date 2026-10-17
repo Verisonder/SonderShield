@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <b>Ad, tracker and malware blocker for Android.</b><br>
+  <b>Ad, tracker and malware blocker for Android and Windows.</b><br>
   No root needed, no account, no analytics. Everything stays on your phone.
 </p>
 
@@ -46,6 +46,8 @@ Turn on **HTTPS filtering** and it goes further in your browsers: ad spaces and 
 
 ## Install
 
+**Android:** download the APK below. **Windows:** download `SonderShield-Windows-x.y.z.zip` from the latest release, unzip it, and run `SonderShield.exe` (Windows asks for administrator rights to change the PC's DNS and firewall).
+
 1. Download `SonderShield-x.y.z.apk` from the [latest release](https://github.com/Verisonder/SonderShield/releases/latest) and open it.
 2. Follow the first-run steps: allow the VPN, keep it running in the background.
 3. Tap the shield.
@@ -61,9 +63,10 @@ engine/   Go: DNS and packet handling, list parsing, rules, cache, DoH,
           gVisor netstack full tunnel, WireGuard, HTTPS filtering
 app/      Android app: Kotlin and Jetpack Compose
 tools/    build_engine.sh: engine -> app/libs/engine.aar (gomobile)
+engine/cmd/sondershield/  the Windows app (Go + embedded web UI)
 ```
 
-The engine is plain Go with its own tests, bound to Android with gomobile. A Windows version on the same engine is next.
+The engine is plain Go with its own tests, bound to Android with gomobile and reused directly by the Windows app (`engine/cmd/sondershield`).
 
 ### Building
 

@@ -82,6 +82,29 @@ jobs:
       - name: Tests
         shell: bash
         run: gradle --no-daemon testDebugUnitTest
+      - name: Build the Windows app
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd engine
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build \
+            -trimpath -ldflags "-s -w -H=windowsgui" \
+            -o "../SonderShield.exe" ./cmd/sondershield
+          cd ..
+          mkdir -p winpkg
+          cp SonderShield.exe winpkg/
+          printf '%s\n' \
+            'SonderShield for Windows' '' \
+            'Blocks ads, trackers and malware for every app on this PC by filtering DNS,' \
+            "and can cut off any app's internet (firewall). Nothing leaves your PC." '' \
+            'To run: double-click SonderShield.exe. Windows asks for administrator rights' \
+            "(needed to change the PC's DNS and firewall). A window opens; click the shield" \
+            'to turn protection on.' '' \
+            'Closing the window leaves protection running. To stop it, open the window again' \
+            '(run the .exe) and click Quit, or turn the shield off.' '' \
+            'Free and open source, GPL-3.0: https://github.com/Verisonder/SonderShield' \
+            > winpkg/README.txt
+          cd winpkg && zip -r "../SonderShield-Windows-$VERSION.zip" . && cd ..
       - name: Build
         shell: bash
         env:
@@ -107,7 +130,8 @@ jobs:
           NAMED="SonderShield-$VERSION.apk"
           cp "$APK" "$NAMED"
 
-          gh release create "$GITHUB_REF_NAME" "$NAMED" \
+          WINZIP=$(ls SonderShield-Windows-*.zip | head -n 1)
+          gh release create "$GITHUB_REF_NAME" "$NAMED" "$WINZIP" \
             --repo "$GITHUB_REPOSITORY" \
             --title "SonderShield $VERSION" \
             --notes-file docs/releasenote/release_notes_$GITHUB_REF_NAME.md

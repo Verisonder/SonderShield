@@ -33,6 +33,9 @@ jobs:
       - name: Build the engine
         shell: bash
         run: tools/build_engine.sh 2>&1 | tee engine.log
+      - name: Windows cross-build
+        shell: bash
+        run: cd engine && GOOS=windows GOARCH=amd64 go build ./...
       - name: Engine tests
         shell: bash
         run: |

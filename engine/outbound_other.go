@@ -15,3 +15,7 @@ func (e *Engine) bindOutside(conn.Bind) {}
 
 // dialControl: nothing to do outside Windows.
 var dialControl func(network, address string, c syscall.RawConn) error
+
+// SetOutsideInterface is only meaningful on Windows; elsewhere the engine's sockets
+// already leave on the right interface.
+func (e *Engine) SetOutsideInterface(index4, index6 int) {}

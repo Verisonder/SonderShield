@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SonderShield</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="app">
+  <nav>
+    <div class="brand">
+      <svg width="26" height="29" viewBox="0 0 100 110" aria-hidden="true">
+        <clipPath id="sh"><path d="M50 4L92 18V52C92 78 74 97 50 106C26 97 8 78 8 52V18Z"/></clipPath>
+        <g clip-path="url(#sh)">
+          <path d="M0 0H100V30Q46 60 0 80Z" fill="var(--accent)"/>
+          <path d="M0 88Q52 70 100 45V110H0Z" fill="var(--text)"/>
+        </g>
+      </svg>
+      <span class="wordmark">Sonder<span class="s2">Shield</span></span>
+    </div>
+    <button class="tab active" data-tab="home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3.5 10.5L12 4l8.5 6.5"/><path d="M5.5 9v10.5h13V9"/></svg>
+      <span data-t="Home">Home</span>
+    </button>
+    <button class="tab" data-tab="filter">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3.5l7.5 2.8v5.4c0 4.6-3.1 7.9-7.5 9.3-4.4-1.4-7.5-4.7-7.5-9.3V6.3z"/></svg>
+      <span data-t="Filter">Filter</span>
+    </button>
+    <button class="tab" data-tab="rules">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h10"/><path d="M4 17h6"/><path d="M18 4v6"/><path d="M15 7h6"/><path d="M14 17h6"/></svg>
+      <span data-t="Rules">Rules</span>
+    </button>
+    <button class="tab" data-tab="apps">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/></svg>
+      <span data-t="Firewall">Firewall</span>
+    </button>
+    <button class="tab" data-tab="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"/></svg>
+      <span data-t="Settings">Settings</span>
+    </button>
+    <div class="spacer"></div>
+    <div class="statuschip" id="statuschip"><span class="dot"></span><span id="statustext">Off</span></div>
+    <button class="tab" id="quitbtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/><path d="M15 16l4-4-4-4"/><path d="M19 12H9"/></svg>
+      <span data-t="Quit">Quit</span>
+    </button>
+  </nav>
+  <main>
+    <section class="page active" id="page-home"></section>
+    <section class="page" id="page-filter"></section>
+    <section class="page" id="page-rules"></section>
+    <section class="page" id="page-apps"></section>
+    <section class="page" id="page-settings"></section>
+  </main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
