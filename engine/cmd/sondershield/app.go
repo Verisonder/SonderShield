@@ -142,6 +142,7 @@ func (a *App) setConfig(c Config) {
 	a.mu.Unlock()
 	a.st.save("config.json", &c)
 	if on {
+		a.plat.setDNSLockdown(c.LockDNS, c.Upstream)
 		// Download any list just switched on that we don't have yet, then reload.
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)

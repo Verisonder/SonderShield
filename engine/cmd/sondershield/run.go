@@ -51,6 +51,10 @@ func (a *App) start() error {
 	a.mu.Unlock()
 	a.st.save("config.json", &cfg)
 
+	if cfg.LockDNS {
+		a.plat.setDNSLockdown(true, cfg.Upstream)
+	}
+
 	a.wg.Add(1)
 	go a.background(a.ctx)
 	return nil
@@ -75,6 +79,7 @@ func (a *App) stop() {
 	}
 	a.plat.restoreSystemDNS()
 	a.plat.clearFirewall()
+	a.plat.setDNSLockdown(false, "")
 	a.eng.Stop()
 	a.wg.Wait()
 	a.st.save("config.json", &cfg)

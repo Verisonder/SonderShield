@@ -595,28 +595,32 @@ async function renderSettings() {
     <div class="seclabel"><span class="t">01 DNS SERVER</span></div>
     <div class="picks">${ups}</div>
     <div><input class="field ${cfg.upstream === 'custom' ? '' : 'hidden'}" id="customup" placeholder="udp 9.9.9.9  or  doh https://host/dns-query 1.2.3.4" value="${escapeAttr(cfg.customUpstream || '')}" style="margin-top:10px"></div>
-    <div class="seclabel"><span class="t">02 UPDATE LISTS AUTOMATICALLY</span></div>
+    <div class="seclabel"><span class="t">02 FORCE DNS THROUGH SONDERSHIELD</span></div>
+    <div class="card"><div class="row"><div class="grow"><div class="ctitle">Stop apps using their own DNS</div>
+      <div class="csub">Blocks other DNS routes — plain DNS to other servers, DNS-over-TLS, and known DNS-over-HTTPS resolvers — so browsers and apps can't skip filtering. Your own DNS keeps working. Takes effect while protection is on.</div></div>
+      <div class="sw ${cfg.lockDns ? 'on' : ''}" id="lockdns"><div class="knob"></div></div></div></div>
+    <div class="seclabel"><span class="t">03 UPDATE LISTS AUTOMATICALLY</span></div>
     <div class="card"><div class="subtabs" style="margin:0">
       ${[[0, 'Off'], [12, '12 h'], [24, '24 h'], [48, '48 h']].map(([h, l]) => `<button class="chip ${cfg.updateHours === h ? 'active' : ''}" data-h="${h}">${l}</button>`).join('')}
     </div></div>
-    <div class="seclabel"><span class="t">03 THEME</span></div>
+    <div class="seclabel"><span class="t">04 THEME</span></div>
     <div class="card"><div class="subtabs" style="margin:0">
       ${[['default', 'Dark'], ['light', 'Light'], ['system', 'System']].map(([t, l]) => `<button class="chip ${cfg.theme === t ? 'active' : ''}" data-theme="${t}">${l}</button>`).join('')}
     </div><div class="accentrow">${ACCENTS.map(a => `<div class="swatch ${cfg.accent === a ? 'sel' : ''}" data-a="${a}" style="background:#${(a & 0xffffff).toString(16).padStart(6, '0')}"></div>`).join('')}</div></div>
-    <div class="seclabel"><span class="t">04 STARTUP</span></div>
+    <div class="seclabel"><span class="t">05 STARTUP</span></div>
     <div class="card"><div class="row"><div class="grow"><div class="ctitle">Start with Windows</div><div class="csub">Launch in the background when you sign in.</div></div>
       <div class="sw ${auto.on ? 'on' : ''}" id="autostart"><div class="knob"></div></div></div></div>
-    <div class="seclabel"><span class="t">05 STATISTICS</span></div>
+    <div class="seclabel"><span class="t">06 STATISTICS</span></div>
     <div class="card"><div class="row"><div class="grow"><div class="ctitle">Blocked in total</div><div class="csub">${fmt(state.stats.blocked)}</div></div>
       <button class="pill" id="resetstats">Reset</button></div></div>
-    <div class="seclabel"><span class="t">06 UPDATES</span></div>
+    <div class="seclabel"><span class="t">07 UPDATES</span></div>
     <div class="card" id="updatecard">
       <div class="row"><div class="grow"><div class="ctitle">Version ${esc(cat.version)}</div>
         <div class="csub" id="updatestatus">Check for a newer version.</div></div>
         <button class="pill" id="checkupdate">Check for updates</button></div>
       <div id="updateaction" class="hidden" style="margin-top:12px"></div>
     </div>
-    <div class="seclabel"><span class="t">07 ABOUT</span></div>
+    <div class="seclabel"><span class="t">08 ABOUT</span></div>
     <div class="card"><div class="ctitle">SonderShield for Windows</div>
       <div class="csub" style="margin-top:6px">By Verisonder. Free and open source under GPL-3.0. Everything stays on this PC: no account, no analytics.</div>
       <div class="csub" style="margin-top:8px">Blocks ads, trackers and malware by DNS, and can cut off any app's internet.${state.on ? (state.mode === 'adapter' ? ' Filtering through the SonderShield network adapter.' : ' Filtering on this PC (port 53).') : ''}</div>
@@ -631,6 +635,7 @@ async function renderSettings() {
   p.querySelectorAll('.chip[data-h]').forEach(c => c.onclick = () => { cfg.updateHours = +c.dataset.h; save(); renderSettings(); });
   p.querySelectorAll('.chip[data-theme]').forEach(c => c.onclick = () => { cfg.theme = c.dataset.theme; save(); applyTheme(); renderSettings(); });
   p.querySelectorAll('.swatch[data-a]').forEach(s => s.onclick = () => { cfg.accent = +s.dataset.a; save(); applyTheme(); renderSettings(); });
+  $('#lockdns').onclick = () => { cfg.lockDns = !cfg.lockDns; save(); renderSettings(); };
   $('#autostart').onclick = async () => { const on = !auto.on; await api('autostart?on=' + (on ? '1' : '0'), { method: 'POST' }); renderSettings(); };
   $('#resetstats').onclick = async () => { if (await ask({ title: 'Reset counters?', text: "Today's and all-time numbers go back to zero. The log stays.", ok: 'Reset' })) { await api('reset-stats', { method: 'POST' }); poll(); } };
   $('#src').onclick = () => open('https://github.com/Verisonder/SonderShield', '_blank');

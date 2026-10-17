@@ -40,6 +40,10 @@ type platform interface {
 	// stays up, so SonderShield itself keeps working to switch it back off.
 	setKillSwitch(on bool) error
 	killSwitchOn() bool
+	// setDNSLockdown blocks every DNS route except SonderShield (plain DNS, DoT, and known
+	// DoH resolvers), so apps and browsers can't use their own DNS to skip filtering.
+	// skipProvider is the upstream id whose servers must stay reachable for our own DNS.
+	setDNSLockdown(on bool, skipProvider string) error
 }
 
 // Conn is one outbound connection the computer currently has open.
