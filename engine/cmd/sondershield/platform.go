@@ -34,6 +34,21 @@ type platform interface {
 	autostartOn() bool
 	// listPrograms: programs the user can pick for the firewall (running apps with a path).
 	listPrograms() []Program
+	// listConnections: the computer's current outbound TCP connections, with the owning app.
+	listConnections() []Conn
+}
+
+// Conn is one outbound connection the computer currently has open.
+type Conn struct {
+	Proto      string `json:"proto"`
+	State      string `json:"state"`
+	App        string `json:"app"`
+	Path       string `json:"path"`
+	PID        int    `json:"pid"`
+	LocalAddr  string `json:"localAddr"`
+	LocalPort  int    `json:"localPort"`
+	RemoteAddr string `json:"remoteAddr"`
+	RemotePort int    `json:"remotePort"`
 }
 
 // Program is one app the firewall can block.

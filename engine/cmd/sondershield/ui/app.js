@@ -72,6 +72,7 @@ async function poll() {
       if (logs.length > 2000) logs.length = 2000;
       if (tab === 'filter' && filterView === 'log') drawLog();
     }
+    if (tab === 'conns' && !connPaused) { conns = await api('connections'); drawConns(); }
   } catch (e) { /* server starting or gone */ }
 }
 
@@ -91,7 +92,7 @@ function renderStatus() {
 
 function render() {
   if (!state) return;
-  ({ home: renderHome, filter: renderFilter, rules: renderRules, apps: renderApps, settings: renderSettings }[tab])();
+  ({ home: renderHome, filter: renderFilter, rules: renderRules, apps: renderApps, conns: renderConns, settings: renderSettings }[tab])();
 }
 
 // ---- Home ----
@@ -343,6 +344,56 @@ async function toggleProtection() {
     justOn = !wasOn && state.on;
     homeKey = ''; renderHome();
   }, wait);
+}
+
+// ---- Connections ----
+// A live view of every outbound connection on this PC and which app opened it, like
+// Portmaster's network monitor. Built from Windows' own connection table (no driver),
+// with the hostname filled in from what SonderShield resolved. Connections to an IP that
+// was never looked up are flagged "direct IP" — a DNS filter can't see their name.
+let conns = null, connPaused = false, connSearch = '';
+function renderConns() {
+  const p = $('#page-conns');
+  p.innerHTML = `<div class="kicker">NETWORK</div><h1>Connections</h1>
+    <div class="sub">Every app talking to the internet right now, and where to. Updated live.</div>
+    <div class="connbar">
+      <input class="field" id="connsearch" placeholder="Search app or domain…" value="${escapeAttr(connSearch)}">
+      <button class="pill ${connPaused ? 'filled' : ''}" id="connpause">${connPaused ? 'Resume' : 'Pause'}</button>
+    </div>
+    <div id="connlist"><div class="empty">Reading connections…</div></div>`;
+  $('#connsearch').oninput = e => { connSearch = e.target.value; drawConns(); };
+  $('#connpause').onclick = () => { connPaused = !connPaused; renderConns(); if (!connPaused) poll(); };
+  drawConns();
+}
+function drawConns() {
+  const box = $('#connlist');
+  if (!box) return;
+  if (!conns) return;
+  const q = connSearch.trim().toLowerCase();
+  let list = conns;
+  if (q) list = conns.filter(c => (c.app || '').toLowerCase().includes(q) || (c.domain || '').toLowerCase().includes(q) || (c.remoteAddr || '').includes(q));
+  if (!list.length) {
+    box.innerHTML = `<div class="empty">${conns.length ? 'Nothing matches.' : 'No outbound connections right now.' }${ q ? '' : ' (On Linux this list is empty.)'}</div>`;
+    return;
+  }
+  // Group by app.
+  const groups = {};
+  for (const c of list) { (groups[c.app || 'Unknown'] ||= []).push(c); }
+  const names = Object.keys(groups).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+  box.innerHTML = names.map(name => {
+    const g = groups[name];
+    const blocked = g[0].blocked;
+    const rows = g.map(c => `
+      <div class="connrow">
+        <span class="cdest">${c.domain ? esc(c.domain) : `<span class="cip">${esc(c.remoteAddr)}</span>`}${c.direct ? '<span class="cdirect">direct IP</span>' : ''}</span>
+        <span class="cport">:${c.remotePort}</span>
+        <span class="cstate ${c.state === 'established' ? 'live' : ''}">${esc(c.state)}</span>
+      </div>`).join('');
+    return `<div class="conngroup ${blocked ? 'isblocked' : ''}">
+      <div class="conghead"><span class="cgname">${esc(name)}</span>${blocked ? '<span class="cgblocked">blocked</span>' : ''}<span class="cgcount">${g.length}</span></div>
+      <div class="congbody">${rows}</div>
+    </div>`;
+  }).join('');
 }
 
 // ---- Filter ----

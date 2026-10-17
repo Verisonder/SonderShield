@@ -24,6 +24,7 @@ func (p *otherPlatform) outsideInterfaces() (int, int)          { return 0, 0 }
 func (p *otherPlatform) setAutostart(on bool, exe string) error { return nil }
 func (p *otherPlatform) autostartOn() bool                      { return false }
 func (p *otherPlatform) listPrograms() []Program                { return nil }
+func (p *otherPlatform) listConnections() []Conn                { return nil }
 func (p *otherPlatform) startTunDNS(e *shield.Engine) (string, string, error) {
 	return "", "", errors.New("no tunnel on this system")
 }

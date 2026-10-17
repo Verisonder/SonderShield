@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -101,6 +103,37 @@ func (a *App) config() Config {
 	return a.cfg
 }
 
+// connView is a connection plus what SonderShield knows about it: the domain it was
+// resolved from, and whether this app is firewall-blocked. A connection with no known
+// domain is a direct-to-IP connection, which a DNS filter can't see into.
+type connView struct {
+	Conn
+	Domain  string `json:"domain"`
+	Blocked bool   `json:"blocked"`
+	Direct  bool   `json:"direct"`
+}
+
+// connections lists the computer's open connections, each tagged with its hostname and
+// whether the owning app is blocked by the firewall.
+func (a *App) connections() []connView {
+	cs := a.plat.listConnections()
+	c := a.config()
+	blocked := map[string]bool{}
+	for _, p := range c.Firewall {
+		blocked[strings.ToLower(p)] = true
+	}
+	out := make([]connView, 0, len(cs))
+	for _, cn := range cs {
+		dom := a.eng.RecentName(cn.RemoteAddr)
+		out = append(out, connView{
+			Conn: cn, Domain: dom,
+			Blocked: cn.Path != "" && blocked[strings.ToLower(cn.Path)],
+			Direct:  dom == "" && !isPrivateIP(cn.RemoteAddr),
+		})
+	}
+	return out
+}
+
 // setConfig replaces settings, saves them, and re-applies to a running engine.
 func (a *App) setConfig(c Config) {
 	a.mu.Lock()
@@ -147,3 +180,13 @@ func (a *App) running() bool {
 }
 
 func systemLocale() (lang, country string) { return localeFromOS() }
+
+// isPrivateIP reports whether an address is a LAN / loopback / link-local address, which
+// legitimately has no public hostname and shouldn't be flagged as a direct-IP connection.
+func isPrivateIP(s string) bool {
+	ip := net.ParseIP(s)
+	if ip == nil {
+		return true
+	}
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified()
+}

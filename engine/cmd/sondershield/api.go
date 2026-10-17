@@ -129,6 +129,8 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		}
 	case "programs":
 		writeJSON(w, s.a.plat.listPrograms())
+	case "connections":
+		writeJSON(w, s.a.connections())
 	case "catalog":
 		writeJSON(w, map[string]any{"upstreams": upstreams, "version": version})
 	case "update/check":
