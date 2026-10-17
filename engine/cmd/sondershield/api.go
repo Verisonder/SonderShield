@@ -131,6 +131,8 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, s.a.plat.listPrograms())
 	case "connections":
 		writeJSON(w, s.a.connections())
+	case "diag":
+		writeJSON(w, s.a.diag())
 	case "killswitch":
 		on := r.URL.Query().Get("on") == "1"
 		if err := s.a.plat.setKillSwitch(on); err != nil {

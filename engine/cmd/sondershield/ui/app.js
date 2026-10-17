@@ -158,7 +158,7 @@ function renderHome() {
     <div class="headline ${roll ? 'roll' : ''}">${head}</div>
     <div class="headsub">${sub}</div>
     ${state.kill ? `<div class="banner danger" style="margin-top:22px">All internet is blocked by the panic switch. Turn it off in Firewall to restore.</div>` : ''}
-    ${warn ? `<div class="banner" style="margin-top:22px">Windows isn't sending its lookups to SonderShield yet. If this stays, another DNS tool may be set, or a VPN is overriding DNS.</div>` : ''}
+    ${warn ? `<div class="banner" style="margin-top:22px">Windows isn't sending its lookups to SonderShield yet. <button class="linkbtn" id="diagbtn">See why</button></div>` : ''}
     ${problem ? `<div class="banner" style="margin-top:22px">${esc(problem)}</div>` : ''}
     <div class="homebody ${fresh ? 'enter' : ''}">
       <div class="todaycol">
@@ -345,6 +345,38 @@ async function toggleProtection() {
     justOn = !wasOn && state.on;
     homeKey = ''; renderHome();
   }, wait);
+}
+
+// ---- DNS diagnostic ----
+// Shows whether Windows is really sending its DNS to SonderShield, adapter by adapter,
+// and what to do when it isn't.
+async function showDiag() {
+  let d;
+  try { d = await api('diag'); } catch (e) { return; }
+  const bg = el('div', 'modal-bg');
+  const adRows = (d.adapters || []).map(a => `
+    <div class="diagrow ${a.ok ? 'ok' : 'bad'}">
+      <div class="diagmark">${a.ok ? '✓' : '✕'}</div>
+      <div class="grow"><div class="ctitle">${esc(a.name)}${a.ours ? ' <span class="cfaint">(SonderShield)</span>' : ''}</div>
+        <div class="cfaint">DNS: ${a.servers && a.servers.length ? esc(a.servers.join(', ')) : 'none / automatic'}</div></div>
+    </div>`).join('') || '<div class="cfaint">No active adapters found.</div>';
+  let verdict, cls;
+  if (!d.on) { verdict = 'Protection is off, so nothing is pointed at SonderShield yet.'; cls = ''; }
+  else if (d.receiving) { verdict = 'Windows is sending its DNS to SonderShield and queries are arriving. All good.'; cls = 'good'; }
+  else if (d.allGood) { verdict = 'Every adapter is pointed at SonderShield, but no queries are arriving. The most likely cause is Windows Encrypted DNS (DoH): open Settings → Network & internet → your connection → DNS server assignment, and set DNS over HTTPS to Off. Another DNS app could also be intercepting.'; cls = 'warn'; }
+  else { verdict = "One or more adapters below aren't pointed at SonderShield (✕). SonderShield should set them automatically — switch protection off and on. If an adapter keeps showing ✕, that adapter type may not be caught yet; tell me which one."; cls = 'warn'; }
+  bg.innerHTML = `<div class="modal diag" role="dialog">
+    <h3>DNS diagnostic</h3>
+    <div class="diagverdict ${cls}">${verdict}</div>
+    <div class="diagmeta">Mode: <b>${d.mode === 'adapter' ? 'SonderShield adapter' : d.mode === 'local' ? 'This PC (port 53)' : '—'}</b> · SonderShield answers on: <b>${(d.expected || []).join(', ') || '—'}</b> · Queries arriving: <b>${d.receiving ? 'yes' : 'no'}</b></div>
+    <div class="diagadapters">${adRows}</div>
+    <div class="actions"><button class="pill" data-a="close">Close</button><button class="pill filled" data-a="refresh">Refresh</button></div>
+  </div>`;
+  document.body.appendChild(bg);
+  const close = () => bg.remove();
+  bg.querySelector('[data-a=close]').onclick = close;
+  bg.querySelector('[data-a=refresh]').onclick = () => { close(); showDiag(); };
+  bg.onclick = e => { if (e.target === bg) close(); };
 }
 
 // ---- Connections ----
@@ -670,7 +702,7 @@ async function renderSettings() {
     <div class="card"><div class="ctitle">SonderShield for Windows</div>
       <div class="csub" style="margin-top:6px">By Verisonder. Free and open source under GPL-3.0. Everything stays on this PC: no account, no analytics.</div>
       <div class="csub" style="margin-top:8px">Blocks ads, trackers and malware by DNS, and can cut off any app's internet.${state.on ? (state.mode === 'adapter' ? ' Filtering through the SonderShield network adapter.' : ' Filtering on this PC (port 53).') : ''}</div>
-      <div style="margin-top:12px"><button class="pill" id="src">Source code</button></div></div>`;
+      <div style="margin-top:12px"><button class="pill" id="diagbtn2">Run DNS diagnostic</button> <button class="pill" id="src">Source code</button></div></div>`;
   p.querySelectorAll('.pick[data-up]').forEach(r => r.onclick = () => {
     cfg.upstream = r.dataset.up; save();
     p.querySelectorAll('.pick[data-up]').forEach(x => x.classList.toggle('sel', x === r));
@@ -685,6 +717,7 @@ async function renderSettings() {
   $('#autostart').onclick = async () => { const on = !auto.on; await api('autostart?on=' + (on ? '1' : '0'), { method: 'POST' }); renderSettings(); };
   $('#resetstats').onclick = async () => { if (await ask({ title: 'Reset counters?', text: "Today's and all-time numbers go back to zero. The log stays.", ok: 'Reset' })) { await api('reset-stats', { method: 'POST' }); poll(); } };
   $('#src').onclick = () => open('https://github.com/Verisonder/SonderShield', '_blank');
+  $('#diagbtn2').onclick = showDiag;
   $('#checkupdate').onclick = checkForUpdate;
   if (cat.version === 'dev') { $('#updatestatus').textContent = 'Development build — updates are checked only in a released build.'; }
 }

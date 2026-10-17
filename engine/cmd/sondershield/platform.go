@@ -47,6 +47,9 @@ type platform interface {
 	// setNetworkBlocks replaces the block rules for raw addresses and ports (not tied to one
 	// app): outbound to an IP/CIDR, or to a TCP/UDP port.
 	setNetworkBlocks(rules []NetBlock) error
+	// currentDNS reports, per active adapter, the DNS servers Windows is really using right
+	// now. Used by the diagnostic to show whether Windows is actually pointed at us.
+	currentDNS() []AdapterDNS
 }
 
 // Conn is one outbound connection the computer currently has open.
@@ -60,6 +63,14 @@ type Conn struct {
 	LocalPort  int    `json:"localPort"`
 	RemoteAddr string `json:"remoteAddr"`
 	RemotePort int    `json:"remotePort"`
+}
+
+// AdapterDNS is one network adapter and the DNS servers Windows currently uses on it.
+type AdapterDNS struct {
+	Name    string   `json:"name"`
+	Servers []string `json:"servers"`
+	Ours    bool     `json:"ours"` // this adapter is SonderShield's own
+	Ok      bool     `json:"ok"`   // its DNS points at SonderShield
 }
 
 // NetBlock is an outbound block by address or port, for all apps.

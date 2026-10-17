@@ -142,6 +142,50 @@ func (a *App) connections() []connView {
 	return out
 }
 
+// dnsDiag is the "is Windows actually using us?" picture: what we set, what each adapter
+// is really using, and whether queries are arriving.
+type dnsDiag struct {
+	On        bool         `json:"on"`
+	Mode      string       `json:"mode"`
+	Expected  []string     `json:"expected"`
+	Receiving bool         `json:"receiving"`
+	AllGood   bool         `json:"allGood"`
+	Adapters  []AdapterDNS `json:"adapters"`
+}
+
+// diag builds the DNS diagnostic shown when queries aren't arriving.
+func (a *App) diag() dnsDiag {
+	a.mu.Lock()
+	on, mode := a.on, a.mode
+	a.mu.Unlock()
+	var expected []string
+	switch mode {
+	case "local":
+		expected = []string{"127.0.0.1", "::1"}
+	case "adapter":
+		expected = []string{"10.111.222.53", "fd00:5d5d::53"}
+	}
+	ads := a.plat.currentDNS()
+	allGood := on && len(ads) > 0
+	for i := range ads {
+		if ads[i].Ours {
+			ads[i].Ok = true
+			continue
+		}
+		for _, s := range ads[i].Servers {
+			for _, e := range expected {
+				if strings.EqualFold(s, e) {
+					ads[i].Ok = true
+				}
+			}
+		}
+		if !ads[i].Ok {
+			allGood = false
+		}
+	}
+	return dnsDiag{On: on, Mode: mode, Expected: expected, Receiving: a.active(), AllGood: allGood, Adapters: ads}
+}
+
 // setConfig replaces settings, saves them, and re-applies to a running engine.
 func (a *App) setConfig(c Config) {
 	a.mu.Lock()
