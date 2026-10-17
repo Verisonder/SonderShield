@@ -1,51 +1,88 @@
-# SonderShield
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="SonderShield" width="100%">
+</p>
 
-Free, open-source ad and tracker blocker for Android, by Verisonder. No root, no account, no analytics.
+<p align="center">
+  <a href="https://github.com/Verisonder/SonderShield/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Verisonder/SonderShield?style=flat-square&color=3B82FF&label=release"></a>
+  <a href="https://github.com/Verisonder/SonderShield/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/Verisonder/SonderShield/total?style=flat-square&color=3B82FF"></a>
+  <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3B82FF?style=flat-square">
+  <a href="LICENSE"><img alt="GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-3B82FF?style=flat-square"></a>
+  <a href="https://github.com/Verisonder/SonderShield/actions/workflows/checks.yml"><img alt="Checks" src="https://img.shields.io/github/actions/workflow/status/Verisonder/SonderShield/checks.yml?branch=main&style=flat-square&label=checks"></a>
+</p>
 
-It works as a local VPN that only carries DNS: the phone's resolver is pointed at an address inside the
-tunnel, SonderShield answers blocked names with `0.0.0.0` / `::` and forwards the rest to the DNS server
-you pick, encrypted (DNS over HTTPS) by default. All other traffic keeps its normal path, so there is
-no speed or battery cost from routing.
+<p align="center">
+  <b>Ad, tracker and malware blocker for Android.</b><br>
+  No root needed, no account, no analytics. Everything stays on your phone.
+</p>
+
+<p align="center">
+  <a href="https://github.com/Verisonder/SonderShield/releases/latest"><b>⬇ Download the APK</b></a>
+</p>
+
+---
+
+## What it does
+
+SonderShield runs a local VPN on your phone. Every app's DNS lookups go through it: names on your block lists get nothing back, the rest go on to the DNS server you pick, encrypted by default. Nothing is sent to any SonderShield server, because there isn't one.
+
+Turn on **HTTPS filtering** and it goes further in your browsers: ad spaces and anti-adblock walls are removed from the page itself.
 
 ## Features
 
-- System-wide blocking with well-known lists: StevenBlack, AdGuard DNS, URLhaus, HaGeZi (Pro, Threat
-  Intelligence, Xiaomi tracking), OISD. Add your own list by URL (hosts, AdBlock `||domain^` or plain
-  domain lists).
-- Your own block and allow rules (allow wins over everything), and a "test a domain" check that says
-  which list or rule decides.
-- Live DNS log with search and filters; tap a row to block or allow that domain.
-- Per-app bypass for apps that break.
-- DNS servers: Cloudflare, Quad9, Google, AdGuard (encrypted or plain) or a custom one.
-- Answer cache, today / all-time counters, Quick Settings tile, start on boot, always-on VPN support,
-  scheduled list updates (Wi-Fi only).
+| | |
+|---|---|
+| **Blocks everywhere** | Every app on the phone, through a DNS-only VPN. No speed or battery cost from routing. |
+| **Good lists, ready** | StevenBlack, AdGuard DNS, URLhaus, HaGeZi, OISD, EasyList, uBlock Origin filters, plus regional lists switched on for your language. Add any list by URL (hosts, AdBlock or plain domains). |
+| **Your rules win** | Block or allow any domain, subdomains included. Test a domain to see which list or rule decides. |
+| **HTTPS filtering** | Hides ads inside pages in the browsers you pick, with element hiding and scriptlets from the lists. Uses a certificate made on your phone. Banks, payments and government sites are never touched. |
+| **Encrypted DNS** | DNS over HTTPS with Cloudflare, Quad9, Google, AdGuard, or your own server. |
+| **WireGuard** | Import a `.conf` and your traffic leaves through your own server or VPN provider, still filtered. |
+| **Root mode** | On rooted phones, blocks without a VPN so another VPN can run alongside. |
+| **Live log** | Every lookup, with the app that asked. Search, filter, and block or allow from a tap. |
+| **Per-app bypass** | Let an app that breaks skip SonderShield. |
+| **Always there** | Quick Settings tile, home screen widget, start on boot, always-on VPN. |
+| **Yours to shape** | Pure black, light, system or Material You theme, any accent colour. English, French and German. |
+| **Portable** | Export and import your settings; export the log as CSV. |
 
-Planned: HTTPS filtering (cosmetic rules in browsers), then a Windows version using the same engine.
+## Install
 
-## Layout
+1. Download `SonderShield-x.y.z.apk` from the [latest release](https://github.com/Verisonder/SonderShield/releases/latest) and open it.
+2. Follow the first-run steps: allow the VPN, keep it running in the background.
+3. Tap the shield.
 
-- `engine/`: the filtering engine in Go, no dependencies. DNS and packet handling, list parsing,
-  rules, cache, plain and DoH upstreams. Bound to Android with gomobile; the Windows app will use it
-  directly.
-- `app/`: the Android app (Kotlin, Jetpack Compose).
-- `tools/build_engine.sh`: builds `app/libs/engine.aar` from `engine/`.
+**Private DNS:** if Android's Private DNS is set to a specific provider, lookups go straight there and skip SonderShield. The app warns you; set it to Automatic or Off.
 
-## Building
+**HTTPS filtering:** Settings › HTTPS filtering. Save the certificate, install it from Android's settings (the app shows where), and pick your browsers. Firefox needs one extra switch, shown in the app.
 
-Needs JDK 17, the Android SDK with an NDK, and Go 1.23+.
+## How it is built
 
 ```
+engine/   Go: DNS and packet handling, list parsing, rules, cache, DoH,
+          gVisor netstack full tunnel, WireGuard, HTTPS filtering
+app/      Android app: Kotlin and Jetpack Compose
+tools/    build_engine.sh: engine -> app/libs/engine.aar (gomobile)
+```
+
+The engine is plain Go with its own tests, bound to Android with gomobile. A Windows version on the same engine is next.
+
+### Building
+
+Needs JDK 17, the Android SDK with an NDK, and Go 1.24+.
+
+```sh
+(cd engine && go mod tidy)
 tools/build_engine.sh          # engine -> app/libs/engine.aar
 gradle assembleDebug
 ```
 
-Engine tests: `cd engine && go test ./...`
+Engine tests: `cd engine && go test -race ./...`
 
-## Private DNS
+## Privacy
 
-If Android's Private DNS is set to a specific provider, DNS goes straight to it and skips SonderShield.
-The app warns when that is the case. Set Private DNS to Automatic or Off.
+No account, no analytics, no crash reporting sent anywhere. The log and statistics live on the phone. Block lists are downloaded straight from their authors. The HTTPS certificate is created on the phone and never leaves it.
 
 ## Licence
 
-GPL-3.0-only. See [LICENSE](LICENSE). Block lists belong to their authors and keep their own licences.
+[GPL-3.0-only](LICENSE). Block lists belong to their authors and keep their own licences. Fonts: Unbounded and DM Sans, SIL Open Font License.
+
+<p align="center"><sub>By <a href="https://github.com/Verisonder">Verisonder</a></sub></p>
