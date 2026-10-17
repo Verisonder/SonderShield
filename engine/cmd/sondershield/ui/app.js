@@ -112,7 +112,9 @@ function shieldSVG(phase) {
 // rolls over when the state changes. Live updates only touch the numbers, so nothing replays.
 let homeShape = '', lastHead = '', shown = {};
 const ease = t => 1 - Math.pow(1 - t, 3);
-function countTo(node, to, f) {
+function countTo(node, to) {
+  if (!node) return;
+  const f = numFmt(node);
   const key = node.dataset.k, from = shown[key] ?? 0;
   shown[key] = to;
   if (node._raf) cancelAnimationFrame(node._raf);
@@ -171,23 +173,159 @@ function renderHome() {
           </div>
         </div>
       </div>
-      <div class="sidetiles">
-        <div class="tile"><div class="num" data-k="all"></div><div class="lbl">blocked\nall time</div></div>
-        <div class="tile"><div class="num" data-k="thr"></div><div class="lbl">threats blocked\nmalware & phishing</div></div>
-        <div class="tile"><div class="num" data-k="dom"></div><div class="lbl">domains\non the lists</div></div>
+      <div class="alltime rv">
+        <div class="kicker">▲ ALL TIME</div>
+        <div class="atgrid">
+          <div class="tile rv" style="--d:1"><div class="num" data-k="aq" data-f="c"></div><div class="lbl">DNS queries</div></div>
+          <div class="tile rv" style="--d:2"><div class="num" data-k="ab" data-f="c"></div><div class="lbl">blocked</div></div>
+          <div class="tile rv" style="--d:3"><div class="num" data-k="thr" data-f="c"></div><div class="lbl">threats blocked\nmalware & phishing</div></div>
+          <div class="tile rv" style="--d:4"><div class="num" data-k="dom" data-f="c"></div><div class="lbl">filter rules\nloaded now</div></div>
+          <div class="rate rv" style="--d:5"><div class="num" data-k="ar" data-f="p"></div><div class="lbl">block rate,\nall time</div></div>
+          <div class="tile rv" style="--d:6"><div class="num" data-k="mb" data-f="b"></div><div class="lbl">data not downloaded\nestimate</div></div>
+          <div class="tile rv" style="--d:7"><div class="num" id="uptime"></div><div class="lbl">on without a break</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="homebody lower">
+      <div class="activity rv">
+        <div class="kicker">▲ ACTIVITY</div>
+        <div class="chiprow rv" style="--d:1"><button class="chip ${chartWeek ? '' : 'active'}" data-w="0">24 hours</button><button class="chip ${chartWeek ? 'active' : ''}" data-w="1">7 days</button></div>
+        <div class="chartcard rv" style="--d:2" id="chart"></div>
+      </div>
+      <div class="topblocked rv">
+        <div class="kicker">▲ TOP BLOCKED</div>
+        <div class="toplist" id="toplist"></div>
       </div>
     </div>`;
-    for (const n of p.querySelectorAll('.num[data-k]')) n.textContent = shown[n.dataset.k] != null ? (n.dataset.k === 'r' ? shown.r.toFixed(1) + '%' : fmt(Math.round(shown[n.dataset.k]))) : (n.dataset.k === 'r' ? '0.0%' : '0');
+    for (const n of p.querySelectorAll('.num[data-k]')) n.textContent = numFmt(n)(shown[n.dataset.k] ?? 0);
+    p.querySelectorAll('.chip[data-w]').forEach(c => c.onclick = () => {
+      chartWeek = c.dataset.w === '1'; chartKey = '';
+      p.querySelectorAll('.chip[data-w]').forEach(x => x.classList.toggle('active', x === c));
+      drawChart(true);
+    });
+    chartKey = ''; topKey = '';
+    watchReveal(p, fresh);
     $('#shield').onclick = toggleProtection;
   }
   const n = k => p.querySelector(`.num[data-k="${k}"]`);
-  const whole = v => fmt(Math.round(v)), pct = v => v.toFixed(1) + '%';
-  countTo(n('t'), total, whole);
-  countTo(n('b'), blocked, whole);
-  countTo(n('r'), total ? blocked / total * 100 : 0, pct);
-  countTo(n('all'), s.blocked, whole);
-  countTo(n('thr'), s.threats, whole);
-  countTo(n('dom'), state.domains, whole);
+  countTo(n('t'), total);
+  countTo(n('b'), blocked);
+  countTo(n('r'), total ? blocked / total * 100 : 0);
+  if (seenAll) {
+    countTo(n('aq'), s.total);
+    countTo(n('ab'), s.blocked);
+    countTo(n('thr'), s.threats);
+    countTo(n('dom'), state.domains);
+    if (!state.domains) n('dom').textContent = '–';
+    countTo(n('ar'), s.total ? s.blocked / s.total * 100 : 0);
+    countTo(n('mb'), s.blocked * BYTES_PER_BLOCK);
+  }
+  $('#uptime').textContent = state.startedAt ? duration(Date.now() - state.startedAt) : 'off';
+  if (seenChart) drawChart(false);
+  if (seenTop) drawTop();
+}
+
+// ---- Home, lower part (all time, activity chart, top blocked) ----
+const BYTES_PER_BLOCK = 30000; // same rough estimate as the phone app
+let chartWeek = false, chartKey = '', topKey = '', seenAll = false, seenChart = false, seenTop = false, revealObs = null;
+const trim1 = v => v.toFixed(1).replace(/\.0$/, '');
+const compact = v => { v = Math.round(v); return v < 10000 ? fmt(v) : v < 1e6 ? trim1(v / 1e3) + 'K' : v < 1e9 ? trim1(v / 1e6) + 'M' : trim1(v / 1e9) + 'B'; };
+const bytes = b => b < 1e6 ? Math.round(b / 1000) + ' KB' : b < 1e9 ? trim1(b / 1e6) + ' MB' : trim1(b / 1e9) + ' GB';
+function numFmt(node) {
+  const f = node.dataset.f;
+  if (f === 'c') return compact;
+  if (f === 'p' || node.dataset.k === 'r') return v => v.toFixed(1) + '%';
+  if (f === 'b') return v => '≈ ' + bytes(v);
+  return v => fmt(Math.round(v));
+}
+function duration(ms) {
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + ' min';
+  if (m < 1440) return Math.floor(m / 60) + ' h ' + (m % 60) + ' min';
+  return Math.floor(m / 1440) + ' d ' + Math.floor(m % 1440 / 60) + ' h';
+}
+
+// Sections play their entrance when they scroll into view, like the phone.
+function watchReveal(p, fresh) {
+  if (revealObs) revealObs.disconnect();
+  if (fresh) seenAll = seenChart = seenTop = false;
+  const mark = sec => {
+    sec.classList.add('in');
+    if (sec.classList.contains('alltime') && !seenAll) { seenAll = true; renderHome(); }
+    if (sec.classList.contains('activity') && !seenChart) { seenChart = true; drawChart(true); }
+    if (sec.classList.contains('topblocked') && !seenTop) { seenTop = true; drawTop(true); }
+  };
+  const secs = p.querySelectorAll('.alltime, .activity, .topblocked');
+  if (!fresh) { secs.forEach(sec => { sec.classList.add('in', 'quiet'); }); return; }
+  revealObs = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { revealObs.unobserve(e.target); mark(e.target); } }), { threshold: .15 });
+  secs.forEach(sec => revealObs.observe(sec));
+}
+
+function chartPoints() {
+  const h = state.stats.hours || [];
+  if (!chartWeek) {
+    const now = new Date();
+    return h.slice(-24).map((v, i) => [v[0], v[1], i % 6 === 0 || i === 23 ? String((now.getHours() - 23 + i + 48) % 24).padStart(2, '0') + ':00' : '']);
+  }
+  const hod = new Date().getHours(), N = h.length, out = [];
+  const day = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
+  for (let d = 6; d >= 0; d--) {
+    const end = N - 1 - hod - 24 * (d - 1), start = end - 24;
+    let t = 0, b = 0;
+    for (let i = Math.max(0, start); i < Math.min(N, end); i++) { t += h[i][0]; b += h[i][1]; }
+    out.push([t, b, day.format(Date.now() - d * 864e5)]);
+  }
+  return out;
+}
+function drawChart(animate) {
+  const box = $('#chart');
+  if (!box) return;
+  const pts = chartPoints(), key = JSON.stringify([chartWeek, pts]);
+  if (key === chartKey && !animate) return;
+  chartKey = key;
+  const W = 1000, H = 220, max = Math.max(1, ...pts.map(p => p[0]));
+  const xy = (i, v) => [W * i / (pts.length - 1), H - H * .92 * v / max];
+  const path = k => {
+    const ps = pts.map((p, i) => xy(i, p[k]));
+    let d = `M${ps[0][0]} ${ps[0][1]}`;
+    for (let i = 1; i < ps.length; i++) { const a = ps[i - 1], b = ps[i], mx = (a[0] + b[0]) / 2; d += `C${mx} ${a[1]} ${mx} ${b[1]} ${b[0]} ${b[1]}`; }
+    return d;
+  };
+  const q = path(0), b = path(1), close = `L${W} ${H}L0 ${H}Z`;
+  const tq = pts.reduce((a, p) => a + p[0], 0), tb = pts.reduce((a, p) => a + p[1], 0);
+  box.innerHTML = `
+    <div class="legend"><span><i class="sq soft"></i>Queries ${compact(tq)}</span><span><i class="sq acc"></i>Blocked ${compact(tb)}</span></div>
+    <svg class="chart ${animate ? 'draw' : ''}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="gq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--dim)" stop-opacity=".22"/><stop offset="1" stop-color="var(--dim)" stop-opacity="0"/></linearGradient>
+        <linearGradient id="gb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".38"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient>
+      </defs>
+      ${[0, 1, 2, 3].map(i => `<line x1="0" x2="${W}" y1="${H * i / 3}" y2="${H * i / 3}" class="grid"/>`).join('')}
+      <g class="plot">
+        <path d="${q}${close}" fill="url(#gq)"/><path d="${b}${close}" fill="url(#gb)"/>
+        <path d="${q}" class="lq"/><path d="${b}" class="lb"/>
+      </g>
+    </svg>
+    <div class="axis">${pts.filter(p => p[2]).map(p => `<span>${p[2]}</span>`).join('')}</div>`;
+}
+function drawTop(animate) {
+  const box = $('#toplist');
+  if (!box) return;
+  const top = state.stats.top || [], key = JSON.stringify(top);
+  if (key === topKey && !animate) return;
+  topKey = key;
+  if (!top.length) { box.innerHTML = '<div class="empty">Nothing blocked yet.</div>'; return; }
+  const max = Math.max(1, top[0].hits);
+  box.innerHTML = top.map((t, i) => `
+    <div class="toprow ${animate ? 'rv' : ''}" style="--d:${i + 1}">
+      <div class="trow"><span class="rank">${String(i + 1).padStart(2, '0')}</span><span class="dom">${esc(t.domain)}</span><span class="hits">${compact(t.hits)}</span></div>
+      <div class="bar"><i style="width:${animate ? 0 : Math.max(2, t.hits / max * 100)}%" data-w="${Math.max(2, t.hits / max * 100)}"></i></div>
+    </div>`).join('');
+  if (animate) requestAnimationFrame(() => requestAnimationFrame(() => {
+    box.querySelectorAll('.toprow').forEach(r => r.classList.add('in'));
+    box.querySelectorAll('.bar i').forEach((b, i) => { b.style.transitionDelay = (80 * (i + 1)) + 'ms'; b.style.width = b.dataset.w + '%'; });
+  }));
 }
 
 async function toggleProtection() {

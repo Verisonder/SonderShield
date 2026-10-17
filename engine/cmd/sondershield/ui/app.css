@@ -226,3 +226,41 @@ textarea.field { resize: vertical; min-height: 90px; font-family: 'DM Sans'; }
 @keyframes riseIn { from { transform: translateY(36px); opacity: 0; } }
 @keyframes roll { from { transform: translateY(50%); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .homebody.enter .step, .homebody.enter .tile, .headline.roll { animation: none !important; } }
+
+/* Home, lower part: All time beside today's ladder, then Activity and Top blocked */
+.homebody.lower { margin-top: 34px; align-items: start; }
+.alltime { display: flex; flex-direction: column; }
+.alltime .kicker, .activity .kicker, .topblocked .kicker { margin-bottom: 12px; }
+.atgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.atgrid .tile { background: var(--card); padding: 14px 16px; border-radius: 16px; }
+.atgrid .tile .num, .atgrid .rate .num { color: var(--accent); font-family: 'Unbounded'; font-size: 22px; font-weight: 800; letter-spacing: -.5px; white-space: nowrap; }
+.atgrid .tile .lbl { color: var(--dim); }
+.atgrid .rate { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; background: var(--accent); color: var(--on-accent); border-radius: 18px; padding: 16px 20px; }
+.atgrid .rate .num { color: var(--on-accent); font-size: 28px; }
+.atgrid .rate .lbl { font-size: 13px; font-weight: 600; white-space: pre-line; text-align: right; }
+.chiprow { display: flex; gap: 8px; margin-bottom: 12px; }
+.chartcard { background: var(--panel); border-radius: 22px; padding: 18px 20px 14px; }
+.legend { display: flex; gap: 18px; font-size: 12.5px; font-weight: 700; color: var(--dim); margin-bottom: 12px; }
+.legend .sq { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
+.sq.soft { background: var(--dim); } .sq.acc { background: var(--accent); }
+svg.chart { display: block; width: 100%; height: 190px; overflow: visible; }
+svg.chart .grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+svg.chart .lq { fill: none; stroke: var(--dim); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+svg.chart .lb { fill: none; stroke: var(--accent); stroke-width: 2.5; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+svg.chart.draw .plot { animation: sweep 1s cubic-bezier(.4,0,.2,1); }
+.axis { display: flex; justify-content: space-between; color: var(--faint); font-size: 11px; margin-top: 8px; }
+.toplist { display: flex; flex-direction: column; gap: 8px; }
+.toprow { background: var(--panel); border-radius: 16px; padding: 12px 16px; }
+.trow { display: flex; align-items: center; gap: 8px; }
+.trow .rank { font-family: 'Unbounded'; font-weight: 800; font-size: 14px; color: var(--accent); width: 30px; flex-shrink: 0; }
+.trow .dom { flex: 1; min-width: 0; font-weight: 700; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trow .hits { color: var(--dim); font-weight: 700; font-size: 12.5px; }
+.toprow .bar { width: auto; margin: 8px 0 0 38px; height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.toprow .bar i { display: block; height: 100%; border-radius: 4px; background: var(--accent); transition: width .7s cubic-bezier(.4,0,.2,1); }
+.empty { color: var(--faint); font-size: 14px; padding: 6px 2px; }
+
+/* Scroll-in entrance */
+.rv { opacity: 0; transform: translateY(36px); transition: opacity .5s ease, transform .7s cubic-bezier(.22,1.2,.36,1); transition-delay: calc(var(--d, 0) * 70ms); }
+.in > .rv, .in .atgrid > .rv, .rv.in { opacity: 1; transform: none; }
+.quiet, .quiet .rv { transition: none !important; }
+@media (prefers-reduced-motion: reduce) { .rv { opacity: 1; transform: none; transition: none; } svg.chart.draw .plot { animation: none; } }
