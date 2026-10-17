@@ -1,0 +1,15 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+*.jks
+*.keystore
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Built from engine/ by tools/build_engine.sh (CI does it on every build).
+app/libs/engine.aar
+app/libs/engine-sources.jar

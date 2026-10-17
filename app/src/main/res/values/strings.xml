@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SonderShield</string>
+    <string name="channel_name">Protection status</string>
+    <string name="note_title">Protected</string>
+    <string name="note_text">%1$d blocked today</string>
+    <string name="note_stop">Turn off</string>
+    <string name="tile_on">On</string>
+    <string name="tile_off">Off</string>
+</resources>
