@@ -3,6 +3,12 @@ package com.verisonder.sondershield.ui
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.MutableState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -51,6 +57,43 @@ import java.util.Locale
 /** Rough size of an ad or tracker request that never happens. Only for the estimate. */
 private const val BYTES_PER_BLOCK = 30_000L
 
+/**
+ * Becomes true once the element has scrolled into view (and stays true), so its entrance
+ * plays when the user gets there, not off-screen.
+ */
+@Composable
+private fun Modifier.onSeen(seen: MutableState<Boolean>): Modifier {
+    return this.onGloballyPositioned { c ->
+        if (!seen.value && c.isAttached) {
+            val window = c.findRootCoordinates().size.height
+            if (c.boundsInWindow().top < window * 0.94f) seen.value = true
+        }
+    }
+}
+
+/** Slides up and fades in once [seen], [order] steps after the others in its group. */
+@Composable
+private fun Modifier.reveal(seen: Boolean, order: Int = 0): Modifier {
+    val e = remember { Animatable(0f) }
+    LaunchedEffect(seen) {
+        if (seen) { delay(70L * order); e.animateTo(1f, spring(dampingRatio = 0.75f, stiffness = 240f)) }
+    }
+    return this.graphicsLayer { translationY = (1f - e.value) * 36.dp.toPx(); alpha = e.value.coerceIn(0f, 1f) }
+}
+
+/** Counts from 0 up to [target] the first time [seen], then follows changes smoothly. */
+@Composable
+private fun counted(target: Double, seen: Boolean): Double {
+    val v = remember { Animatable(0f) }
+    var started by remember { mutableStateOf(false) }
+    LaunchedEffect(seen, target) {
+        if (!seen) return@LaunchedEffect
+        v.animateTo(target.toFloat(), tween(if (!started) 1100 else 500, easing = FastOutSlowInEasing))
+        started = true
+    }
+    return v.value.toDouble()
+}
+
 /** Everything below the first screen of Home: all-time numbers, activity chart, top blocked. */
 @Composable
 fun HomeStats() {
@@ -58,54 +101,65 @@ fun HomeStats() {
     val domains by ShieldState.domains.collectAsState()
     val startedAt by ShieldState.startedAt.collectAsState()
 
+    val allSeen = remember { mutableStateOf(false) }
+    val chartSeen = remember { mutableStateOf(false) }
+    val topSeen = remember { mutableStateOf(false) }
+
     Column(Modifier.fillMaxWidth().background(Palette.panel).padding(horizontal = Gutter).padding(bottom = 28.dp)) {
-        Kicker("All time", Modifier.padding(top = 10.dp))
+        Kicker("All time", Modifier.padding(top = 10.dp).onSeen(allSeen).reveal(allSeen.value))
         Spacer(Modifier.height(12.dp))
+        val seen = allSeen.value
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Tile(compact(s.allTotal), "DNS queries", Modifier.weight(1f))
-            Tile(compact(s.allBlocked), "blocked", Modifier.weight(1f))
+            Tile(compact(counted(s.allTotal.toDouble(), seen).toLong()), "DNS queries", Modifier.weight(1f).reveal(seen, 1))
+            Tile(compact(counted(s.allBlocked.toDouble(), seen).toLong()), "blocked", Modifier.weight(1f).reveal(seen, 2))
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Tile(compact(s.allThreats), "threats blocked\nmalware and phishing", Modifier.weight(1f))
-            Tile(if (domains > 0) compact(domains.toLong()) else "–", "filter rules\nloaded now", Modifier.weight(1f))
+            Tile(compact(counted(s.allThreats.toDouble(), seen).toLong()), "threats blocked\nmalware and phishing", Modifier.weight(1f).reveal(seen, 3))
+            Tile(
+                if (domains > 0) compact(counted(domains.toDouble(), seen).toLong()) else "–", "filter rules\nloaded now",
+                Modifier.weight(1f).reveal(seen, 4),
+            )
         }
         Spacer(Modifier.height(8.dp))
         // Block rate: the filled one, wide.
+        val rate = counted(if (s.allTotal > 0) s.allBlocked * 100.0 / s.allTotal else 0.0, seen)
         Row(
-            Modifier.fillMaxWidth().clip(blockShape).background(Palette.accent).padding(horizontal = 18.dp, vertical = 16.dp),
+            Modifier.fillMaxWidth().reveal(seen, 5).clip(blockShape).background(Palette.accent).padding(horizontal = 18.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                if (s.allTotal > 0) "%.1f%%".format(s.allBlocked * 100.0 / s.allTotal) else "0%",
-                style = display(30), color = Palette.onAccent, modifier = Modifier.weight(1f),
-            )
+            Text("%.1f%%".format(rate), style = display(30), color = Palette.onAccent, modifier = Modifier.weight(1f))
             Text("block rate,\nall time", color = Palette.onAccent, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium)
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Tile("≈ " + bytes(s.allBlocked * BYTES_PER_BLOCK), "data not downloaded\nestimate", Modifier.weight(1f))
-            Uptime(startedAt, Modifier.weight(1f))
+            Tile(
+                "≈ " + bytes(counted((s.allBlocked * BYTES_PER_BLOCK).toDouble(), seen).toLong()), "data not downloaded\nestimate",
+                Modifier.weight(1f).reveal(seen, 6),
+            )
+            Uptime(startedAt, Modifier.weight(1f).reveal(seen, 7))
         }
 
-        Kicker("Activity", Modifier.padding(top = 28.dp))
+        Kicker("Activity", Modifier.padding(top = 28.dp).onSeen(chartSeen).reveal(chartSeen.value))
         Spacer(Modifier.height(10.dp))
         var week by rememberSaveable { mutableStateOf(false) }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.reveal(chartSeen.value, 1), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Chip("24 hours", !week) { week = false }
             Chip("7 days", week) { week = true }
         }
         Spacer(Modifier.height(14.dp))
-        ActivityChart(s, week)
+        Box(Modifier.reveal(chartSeen.value, 2)) { ActivityChart(s, week, chartSeen.value) }
 
-        Kicker("Top blocked", Modifier.padding(top = 28.dp))
+        Kicker("Top blocked", Modifier.padding(top = 28.dp).onSeen(topSeen).reveal(topSeen.value))
         Spacer(Modifier.height(10.dp))
         if (s.top.isEmpty()) {
             Text("Nothing blocked yet.", color = Palette.faint, fontSize = 14.sp)
         } else {
             val max = s.top.first().second.coerceAtLeast(1)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                s.top.forEachIndexed { i, (domain, count) -> TopRow(i + 1, domain, count, count.toFloat() / max) }
+                s.top.forEachIndexed { i, (domain, count) ->
+                    TopRow(i + 1, domain, count, count.toFloat() / max, topSeen.value, Modifier.reveal(topSeen.value, i + 1))
+                }
             }
         }
     }
@@ -129,8 +183,13 @@ private fun Uptime(startedAt: Long, modifier: Modifier) {
 }
 
 @Composable
-private fun TopRow(rank: Int, domain: String, count: Int, share: Float) {
-    Column(Modifier.fillMaxWidth().clip(blockShape).background(Palette.card2).padding(horizontal = 16.dp, vertical = 12.dp)) {
+private fun TopRow(rank: Int, domain: String, count: Int, share: Float, seen: Boolean, modifier: Modifier = Modifier) {
+    // The bar grows from the left once the row is on screen.
+    val grow = remember { Animatable(0f) }
+    LaunchedEffect(seen, share) {
+        if (seen) { delay(80L * rank); grow.animateTo(share.coerceIn(0.02f, 1f), tween(700, easing = FastOutSlowInEasing)) }
+    }
+    Column(modifier.fillMaxWidth().clip(blockShape).background(Palette.card2).padding(horizontal = 16.dp, vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("%02d".format(rank), style = display(15), color = Palette.accentText, modifier = Modifier.width(34.dp))
             Text(domain, color = Palette.text, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
@@ -139,7 +198,7 @@ private fun TopRow(rank: Int, domain: String, count: Int, share: Float) {
         }
         // Share of the top domain, as a bar.
         Box(Modifier.padding(start = 34.dp, top = 8.dp).fillMaxWidth().height(4.dp).clip(CircleShape).background(Palette.line)) {
-            Box(Modifier.fillMaxWidth(share.coerceIn(0.02f, 1f)).height(4.dp).clip(CircleShape).background(Palette.accent))
+            Box(Modifier.fillMaxWidth(grow.value.coerceIn(0.001f, 1f)).height(4.dp).clip(CircleShape).background(Palette.accent))
         }
     }
 }
@@ -149,7 +208,7 @@ private fun TopRow(rank: Int, domain: String, count: Int, share: Float) {
  * Draws itself in from the left when it appears or the range changes.
  */
 @Composable
-private fun ActivityChart(s: StatsSnapshot, week: Boolean) {
+private fun ActivityChart(s: StatsSnapshot, week: Boolean, seen: Boolean) {
     val points: List<Pair<Int, Int>> = if (week) {
         // 7 days ending today: sum the hours of each calendar day.
         val cal = Calendar.getInstance()
@@ -171,7 +230,10 @@ private fun ActivityChart(s: StatsSnapshot, week: Boolean) {
     }
 
     val draw = remember { Animatable(0f) }
-    LaunchedEffect(week) { draw.snapTo(0f); draw.animateTo(1f, tween(900, easing = FastOutSlowInEasing)) }
+    LaunchedEffect(week, seen) {
+        if (!seen) return@LaunchedEffect
+        draw.snapTo(0f); draw.animateTo(1f, tween(1000, easing = FastOutSlowInEasing))
+    }
 
     val soft = Palette.dim
     val accent = Palette.accent

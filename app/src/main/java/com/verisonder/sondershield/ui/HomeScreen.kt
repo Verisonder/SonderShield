@@ -242,12 +242,9 @@ private fun BigToggle(phase: Phase, logo: Dp, onClick: () -> Unit) {
     val rock by breathe.animateFloat(-1f, 1f, infiniteRepeatable(tween(420), RepeatMode.Reverse), label = "rock")
     val glowAlpha by animateFloatAsState(if (on) 1f else 0f, tween(500), label = "glowAlpha")
 
-    Column(
-        Modifier.fillMaxWidth()
-            .clickable(interactionSource = press, indication = null, onClick = onClick)
-            .semantics { role = Role.Switch; contentDescription = if (on) "Protection on. Tap to turn off." else "Protection off. Tap to turn on." },
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
+    // Only the shield itself is the button (a circle the logo's size), so taps beside it
+    // or on the label don't toggle protection by accident.
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         val area = logo * 1.5f
         Box(Modifier.size(area), contentAlignment = Alignment.Center) {
             Canvas(Modifier.size(area)) {
@@ -270,7 +267,11 @@ private fun BigToggle(phase: Phase, logo: Dp, onClick: () -> Unit) {
             }
             Logo(
                 logo, lit = on, split = split.value,
-                modifier = Modifier.graphicsLayer {
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .clickable(interactionSource = press, indication = null, onClick = onClick)
+                    .semantics { role = Role.Switch; contentDescription = if (on) "Protection on. Tap to turn off." else "Protection off. Tap to turn on." }
+                    .graphicsLayer {
                     scaleX = pressScale; scaleY = pressScale
                     rotationZ = if (phase == Phase.STARTING) rock * 4f else 0f
                 },
