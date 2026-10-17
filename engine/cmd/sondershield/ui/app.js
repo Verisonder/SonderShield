@@ -161,12 +161,12 @@ function renderHome() {
     ${warn ? `<div class="banner" style="margin-top:22px">Windows isn't sending its lookups to SonderShield yet. <button class="linkbtn" id="diagbtn">See why</button></div>` : ''}
     ${problem ? `<div class="banner" style="margin-top:22px">${esc(problem)}</div>` : ''}
     <div class="homebody ${fresh ? 'enter' : ''}">
-      <div class="todaycol">
-        <svg class="swoosh" viewBox="0 0 360 46" preserveAspectRatio="none">
-          <path class="blade ${phase === 'on' ? 'lit' : ''} ${snap ? 'sweep' : ''}" d="M0 46Q130 4 360 12L360 20Q155 16 0 46Z"/>
-          <path d="M0 46Q150 20 360 28L360 47L0 47Z" fill="var(--panel)"/>
-        </svg>
-        <div class="ladder">
+      <svg class="swoosh" viewBox="0 0 360 46" preserveAspectRatio="none">
+        <path class="blade ${phase === 'on' ? 'lit' : ''} ${snap ? 'sweep' : ''}" d="M0 46Q130 4 360 12L360 20Q155 16 0 46Z"/>
+        <path d="M0 46Q150 20 360 28L360 47L0 47Z" fill="var(--panel)"/>
+      </svg>
+      <div class="ladder panelgrid">
+        <div class="todaycol">
           <h2>TODAY</h2>
           <div class="steps">
             <div class="step"><div class="num" data-k="t"></div><div class="lbl">DNS queries</div></div>
@@ -174,17 +174,17 @@ function renderHome() {
             <div class="step"><div class="num" data-k="r"></div><div class="lbl">of everything blocked</div></div>
           </div>
         </div>
-      </div>
-      <div class="alltime rv">
-        <div class="kicker">▲ ALL TIME</div>
-        <div class="atgrid">
-          <div class="tile rv" style="--d:1"><div class="num" data-k="aq" data-f="c"></div><div class="lbl">DNS queries</div></div>
-          <div class="tile rv" style="--d:2"><div class="num" data-k="ab" data-f="c"></div><div class="lbl">blocked</div></div>
-          <div class="tile rv" style="--d:3"><div class="num" data-k="thr" data-f="c"></div><div class="lbl">threats blocked\nmalware & phishing</div></div>
-          <div class="tile rv" style="--d:4"><div class="num" data-k="dom" data-f="c"></div><div class="lbl">filter rules\nloaded now</div></div>
-          <div class="rate rv" style="--d:5"><div class="num" data-k="ar" data-f="p"></div><div class="lbl">block rate,\nall time</div></div>
-          <div class="tile rv" style="--d:6"><div class="num" data-k="mb" data-f="b"></div><div class="lbl">data not downloaded\nestimate</div></div>
-          <div class="tile rv" style="--d:7"><div class="num" id="uptime"></div><div class="lbl">on without a break</div></div>
+        <div class="alltime rv">
+          <h2>ALL TIME</h2>
+          <div class="atgrid">
+            <div class="tile rv" style="--d:1"><div class="num" data-k="aq" data-f="c"></div><div class="lbl">DNS queries</div></div>
+            <div class="tile rv" style="--d:2"><div class="num" data-k="ab" data-f="c"></div><div class="lbl">blocked</div></div>
+            <div class="tile rv" style="--d:3"><div class="num" data-k="thr" data-f="c"></div><div class="lbl">threats blocked\nmalware & phishing</div></div>
+            <div class="tile rv" style="--d:4"><div class="num" data-k="dom" data-f="c"></div><div class="lbl">filter rules\nloaded now</div></div>
+            <div class="rate rv" style="--d:5"><div class="num" data-k="ar" data-f="p"></div><div class="lbl">block rate,\nall time</div></div>
+            <div class="tile rv" style="--d:6"><div class="num" data-k="mb" data-f="b"></div><div class="lbl">data not downloaded\nestimate</div></div>
+            <div class="tile rv" style="--d:7"><div class="num" id="uptime"></div><div class="lbl">on without a break</div></div>
+          </div>
         </div>
       </div>
     </div>

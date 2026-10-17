@@ -316,3 +316,15 @@ svg.chart.draw .plot { animation: sweep 1s cubic-bezier(.4,0,.2,1); }
 .diagrow .diagmark { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; flex-shrink: 0; }
 .diagrow.ok .diagmark { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
 .diagrow.bad .diagmark { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
+
+/* One panel under one swoosh: Today on the left, All time on the right (like the phone's panel) */
+.homebody:not(.lower) { display: block; }
+.homebody:not(.lower) .swoosh { margin-top: 0; }
+.panelgrid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, 1fr); gap: 28px; align-items: stretch; }
+.panelgrid .alltime { display: flex; flex-direction: column; }
+.panelgrid .atgrid { flex: 1; grid-auto-rows: 1fr; }
+.panelgrid .atgrid .tile { display: flex; flex-direction: column; justify-content: center; }
+@media (max-width: 900px) { .panelgrid { grid-template-columns: 1fr; } }
+.panelgrid .todaycol { display: flex; flex-direction: column; }
+.panelgrid .todaycol .steps { flex: 1; }
+.panelgrid .todaycol .step { flex: 1; display: flex; flex-direction: column; justify-content: center; }
