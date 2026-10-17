@@ -17,7 +17,36 @@ let state = null, cfg = null, lastLogSeq = 0, logs = [], tab = 'home';
 
 // ---- shell ----
 document.querySelectorAll('nav .tab[data-tab]').forEach(b => b.onclick = () => setTab(b.dataset.tab));
-$('#quitbtn').onclick = async () => { if (confirm('Quit SonderShield? Protection will stop.')) { await api('quit', { method: 'POST' }); setTimeout(() => window.close(), 300); } };
+$('#quitbtn').onclick = async () => {
+  const r = await ask({ title: 'Quit SonderShield?', text: 'Protection stops and Windows goes back to its usual DNS. Closing the window instead keeps SonderShield running in the tray.', ok: 'Quit', danger: true });
+  if (r) await api('quit', { method: 'POST' });
+};
+
+// ask: an in-app dialog. fields: [{name, placeholder, value}] -> resolves with values, or null.
+function ask({ title, text = '', ok = 'OK', cancel = 'Cancel', fields = [], validate }) {
+  return new Promise(resolve => {
+    const bg = el('div', 'modal-bg');
+    bg.innerHTML = `<div class="modal" role="dialog"><h3>${esc(title)}</h3>${text ? `<p>${esc(text)}</p>` : ''}
+      ${fields.map((f, i) => `<input class="field" data-i="${i}" placeholder="${escapeAttr(f.placeholder || '')}" value="${escapeAttr(f.value || '')}">`).join('')}
+      <div class="err"></div>
+      <div class="actions"><button class="pill" data-a="no">${esc(cancel)}</button><button class="pill filled" data-a="yes">${esc(ok)}</button></div></div>`;
+    document.body.appendChild(bg);
+    const inputs = [...bg.querySelectorAll('input')];
+    (inputs[0] || bg.querySelector('[data-a=yes]')).focus();
+    const done = v => { bg.remove(); document.removeEventListener('keydown', key); resolve(v); };
+    const yes = () => {
+      const vals = inputs.map(i => i.value.trim());
+      const e = validate && validate(vals);
+      if (e) { bg.querySelector('.err').textContent = e; return; }
+      done(fields.length ? vals : true);
+    };
+    const key = e => { if (e.key === 'Escape') done(null); if (e.key === 'Enter') yes(); };
+    document.addEventListener('keydown', key);
+    bg.querySelector('[data-a=no]').onclick = () => done(null);
+    bg.querySelector('[data-a=yes]').onclick = yes;
+    bg.onclick = e => { if (e.target === bg) done(null); };
+  });
+}
 
 function setTab(t) {
   tab = t;
@@ -179,12 +208,17 @@ async function removeList(id) {
   await postConfig(cfg);
   listsCache = await api('lists'); renderLists();
 }
-function addListDialog() {
-  const name = prompt('List name:'); if (!name) return;
-  const url = prompt('Download URL (https://…):'); if (!url || !url.startsWith('https://')) { alert('URL must start with https://'); return; }
-  cfg.custom = (cfg.custom || []).concat([{ name: name.trim(), url: url.trim() }]);
-  cfg.lists = (cfg.lists || []).concat([customId(url.trim())]);
-  postConfig(cfg).then(async () => { listsCache = await api('lists'); renderLists(); });
+async function addListDialog() {
+  const v = await ask({
+    title: 'Add a block list', text: 'Hosts files, AdBlock-style lists and plain domain lists all work.', ok: 'Add',
+    fields: [{ placeholder: 'Name' }, { placeholder: 'https://…' }],
+    validate: ([n, u]) => !n ? 'Give the list a name.' : !u.startsWith('https://') ? 'The address must start with https://' : '',
+  });
+  if (!v) return;
+  const [name, url] = v;
+  cfg.custom = (cfg.custom || []).concat([{ name, url }]);
+  cfg.lists = (cfg.lists || []).concat([customId(url)]);
+  await postConfig(cfg); listsCache = await api('lists'); renderLists();
 }
 
 function renderLog() {
@@ -297,7 +331,7 @@ async function renderSettings() {
     <div class="seclabel"><span class="t">07 ABOUT</span></div>
     <div class="card"><div class="ctitle">SonderShield for Windows</div>
       <div class="csub" style="margin-top:6px">By Verisonder. Free and open source under GPL-3.0. Everything stays on this PC: no account, no analytics.</div>
-      <div class="csub" style="margin-top:8px">This version blocks ads, trackers and malware by DNS, and can cut off any app's internet. It points Windows' DNS at SonderShield on this PC.</div>
+      <div class="csub" style="margin-top:8px">Blocks ads, trackers and malware by DNS, and can cut off any app's internet.${state.on ? (state.mode === 'adapter' ? ' Filtering through the SonderShield network adapter.' : ' Filtering on this PC (port 53).') : ''}</div>
       <div style="margin-top:12px"><button class="pill" id="src">Source code</button></div></div>`;
   const up = $('#upstream'); up.onchange = () => { cfg.upstream = up.value; $('#customup').classList.toggle('hidden', up.value !== 'custom'); save(); };
   $('#customup').onchange = () => { cfg.customUpstream = $('#customup').value; save(); };
@@ -305,7 +339,7 @@ async function renderSettings() {
   p.querySelectorAll('.chip[data-theme]').forEach(c => c.onclick = () => { cfg.theme = c.dataset.theme; save(); applyTheme(); renderSettings(); });
   p.querySelectorAll('.swatch[data-a]').forEach(s => s.onclick = () => { cfg.accent = +s.dataset.a; save(); applyTheme(); renderSettings(); });
   $('#autostart').onclick = async () => { const on = !auto.on; await api('autostart?on=' + (on ? '1' : '0'), { method: 'POST' }); renderSettings(); };
-  $('#resetstats').onclick = async () => { if (confirm('Reset all counters? The log stays.')) { await api('reset-stats', { method: 'POST' }); poll(); } };
+  $('#resetstats').onclick = async () => { if (await ask({ title: 'Reset counters?', text: "Today's and all-time numbers go back to zero. The log stays.", ok: 'Reset' })) { await api('reset-stats', { method: 'POST' }); poll(); } };
   $('#src').onclick = () => open('https://github.com/Verisonder/SonderShield', '_blank');
   $('#checkupdate').onclick = checkForUpdate;
   if (cat.version === 'dev') { $('#updatestatus').textContent = 'Development build — updates are checked only in a released build.'; }

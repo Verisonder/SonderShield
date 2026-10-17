@@ -25,6 +25,7 @@ type server struct {
 	token  string
 	ln     net.Listener
 	onQuit func()
+	onShow func()
 }
 
 func newServer(a *App) (*server, error) {
@@ -116,6 +117,11 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 			a.plat.setAutostart(on, exe)
 		}
 		writeJSON(w, map[string]bool{"on": a.plat.autostartOn()})
+	case "show":
+		w.WriteHeader(204)
+		if s.onShow != nil {
+			s.onShow()
+		}
 	case "quit":
 		w.WriteHeader(204)
 		if s.onQuit != nil {
@@ -163,18 +169,19 @@ type stateView struct {
 	Stats     statsView `json:"stats"`
 	Today     [2]int64  `json:"today"`
 	Config    Config    `json:"config"`
+	Mode      string    `json:"mode"`
 }
 
 func (s *server) state() stateView {
 	a := s.a
 	a.mu.Lock()
-	on, started, problem := a.on, a.startedAt, a.problem
+	on, started, problem, mode := a.on, a.startedAt, a.problem, a.mode
 	cfg := a.cfg
 	a.mu.Unlock()
 	sv := a.stats.view(time.Now())
 	return stateView{
 		On: on, Active: a.active(), Problem: problem, Domains: int(a.eng.DomainCount()),
-		StartedAt: started, Stats: sv, Today: sv.Today, Config: cfg,
+		StartedAt: started, Stats: sv, Today: sv.Today, Config: cfg, Mode: mode,
 	}
 }
 

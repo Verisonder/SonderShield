@@ -10,9 +10,25 @@ import (
 )
 
 func main() {
+	// Commands the installer runs (no window).
+	if hasFlag("--uninstall") {
+		plat := newPlatform()
+		plat.restoreSystemDNS()
+		plat.clearFirewall()
+		plat.setAutostart(false, "")
+		return
+	}
+	if i := flagIndex("--autostart"); i >= 0 && i+1 < len(os.Args) {
+		exe, _ := os.Executable()
+		newPlatform().setAutostart(os.Args[i+1] == "on", exe)
+		return
+	}
 	// If another copy is already running, just open its window and exit.
 	if url, ok := existingInstance(); ok {
-		openWindow(url)
+		// Ask the running copy to bring its window forward; fall back to a browser.
+		if !showExisting(url) {
+			openWindow(url)
+		}
 		return
 	}
 	// Blocking DNS on port 53 and changing network settings need administrator rights.
@@ -23,6 +39,10 @@ func main() {
 	cleanupOldUpdate()
 	plat := newPlatform()
 	a := newApp(plat)
+	// A crash or power cut while protection was on can leave Windows pointed at us.
+	if plat.pendingRestore() && !a.config().On {
+		plat.restoreSystemDNS()
+	}
 	srv, err := newServer(a)
 	if err != nil {
 		fatal("Could not start the local interface: " + err.Error())
@@ -38,21 +58,19 @@ func main() {
 		a.start()
 	}
 
-	// Register the quit endpoint now that we have the server and app.
-	quit := make(chan struct{})
-	http.DefaultServeMux.HandleFunc("/__never", func(http.ResponseWriter, *http.Request) {})
-	srv.onQuit = func() {
-		a.stop()
-		close(quit)
-	}
-
-	// Started by "start with Windows": don't pop the window up, just run.
-	if !hasFlag("--tray") {
-		openWindow(srv.url())
-	}
-
-	<-quit
+	// The window (and on Windows the tray icon). Started by "start with Windows" (--tray),
+	// it stays hidden in the tray. Returns when the user quits.
+	runFrontend(a, srv, hasFlag("--tray"))
 	time.Sleep(200 * time.Millisecond)
+}
+
+func flagIndex(f string) int {
+	for i, a := range os.Args {
+		if a == f {
+			return i
+		}
+	}
+	return -1
 }
 
 func hasFlag(f string) bool {
@@ -79,6 +97,18 @@ func existingInstance() (string, bool) {
 	}
 	resp.Body.Close()
 	return url, resp.StatusCode == 200
+}
+
+func showExisting(url string) bool {
+	c := &http.Client{Timeout: 2 * time.Second}
+	req, _ := http.NewRequest("POST", trimURL(url)+"/api/show", nil)
+	req.Header.Set("X-Token", tokenOf(url))
+	resp, err := c.Do(req)
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return resp.StatusCode == 204
 }
 
 func writeInstance(dir, url string) {

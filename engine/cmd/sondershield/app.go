@@ -35,7 +35,8 @@ type App struct {
 	on        bool
 	problem   string
 	startedAt int64
-	lastQuery int64 // ms of the most recent DNS query seen (for the "is it working" check)
+	lastQuery int64  // ms of the most recent DNS query seen (for the "is it working" check)
+	mode      string // "local" (port 53 here) or "adapter" (SonderShield network adapter)
 
 	logMu  sync.Mutex
 	log    []logEntry

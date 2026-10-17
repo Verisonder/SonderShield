@@ -148,3 +148,14 @@ textarea.field { resize: vertical; min-height: 90px; font-family: 'DM Sans'; }
 .accentrow { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
 .swatch { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
 .swatch.sel { border-color: var(--text); }
+
+/* In-app dialog */
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 50; animation: fade .12s ease-out; }
+.modal { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 26px 28px 22px; width: min(460px, calc(100vw - 48px)); box-shadow: 0 20px 60px rgba(0,0,0,.5); animation: pop .16s ease-out; }
+.modal h3 { font-family: 'Unbounded'; font-weight: 700; font-size: 19px; margin-bottom: 10px; }
+.modal p { color: var(--dim); font-size: 14px; line-height: 1.5; }
+.modal .field { margin-top: 12px; }
+.modal .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+.modal .err { color: var(--warn); font-size: 13px; margin-top: 10px; min-height: 1em; }
+@keyframes fade { from { opacity: 0 } }
+@keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.98) } }

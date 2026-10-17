@@ -17,3 +17,6 @@ app/libs/engine-sources.jar
 # The handoff is private — it stays with Nidal, never in the repo.
 docs/HANDOFF.md
 HANDOFF.md
+
+# Downloaded by CI from wintun.net and embedded in the Windows app.
+engine/cmd/sondershield/wintun/

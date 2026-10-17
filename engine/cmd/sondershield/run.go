@@ -18,16 +18,29 @@ func (a *App) start() error {
 	a.mu.Unlock()
 
 	a.applyConfig()
-	if err := a.eng.StartLocal(dnsPort); err != nil {
-		a.setProblem("Could not start the DNS server. Is another DNS program (like Pi-hole or Acrylic) already using port 53? " + err.Error())
-		return err
-	}
 	a.eng.SetOutsideInterface(a.plat.outsideInterfaces())
-	if err := a.plat.setSystemDNS("127.0.0.1"); err != nil {
+	// First choice: a DNS server on this PC (127.0.0.1:53). When something else already
+	// holds port 53 (Windows' connection sharing, Hyper-V, WSL, Docker...), use
+	// SonderShield's own network adapter instead, which nothing can block.
+	v4, v6, mode := "127.0.0.1", "::1", "local"
+	if err := a.eng.StartLocal(dnsPort); err != nil {
+		var terr error
+		v4, v6, terr = a.plat.startTunDNS(a.eng)
+		if terr != nil {
+			a.setProblem("Could not start filtering. Port 53 is taken (" + err.Error() + "), and the SonderShield adapter failed: " + terr.Error())
+			return terr
+		}
+		mode = "adapter"
+	}
+	if err := a.plat.setSystemDNS(v4, v6); err != nil {
 		a.eng.Stop()
-		a.setProblem("Could not point Windows at SonderShield: " + err.Error() + " (SonderShield must run as administrator.)")
+		a.plat.restoreSystemDNS()
+		a.setProblem("Could not point Windows at SonderShield: " + err.Error())
 		return err
 	}
+	a.mu.Lock()
+	a.mode = mode
+	a.mu.Unlock()
 
 	a.mu.Lock()
 	a.on = true

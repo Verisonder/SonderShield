@@ -82,30 +82,6 @@ jobs:
       - name: Tests
         shell: bash
         run: gradle --no-daemon testDebugUnitTest
-      - name: Build the Windows app
-        shell: bash
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          cd engine
-          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build \
-            -trimpath -ldflags "-s -w -H=windowsgui -X main.version=$VERSION" \
-            -o "../SonderShield.exe" ./cmd/sondershield
-          cd ..
-          mkdir -p winpkg
-          cp SonderShield.exe winpkg/
-          printf '%s\n' \
-            'SonderShield for Windows' '' \
-            'Blocks ads, trackers and malware for every app on this PC by filtering DNS,' \
-            "and can cut off any app's internet (firewall). Nothing leaves your PC." '' \
-            'To run: double-click SonderShield.exe. Windows asks for administrator rights' \
-            "(needed to change the PC's DNS and firewall). A window opens; click the shield" \
-            'to turn protection on.' '' \
-            'Closing the window leaves protection running. To stop it, open the window again' \
-            '(run the .exe) and click Quit, or turn the shield off.' '' \
-            'Free and open source, GPL-3.0: https://github.com/Verisonder/SonderShield' \
-            > winpkg/README.txt
-          cd winpkg && zip -r "../SonderShield-Windows-$VERSION.zip" . && cd ..
-          cp SonderShield.exe "SonderShield-Windows-$VERSION.exe"
       - name: Build
         shell: bash
         env:
@@ -131,9 +107,7 @@ jobs:
           NAMED="SonderShield-$VERSION.apk"
           cp "$APK" "$NAMED"
 
-          WINZIP=$(ls SonderShield-Windows-*.zip | head -n 1)
-          WINEXE=$(ls SonderShield-Windows-*.exe | head -n 1)
-          gh release create "$GITHUB_REF_NAME" "$NAMED" "$WINEXE" "$WINZIP" \
+          gh release create "$GITHUB_REF_NAME" "$NAMED" \
             --repo "$GITHUB_REPOSITORY" \
             --title "SonderShield $VERSION" \
             --notes-file docs/releasenote/release_notes_$GITHUB_REF_NAME.md
@@ -157,3 +131,53 @@ jobs:
               --title "Last CI failure" --notes "Replaced on every failed build."
           echo "$GITHUB_WORKFLOW on $GITHUB_REF_NAME at $GITHUB_SHA" | cat - out.txt > failure.txt
           gh release upload ci-failure failure.txt --repo "$GITHUB_REPOSITORY" --clobber
+
+  windows:
+    name: Windows app and installer
+    needs: release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: false
+      - name: Resolve engine dependencies
+        shell: bash
+        run: cd engine && go mod tidy
+      - name: Get wintun.dll
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://www.wintun.net/builds/wintun-0.14.1.zip -OutFile wintun.zip
+          Expand-Archive wintun.zip -DestinationPath wintun-src
+          New-Item -ItemType Directory -Force engine/cmd/sondershield/wintun | Out-Null
+          Copy-Item wintun-src/wintun/bin/amd64/wintun.dll engine/cmd/sondershield/wintun/wintun.dll
+      - name: Build SonderShield.exe
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          cd engine
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath \
+            -ldflags "-s -w -H=windowsgui -X main.version=$VERSION" -o ../dist/SonderShield.exe ./cmd/sondershield
+          cp cmd/sondershield/wintun/wintun.dll ../dist/
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          $v = "$env:GITHUB_REF_NAME".TrimStart('v')
+          & $iscc "/DAppVersion=$v" "/DSrc=..\dist" installer\sondershield.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Upload to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT || github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cp dist/SonderShield.exe "SonderShield-Windows-$VERSION.exe"
+          (cd dist && 7z a -tzip "../SonderShield-Windows-$VERSION.zip" SonderShield.exe > /dev/null)
+          gh release upload "$GITHUB_REF_NAME" \
+            "out/SonderShield-Setup-$VERSION.exe" "SonderShield-Windows-$VERSION.exe" "SonderShield-Windows-$VERSION.zip" \
+            --repo "$GITHUB_REPOSITORY" --clobber

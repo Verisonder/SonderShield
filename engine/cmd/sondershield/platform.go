@@ -3,6 +3,8 @@ package main
 import (
 	"os"
 	"path/filepath"
+
+	shield "github.com/Verisonder/SonderShield/engine"
 )
 
 // platform is the handful of things that differ by operating system: where data lives,
@@ -11,10 +13,15 @@ import (
 type platform interface {
 	// dataDir is where config, lists and stats are kept.
 	dataDir() string
-	// setSystemDNS points every active network adapter at addr (our local server) and
-	// remembers what was there; restore() puts the old settings back.
-	setSystemDNS(addr string) error
+	// setSystemDNS points every connected adapter at our DNS (IPv4 and IPv6 addresses) and
+	// remembers what was there; restoreSystemDNS puts the old settings back.
+	setSystemDNS(v4, v6 string) error
 	restoreSystemDNS() error
+	// pendingRestore: a previous run left the DNS pointed at us (crash, power cut).
+	pendingRestore() bool
+	// startTunDNS: serve DNS on SonderShield's own network adapter instead of port 53 on
+	// this PC. Returns the DNS addresses to point Windows at.
+	startTunDNS(e *shield.Engine) (v4, v6 string, err error)
 	// setFirewall replaces our block rules with one per program path (full paths of .exe
 	// files that should get no internet). Empty clears them.
 	setFirewall(paths []string) error

@@ -20,21 +20,46 @@ import (
 // windowsPlatform drives the system through netsh (DNS and firewall) and the registry
 // (start with Windows), the same tools an administrator would use by hand.
 type windowsPlatform struct {
-	dir   string
-	rule  string // firewall rule name prefix
-	setV4 []string
-	setV6 []string
+	dir  string
+	rule string // firewall rule name prefix
 }
 
 func newPlatform() platform {
-	// Data lives in %ProgramData%\SonderShield when running as a service, else next to the exe.
-	dir := portableDataDir()
+	// One data folder for the installed and the portable app: %ProgramData%\SonderShield.
 	if pd := os.Getenv("ProgramData"); pd != "" {
-		if _, err := os.Stat(filepath.Join(pd, "SonderShield", "service")); err == nil {
-			dir = filepath.Join(pd, "SonderShield")
+		d := filepath.Join(pd, "SonderShield")
+		if os.MkdirAll(d, 0o755) == nil {
+			if exe, err := os.Executable(); err == nil {
+				migrateOldData(filepath.Join(filepath.Dir(exe), "data"), d)
+			}
+			return &windowsPlatform{dir: d, rule: "SonderShield"}
 		}
 	}
-	return &windowsPlatform{dir: dir, rule: "SonderShield"}
+	return &windowsPlatform{dir: portableDataDir(), rule: "SonderShield"}
+}
+
+// migrateOldData copies settings from 1.1.0's "data" folder next to the exe, once.
+func migrateOldData(old, dst string) {
+	if old == dst {
+		return
+	}
+	if _, err := os.Stat(filepath.Join(dst, "config.json")); err == nil {
+		return
+	}
+	for _, n := range []string{"config.json", "stats.json", "lists.json"} {
+		if b, err := os.ReadFile(filepath.Join(old, n)); err == nil {
+			os.WriteFile(filepath.Join(dst, n), b, 0o600)
+		}
+	}
+	if ents, err := os.ReadDir(old); err == nil {
+		for _, e := range ents {
+			if filepath.Ext(e.Name()) == ".txt" {
+				if b, err := os.ReadFile(filepath.Join(old, e.Name())); err == nil {
+					os.WriteFile(filepath.Join(dst, e.Name()), b, 0o644)
+				}
+			}
+		}
+	}
 }
 
 func (p *windowsPlatform) dataDir() string { return p.dir }
@@ -51,63 +76,6 @@ func run(name string, args ...string) (string, error) {
 		return string(out), fmt.Errorf("%s: %v: %s", name, err, strings.TrimSpace(string(out)))
 	}
 	return string(out), nil
-}
-
-// activeAdapters: names of connected, non-virtual adapters that have a gateway.
-func activeAdapters() []string {
-	ifaces, _ := net.Interfaces()
-	var names []string
-	for _, ifc := range ifaces {
-		if ifc.Flags&net.FlagUp == 0 || ifc.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-		low := strings.ToLower(ifc.Name)
-		if strings.Contains(low, "sondershield") || strings.Contains(low, "loopback") {
-			continue
-		}
-		addrs, _ := ifc.Addrs()
-		hasIP := false
-		for _, a := range addrs {
-			if ipn, ok := a.(*net.IPNet); ok && ipn.IP.IsGlobalUnicast() {
-				hasIP = true
-			}
-		}
-		if hasIP {
-			names = append(names, ifc.Name)
-		}
-	}
-	return names
-}
-
-func (p *windowsPlatform) setSystemDNS(addr string) error {
-	p.setV4 = p.setV4[:0]
-	p.setV6 = p.setV6[:0]
-	var errs []string
-	for _, name := range activeAdapters() {
-		if _, err := run("netsh", "interface", "ipv4", "set", "dnsservers", "name="+name, "static", addr, "primary", "no"); err != nil {
-			errs = append(errs, err.Error())
-			continue
-		}
-		p.setV4 = append(p.setV4, name)
-	}
-	if len(p.setV4) == 0 {
-		return fmt.Errorf("could not set DNS on any adapter: %s", strings.Join(errs, "; "))
-	}
-	// Flush the resolver cache so new lookups go to us at once.
-	run("ipconfig", "/flushdns")
-	return nil
-}
-
-func (p *windowsPlatform) restoreSystemDNS() error {
-	for _, name := range p.setV4 {
-		run("netsh", "interface", "ipv4", "set", "dnsservers", "name="+name, "dhcp")
-	}
-	for _, name := range p.setV6 {
-		run("netsh", "interface", "ipv6", "set", "dnsservers", "name="+name, "dhcp")
-	}
-	p.setV4, p.setV6 = nil, nil
-	run("ipconfig", "/flushdns")
-	return nil
 }
 
 func (p *windowsPlatform) setFirewall(paths []string) error {
@@ -161,29 +129,6 @@ func ifaceIndexTo(network, addr string) int {
 		}
 	}
 	return 0
-}
-
-func (p *windowsPlatform) setAutostart(on bool, exe string) error {
-	k, _, err := registry.CreateKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Run`, registry.SET_VALUE)
-	if err != nil {
-		return err
-	}
-	defer k.Close()
-	if on {
-		return k.SetStringValue("SonderShield", `"`+exe+`" --tray`)
-	}
-	k.DeleteValue("SonderShield")
-	return nil
-}
-
-func (p *windowsPlatform) autostartOn() bool {
-	k, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Run`, registry.QUERY_VALUE)
-	if err != nil {
-		return false
-	}
-	defer k.Close()
-	_, _, err = k.GetStringValue("SonderShield")
-	return err == nil
 }
 
 // listPrograms lists running apps (name and full .exe path), deduplicated. These are the
