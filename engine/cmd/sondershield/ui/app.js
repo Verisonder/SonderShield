@@ -140,7 +140,7 @@ function renderHome() {
     : 'Turn on to block ads and trackers for every app on this PC.';
   const warn = !busy && on && !state.active, problem = !busy && state.problem ? state.problem : '';
   const p = $('#page-home');
-  const shape = JSON.stringify([phase, warn, problem, sub]);
+  const shape = JSON.stringify([phase, warn, problem, sub, state.kill]);
   if (shape !== homeShape || justOn || !p.firstChild) {
     const fresh = !p.firstChild || homeShape === '';
     const snap = justOn; justOn = false;
@@ -157,6 +157,7 @@ function renderHome() {
     </div>
     <div class="headline ${roll ? 'roll' : ''}">${head}</div>
     <div class="headsub">${sub}</div>
+    ${state.kill ? `<div class="banner danger" style="margin-top:22px">All internet is blocked by the panic switch. Turn it off in Firewall to restore.</div>` : ''}
     ${warn ? `<div class="banner" style="margin-top:22px">Windows isn't sending its lookups to SonderShield yet. If this stays, another DNS tool may be set, or a VPN is overriding DNS.</div>` : ''}
     ${problem ? `<div class="banner" style="margin-top:22px">${esc(problem)}</div>` : ''}
     <div class="homebody ${fresh ? 'enter' : ''}">
@@ -542,10 +543,22 @@ function renderRules() {
 let programs = null;
 async function renderApps() {
   const p = $('#page-apps');
+  const kill = state.kill;
   p.innerHTML = `<div class="kicker">FIREWALL</div><h1>Firewall</h1>
     <div class="sub">Switch an app on here to cut off its internet completely — on Wi-Fi and Ethernet. Uses Windows Firewall.</div>
-    <div class="row" style="margin-bottom:12px"><button class="pill" id="refreshprog">Refresh running apps</button></div>
+    <div class="panic ${kill ? 'on' : ''}">
+      <div class="panictext"><div class="panicttl">${kill ? 'All internet is blocked' : 'Block all internet'}</div>
+        <div class="panicsub">${kill ? 'Every app is cut off. SonderShield still works.' : 'Cut off every app on this PC at once. A panic switch.'}</div></div>
+      <button class="pill ${kill ? 'filled' : 'danger'}" id="killbtn">${kill ? 'Restore internet' : 'Block everything'}</button>
+    </div>
+    <div class="row" style="margin:16px 0 12px"><button class="pill" id="refreshprog">Refresh running apps</button></div>
     <div id="proglist"><div class="empty">Loading running apps…</div></div>`;
+  $('#killbtn').onclick = async () => {
+    const on = !kill;
+    if (on) { const ok = await ask({ title: 'Block all internet?', text: 'Every app on this PC loses internet until you switch this back off. SonderShield itself keeps working.', ok: 'Block everything', danger: true }); if (!ok) return; }
+    await api('killswitch?on=' + (on ? '1' : '0'), { method: 'POST' });
+    await poll(); renderApps();
+  };
   $('#refreshprog').onclick = async () => { programs = await api('programs'); drawPrograms(); };
   if (!programs) programs = await api('programs');
   drawPrograms();

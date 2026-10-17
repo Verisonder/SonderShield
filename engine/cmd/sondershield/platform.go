@@ -36,6 +36,10 @@ type platform interface {
 	listPrograms() []Program
 	// listConnections: the computer's current outbound TCP connections, with the owning app.
 	listConnections() []Conn
+	// setKillSwitch cuts off (or restores) all internet for the whole computer. Loopback
+	// stays up, so SonderShield itself keeps working to switch it back off.
+	setKillSwitch(on bool) error
+	killSwitchOn() bool
 }
 
 // Conn is one outbound connection the computer currently has open.

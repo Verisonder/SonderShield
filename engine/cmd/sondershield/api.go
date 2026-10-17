@@ -131,6 +131,14 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, s.a.plat.listPrograms())
 	case "connections":
 		writeJSON(w, s.a.connections())
+	case "killswitch":
+		on := r.URL.Query().Get("on") == "1"
+		if err := s.a.plat.setKillSwitch(on); err != nil {
+			w.WriteHeader(500)
+			writeJSON(w, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, map[string]bool{"kill": on})
 	case "catalog":
 		writeJSON(w, map[string]any{"upstreams": upstreams, "version": version})
 	case "update/check":
@@ -172,6 +180,7 @@ type stateView struct {
 	Today     [2]int64  `json:"today"`
 	Config    Config    `json:"config"`
 	Mode      string    `json:"mode"`
+	Kill      bool      `json:"kill"`
 }
 
 func (s *server) state() stateView {
@@ -184,6 +193,7 @@ func (s *server) state() stateView {
 	return stateView{
 		On: on, Active: a.active(), Problem: problem, Domains: int(a.eng.DomainCount()),
 		StartedAt: started, Stats: sv, Today: sv.Today, Config: cfg, Mode: mode,
+		Kill: a.plat.killSwitchOn(),
 	}
 }
 

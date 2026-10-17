@@ -283,3 +283,14 @@ svg.chart.draw .plot { animation: sweep 1s cubic-bezier(.4,0,.2,1); }
 .cport { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 12px; }
 .cstate { color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; width: 86px; text-align: right; }
 .cstate.live { color: var(--accent); }
+
+/* Panic / kill switch */
+.pill.danger { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, transparent); }
+.pill.danger:hover { background: var(--warn); color: #fff; border-color: var(--warn); }
+.panic { display: flex; align-items: center; gap: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 16px 20px; }
+.panic.on { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--panel)); }
+.panictext { flex: 1; min-width: 0; }
+.panicttl { font-weight: 700; font-size: 15px; }
+.panic.on .panicttl { color: var(--warn); }
+.panicsub { color: var(--dim); font-size: 12.5px; margin-top: 2px; }
+.banner.danger { border-color: var(--warn); color: var(--warn); }

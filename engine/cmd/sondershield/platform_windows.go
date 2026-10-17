@@ -202,3 +202,27 @@ func localeFromOS() (lang, country string) {
 	}
 	return strings.ToLower(v), ""
 }
+
+// The panic switch: one "block all outbound" firewall rule (and one for inbound). Windows
+// treats a block rule as higher priority than any allow rule, and never filters loopback,
+// so SonderShield's own UI on 127.0.0.1 keeps working while everything else is cut off.
+func (p *windowsPlatform) killName() string { return p.rule + " KillSwitch" }
+
+func (p *windowsPlatform) setKillSwitch(on bool) error {
+	run("netsh", "advfirewall", "firewall", "delete", "rule", "name="+p.killName())
+	if !on {
+		return nil
+	}
+	if _, err := run("netsh", "advfirewall", "firewall", "add", "rule",
+		"name="+p.killName(), "dir=out", "action=block", "enable=yes", "profile=any"); err != nil {
+		return err
+	}
+	run("netsh", "advfirewall", "firewall", "add", "rule",
+		"name="+p.killName(), "dir=in", "action=block", "enable=yes", "profile=any")
+	return nil
+}
+
+func (p *windowsPlatform) killSwitchOn() bool {
+	_, err := run("netsh", "advfirewall", "firewall", "show", "rule", "name="+p.killName())
+	return err == nil
+}
