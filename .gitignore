@@ -13,3 +13,7 @@ captures/
 # Built from engine/ by tools/build_engine.sh (CI does it on every build).
 app/libs/engine.aar
 app/libs/engine-sources.jar
+
+# The handoff is private — it stays with Nidal, never in the repo.
+docs/HANDOFF.md
+HANDOFF.md
