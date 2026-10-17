@@ -1,5 +1,9 @@
 package com.verisonder.sondershield.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,128 +11,202 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-val cardShape = RoundedCornerShape(16.dp)
+val blockShape = RoundedCornerShape(18.dp)
+val Gutter = 22.dp
 
+/** "▲ LABEL": small uppercase label with a triangle, in the accent. */
 @Composable
-fun ScreenTitle(text: String, modifier: Modifier = Modifier, action: @Composable RowScope.() -> Unit = {}) {
-    Row(
-        modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 18.dp, bottom = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(text, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Palette.text, modifier = Modifier.weight(1f))
-        action()
+fun Kicker(text: String, modifier: Modifier = Modifier, color: Color = Palette.accentText) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Canvas(Modifier.size(10.dp, 9.dp)) {
+            val p = Path().apply { moveTo(size.width / 2, 0f); lineTo(size.width, size.height); lineTo(0f, size.height); close() }
+            drawPath(p, color)
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(text.uppercase(), color = color, fontFamily = Body, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 2.sp)
     }
 }
 
+/** Screen title: optional kicker, big Unbounded word, optional line under it. */
 @Composable
-fun SectionLabel(text: String) {
-    Text(
-        text.uppercase(), color = Palette.dim, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-        letterSpacing = 1.sp, modifier = Modifier.padding(start = 22.dp, top = 22.dp, bottom = 8.dp),
-    )
+fun ScreenHeader(
+    title: String,
+    kicker: String? = null,
+    sub: String? = null,
+    action: @Composable RowScope.() -> Unit = {},
+) {
+    Column(Modifier.fillMaxWidth().padding(start = Gutter, end = 12.dp, top = 22.dp, bottom = 6.dp)) {
+        if (kicker != null) Kicker(kicker, Modifier.padding(bottom = 12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = display(40), color = Palette.text, modifier = Modifier.weight(1f))
+            action()
+        }
+        if (sub != null) Text(sub, color = Palette.dim, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp, end = 10.dp))
+    }
 }
 
+/** A numbered section: thick line on top, "01" in the accent, a title. */
 @Composable
-fun Panel(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+fun Section(number: Int, title: String, first: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = Gutter).padding(top = 24.dp)) {
+        Box(Modifier.fillMaxWidth().height(3.dp).background(if (first) Palette.accent else Palette.text))
+        Text("%02d".format(number), style = display(15), color = Palette.accentText, modifier = Modifier.padding(top = 14.dp))
+        Text(title, color = Palette.text, fontFamily = Body, fontWeight = FontWeight.Bold, fontSize = 19.sp, modifier = Modifier.padding(top = 2.dp, bottom = 12.dp))
+        content()
+    }
+}
+
+/** Rounded block: the building piece of every card. */
+@Composable
+fun Block(
+    modifier: Modifier = Modifier,
+    color: Color = Palette.panel,
+    onClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Column(
-        modifier
-            .padding(horizontal = 16.dp, vertical = 5.dp)
-            .fillMaxWidth()
-            .clip(cardShape)
-            .background(Palette.card)
-            .border(1.dp, Palette.line, cardShape)
+        modifier.fillMaxWidth().clip(blockShape).background(color)
             .let { if (onClick != null) it.clickable(onClick = onClick) else it }
-            .padding(14.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         content = content,
     )
 }
 
-/** A label + value row inside a panel. */
+/** Card with a title, a line under it and something on the right. Picked = filled with the accent. */
 @Composable
-fun InfoRow(label: String, value: String, valueColor: Color = Palette.dim, onClick: (() -> Unit)? = null) {
-    Panel(onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, color = Palette.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
-            Text(value, color = valueColor, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (onClick != null) {
-                Spacer(Modifier.width(6.dp))
-                Icon(Icons.chevron, null, tint = Palette.dim, modifier = Modifier.size(16.dp))
-            }
-        }
-    }
-}
-
-@Composable
-fun SwitchRow(title: String, sub: String?, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    Panel(onClick = if (enabled) ({ onChange(!checked) }) else null) {
+fun OptionCard(
+    title: String,
+    sub: String? = null,
+    selected: Boolean = false,
+    onClick: (() -> Unit)? = null,
+    subColor: Color? = null,
+    trailing: @Composable RowScope.() -> Unit = {},
+) {
+    val bg = if (selected) Palette.accent else Palette.panel
+    val fg = if (selected) Palette.onAccent else Palette.text
+    Block(Modifier.padding(bottom = 8.dp), color = bg, onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(title, color = if (enabled) Palette.text else Palette.dim, fontSize = 15.sp)
-                if (!sub.isNullOrEmpty()) Text(sub, color = Palette.dim, fontSize = 12.sp, lineHeight = 16.sp)
+                Text(title, color = fg, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                if (!sub.isNullOrEmpty()) {
+                    Text(
+                        sub, color = subColor ?: if (selected) fg.copy(alpha = 0.8f) else Palette.dim,
+                        fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
             }
-            Spacer(Modifier.width(10.dp))
-            Switch(
-                checked = checked, onCheckedChange = onChange, enabled = enabled,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Palette.onAccent, checkedTrackColor = Palette.accent,
-                    uncheckedThumbColor = Palette.dim, uncheckedTrackColor = Palette.cardHi, uncheckedBorderColor = Palette.line,
-                ),
-            )
+            trailing()
         }
     }
 }
 
+/** On/off switch in the house style: accent track with a dark knob when on. */
+@Composable
+fun Toggle(checked: Boolean, onDark: Boolean = false, onChange: (Boolean) -> Unit) {
+    val track by animateColorAsState(
+        when {
+            checked && onDark -> Palette.onAccent
+            checked -> Palette.accent
+            else -> Palette.card2
+        }, label = "track",
+    )
+    val knob = when {
+        checked && onDark -> Palette.accent
+        checked -> Palette.onAccent
+        else -> Palette.faint
+    }
+    val x by animateDpAsState(if (checked) 21.dp else 3.dp, label = "knob")
+    Box(
+        Modifier.padding(start = 10.dp).size(46.dp, 28.dp).clip(CircleShape).background(track)
+            .clickable { onChange(!checked) },
+    ) {
+        Box(Modifier.offset(x = x, y = 3.dp).size(22.dp).clip(CircleShape).background(knob))
+    }
+}
+
+/** Title + line + toggle, the whole card clickable. */
+@Composable
+fun ToggleCard(title: String, sub: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
+    OptionCard(title, sub, onClick = { onChange(!checked) }) { Toggle(checked, onChange = onChange) }
+}
+
+/** Filter pill. Picked = solid (white on dark themes). */
 @Composable
 fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(20.dp)
     Box(
-        Modifier
-            .clip(shape)
-            .background(if (selected) Palette.accentSoft else Color.Transparent)
-            .border(1.dp, if (selected) Palette.accent.copy(alpha = 0.4f) else Palette.line, shape)
+        Modifier.height(36.dp).clip(CircleShape)
+            .background(if (selected) Palette.pill else Color.Transparent)
+            .border(1.5.dp, if (selected) Palette.pill else Palette.line, CircleShape)
             .clickable(onClick = onClick)
-            .padding(horizontal = 13.dp, vertical = 7.dp),
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = if (selected) Palette.accent else Palette.dim, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        Text(text, color = if (selected) Palette.onPill else Palette.text, fontWeight = FontWeight.Bold, fontSize = 13.sp)
     }
 }
 
 @Composable
 fun ChipRow(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
-    Row(modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), content = content)
+    Row(modifier.padding(horizontal = Gutter, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), content = content)
 }
 
+/** Pill button: filled with the accent, or outlined. */
+@Composable
+fun PillButton(text: String, filled: Boolean = true, enabled: Boolean = true, onClick: () -> Unit) {
+    val shape = CircleShape
+    Box(
+        Modifier.height(44.dp).clip(shape)
+            .background(if (filled && enabled) Palette.accent else Color.Transparent)
+            .border(2.dp, if (filled && enabled) Palette.accent else if (enabled) Palette.text else Palette.line, shape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 20.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+            color = when { !enabled -> Palette.faint; filled -> Palette.onAccent; else -> Palette.text },
+        )
+    }
+}
+
+/** Text field as a rounded block, with an optional icon in front. */
 @Composable
 fun Field(
     value: String,
@@ -137,38 +215,111 @@ fun Field(
     modifier: Modifier = Modifier,
     leading: ImageVector? = null,
     keyboard: KeyboardType = KeyboardType.Text,
-    singleLine: Boolean = true,
     onDone: (() -> Unit)? = null,
 ) {
-    OutlinedTextField(
+    BasicTextField(
         value = value,
         onValueChange = onChange,
-        placeholder = { Text(placeholder, color = Palette.dim, fontSize = 14.sp) },
-        leadingIcon = leading?.let { { Icon(it, null, tint = Palette.dim, modifier = Modifier.size(18.dp)) } },
-        singleLine = singleLine,
-        shape = RoundedCornerShape(12.dp),
+        singleLine = true,
+        textStyle = TextStyle(color = Palette.text, fontFamily = Body, fontSize = 15.sp),
+        cursorBrush = SolidColor(Palette.accent),
         keyboardOptions = KeyboardOptions(keyboardType = keyboard, imeAction = if (onDone != null) ImeAction.Done else ImeAction.Default, autoCorrectEnabled = false),
         keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Palette.accent.copy(alpha = 0.6f), unfocusedBorderColor = Palette.line,
-            focusedContainerColor = Palette.card, unfocusedContainerColor = Palette.card,
-            cursorColor = Palette.accent, focusedTextColor = Palette.text, unfocusedTextColor = Palette.text,
-        ),
-        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 15.sp),
         modifier = modifier,
+        decorationBox = { inner ->
+            Row(
+                Modifier.height(48.dp).clip(RoundedCornerShape(14.dp)).background(Palette.panel).padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (leading != null) {
+                    Icon(leading, null, tint = Palette.faint, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                }
+                Box(Modifier.weight(1f)) {
+                    if (value.isEmpty()) Text(placeholder, color = Palette.faint, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    inner()
+                }
+            }
+        },
     )
 }
 
+/** The SonderShield mark. [lit]: top piece in the accent; otherwise grey. */
 @Composable
-fun AccentButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
-    TextButton(onClick = onClick, enabled = enabled, contentPadding = PaddingValues(horizontal = 12.dp)) {
-        Text(text, color = if (enabled) Palette.accent else Palette.dim, fontWeight = FontWeight.SemiBold)
+fun Logo(size: Dp, lit: Boolean, modifier: Modifier = Modifier, top: Color? = null, bottom: Color? = null) {
+    val topColor by animateColorAsState(top ?: if (lit) Palette.accent else Palette.off, label = "logoTop")
+    Box(modifier.size(size, size * 1.1f)) {
+        Image(LogoParts.top, null, Modifier.matchParentSize(), colorFilter = ColorFilter.tint(topColor))
+        Image(LogoParts.bottom, null, Modifier.matchParentSize(), colorFilter = ColorFilter.tint(bottom ?: Palette.text))
     }
 }
 
+/** Wordmark: "Sonder" in the text colour, "Shield" in the accent. */
 @Composable
-fun Dot(color: Color) {
-    Box(Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(color))
+fun Wordmark(size: Int = 19) {
+    Row {
+        Text("Sonder", style = display(size), color = Palette.text)
+        Text("Shield", style = display(size), color = Palette.accentText)
+    }
+}
+
+/**
+ * The swoosh between the page and the section below: a thin accent blade over the curved
+ * top edge of [below]. Full width.
+ */
+@Composable
+fun Swoosh(blade: Color, below: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier.fillMaxWidth().height(42.dp)) {
+        val w = size.width
+        val h = size.height
+        val sx = w / 360f
+        val sy = h / 46f
+        fun o(x: Float, y: Float) = Offset(x * sx, y * sy)
+        val bladePath = Path().apply {
+            moveTo(o(0f, 46f).x, o(0f, 46f).y)
+            quadraticTo(o(130f, 4f).x, o(130f, 4f).y, o(360f, 12f).x, o(360f, 12f).y)
+            lineTo(o(360f, 20f).x, o(360f, 20f).y)
+            quadraticTo(o(155f, 16f).x, o(155f, 16f).y, o(0f, 46f).x, o(0f, 46f).y)
+            close()
+        }
+        val fill = Path().apply {
+            moveTo(o(0f, 46f).x, o(0f, 46f).y)
+            quadraticTo(o(150f, 20f).x, o(150f, 20f).y, o(360f, 28f).x, o(360f, 28f).y)
+            lineTo(w, h + 1f)
+            lineTo(0f, h + 1f)
+            close()
+        }
+        drawPath(bladePath, blade)
+        drawPath(fill, below)
+    }
+}
+
+/** One step of the offset "ladder": big number, two-line label. The last one is filled. */
+@Composable
+fun LadderStep(value: String, label: String, index: Int, onPanel: Boolean) {
+    val last = index == 2
+    val bg = when { last -> Palette.accent; onPanel -> Palette.card2; else -> Palette.panel }
+    Row(
+        Modifier.padding(start = (18 * index).dp).fillMaxWidth().clip(blockShape).background(bg)
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            value, style = display(26), color = if (last) Palette.onAccent else Palette.accentText,
+            maxLines = 1, modifier = Modifier.widthIn(min = 92.dp),
+        )
+        Spacer(Modifier.width(14.dp))
+        Text(label, color = if (last) Palette.onAccent else Palette.dim, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = if (last) FontWeight.Medium else FontWeight.Normal)
+    }
+}
+
+/** Small round button with an icon. */
+@Composable
+fun IconPill(icon: ImageVector, description: String, onClick: () -> Unit) {
+    Box(
+        Modifier.size(44.dp).clip(CircleShape).border(1.5.dp, Palette.line, CircleShape).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, description, tint = Palette.text, modifier = Modifier.size(19.dp)) }
 }
 
 fun Long.grouped(): String = "%,d".format(this)

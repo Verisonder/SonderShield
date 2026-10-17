@@ -3,6 +3,8 @@ package com.verisonder.sondershield.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,25 +12,29 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,7 +52,7 @@ fun LogScreen() {
     val log by ShieldState.log.collectAsState()
     val phase by ShieldState.phase.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
-    var filter by rememberSaveable { mutableStateOf(0) } // 0 all, 1 blocked, 2 allowed
+    var filter by rememberSaveable { mutableIntStateOf(0) } // 0 all, 1 blocked, 2 allowed
     var picked by remember { mutableStateOf<LogEntry?>(null) }
 
     val shown = remember(log, query, filter) {
@@ -55,13 +61,17 @@ fun LogScreen() {
             .filter { query.isBlank() || it.domain.contains(query.trim(), ignoreCase = true) }
             .take(1000).toList()
     }
+    val blockedCount = remember(log) { log.count { it.verdict == 1 } }
 
     Column(Modifier.fillMaxSize()) {
-        ScreenTitle("Log") {
-            IconButton(onClick = { ShieldState.clearLog() }) { Icon(Icons.trash, "Clear log", tint = Palette.dim) }
+        ScreenHeader(
+            "Log", kicker = if (phase == Phase.OFF) "Paused" else "Live",
+            sub = "${log.size.grouped()} latest queries · ${blockedCount.grouped()} blocked",
+        ) {
+            if (log.isNotEmpty()) IconPill(Icons.trash, "Clear log") { ShieldState.clearLog() }
         }
-        Field(query, { query = it }, "Search domains", Modifier.fillMaxWidth().padding(horizontal = 16.dp), leading = Icons.search)
-        ChipRow(Modifier.padding(top = 6.dp)) {
+        Field(query, { query = it }, "Search domains", Modifier.fillMaxWidth().padding(horizontal = Gutter).padding(top = 10.dp), leading = Icons.search)
+        ChipRow(Modifier.padding(top = 6.dp, bottom = 4.dp)) {
             Chip("All", filter == 0) { filter = 0 }
             Chip("Blocked", filter == 1) { filter = 1 }
             Chip("Allowed", filter == 2) { filter = 2 }
@@ -70,15 +80,12 @@ fun LogScreen() {
             Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
                     if (phase == Phase.OFF) "Turn protection on to see DNS queries here." else "Nothing yet. Open an app or a website.",
-                    color = Palette.dim, fontSize = 14.sp,
+                    color = Palette.faint, fontSize = 14.sp, textAlign = TextAlign.Center,
                 )
             }
         } else {
             LazyColumn(Modifier.fillMaxSize()) {
-                items(shown) { e ->
-                    LogRow(e) { picked = e }
-                    HorizontalDivider(color = Palette.line.copy(alpha = 0.5f), thickness = 0.5.dp)
-                }
+                items(shown) { e -> LogRow(e) { picked = e } }
             }
         }
     }
@@ -87,23 +94,24 @@ fun LogScreen() {
         val prefs = Prefs(ctx)
         AlertDialog(
             onDismissRequest = { picked = null },
-            containerColor = Palette.card,
-            title = { Text(e.domain, fontSize = 17.sp, color = Palette.text) },
+            containerColor = Palette.panel,
+            shape = RoundedCornerShape(24.dp),
+            title = { Text(e.domain, style = display(18, FontWeight.Bold), color = Palette.text) },
             text = {
                 Column {
                     Text(
                         when (e.verdict) { 1 -> "Blocked by ${e.reason}"; 2 -> "Failed: ${e.reason}"; else -> if (e.reason.isNotEmpty()) "Allowed (${e.reason})" else "Allowed" },
-                        color = if (e.verdict == 1) Palette.blocked else Palette.dim, fontSize = 14.sp,
+                        color = if (e.verdict == 1) Palette.accentText else Palette.dim, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                     )
-                    Text("${e.typeName} · ${time(e.time)}${if (e.ms > 0) " · ${e.ms} ms" else ""}", color = Palette.dim, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+                    Text("${e.typeName} · ${time(e.time)}${if (e.ms > 0) " · ${e.ms} ms" else ""}", color = Palette.faint, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
                     if (e.verdict == 1 && e.reason == "block list") {
-                        Text("Allowing it adds an allow rule, which wins over every list.", color = Palette.dim, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+                        Text("Allowing it adds an allow rule, which wins over every list.", color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
                     }
                 }
             },
             confirmButton = {
                 if (e.verdict == 1) {
-                    AccentButton("Allow") {
+                    PillButton("Allow") {
                         prefs.allowRules = addLine(prefs.allowRules, e.domain)
                         prefs.blockRules = removeLine(prefs.blockRules, e.domain)
                         ShieldState.applyRules()
@@ -111,7 +119,7 @@ fun LogScreen() {
                         Toast.makeText(ctx, "Allowed ${e.domain}", Toast.LENGTH_SHORT).show()
                     }
                 } else {
-                    AccentButton("Block") {
+                    PillButton("Block") {
                         prefs.blockRules = addLine(prefs.blockRules, e.domain)
                         prefs.allowRules = removeLine(prefs.allowRules, e.domain)
                         ShieldState.applyRules()
@@ -121,7 +129,7 @@ fun LogScreen() {
                 }
             },
             dismissButton = {
-                AccentButton("Copy") {
+                PillButton("Copy", filled = false) {
                     ctx.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("domain", e.domain))
                     picked = null
                 }
@@ -132,26 +140,39 @@ fun LogScreen() {
 
 @Composable
 private fun LogRow(e: LogEntry, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Dot(when (e.verdict) { 1 -> Palette.blocked; 2 -> Palette.warn; else -> Palette.accent })
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(e.domain, color = Palette.text, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${e.typeName} · ${time(e.time)}", color = Palette.dim, fontSize = 11.sp)
-        }
-        Spacer(Modifier.width(8.dp))
-        Text(
+    val blocked = e.verdict == 1
+    Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            // The bar on the left: accent for blocked, amber for failed, grey otherwise.
+            Box(
+                Modifier.width(6.dp).height(38.dp).clip(RoundedCornerShape(3.dp))
+                    .background(when (e.verdict) { 1 -> Palette.accent; 2 -> Palette.warn; else -> Palette.card2 }),
+            )
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(e.domain, color = Palette.text, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    buildString {
+                        append(e.typeName); append(" · "); append(time(e.time))
+                        if (blocked) { append(" · "); append(e.reason) }
+                    },
+                    color = Palette.faint, fontSize = 12.sp, maxLines = 1,
+                )
+            }
+            Spacer(Modifier.width(10.dp))
             when {
-                e.verdict == 1 -> e.reason.removePrefix("your ")
-                e.verdict == 2 -> "failed"
-                e.reason == "cached" -> "cached"
-                else -> "${e.ms} ms"
-            },
-            color = if (e.verdict == 1) Palette.blocked.copy(alpha = 0.8f) else Palette.dim, fontSize = 12.sp,
-        )
+                blocked -> Text(
+                    "BLOCKED", color = Palette.onAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+                    modifier = Modifier.clip(CircleShape).background(Palette.accent).padding(horizontal = 9.dp, vertical = 5.dp),
+                )
+                else -> Text(
+                    when { e.verdict == 2 -> "failed"; e.reason == "cached" -> "cached"; else -> "${e.ms} ms" },
+                    color = if (e.verdict == 2) Palette.warn else Palette.faint, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clip(CircleShape).border(1.5.dp, Palette.line, CircleShape).padding(horizontal = 9.dp, vertical = 4.dp),
+                )
+            }
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.line.copy(alpha = 0.7f)))
     }
 }
 

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -31,7 +32,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
@@ -87,7 +88,7 @@ class MainActivity : ComponentActivity() {
             // Status and navigation bars follow the theme: light icons on dark themes and back.
             LaunchedEffect(colors) {
                 val bg = colors.bg.toArgb()
-                val nav = colors.card.toArgb()
+                val nav = colors.bg.toArgb()
                 enableEdgeToEdge(
                     statusBarStyle = if (colors.dark) SystemBarStyle.dark(bg) else SystemBarStyle.light(bg, bg),
                     navigationBarStyle = if (colors.dark) SystemBarStyle.dark(nav) else SystemBarStyle.light(nav, nav),
@@ -103,7 +104,7 @@ class MainActivity : ComponentActivity() {
                 ) { pad ->
                     Box(Modifier.fillMaxSize().background(Palette.bg).padding(pad)) {
                         when (tab) {
-                            Tab.Home -> HomeScreen(onToggle = ::toggle, goTo = { tab = it })
+                            Tab.Home -> HomeScreen(onToggle = ::toggle)
                             Tab.Log -> LogScreen()
                             Tab.Rules -> RulesScreen()
                             Tab.Apps -> AppsScreen()
@@ -136,36 +137,37 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * Bottom bar: icon over label. Each item takes a full fifth of the width and the whole 64 dp
- * height as its touch area; the visible pill stays small.
+ * Bottom bar: the current tab is a filled pill with its icon and name; the others show
+ * their icon only. Each slot is a full fifth of the width and the bar's full height.
  */
 @Composable
 private fun BottomBar(current: Tab, onPick: (Tab) -> Unit) {
-    Column(Modifier.fillMaxWidth().background(Palette.card)) {
-        HorizontalDivider(color = Palette.line, thickness = 0.5.dp)
-        Row(Modifier.fillMaxWidth().navigationBarsPadding().height(64.dp)) {
+    Column(Modifier.fillMaxWidth().background(Palette.bg)) {
+        HorizontalDivider(color = Palette.line, thickness = 1.dp)
+        Row(
+            Modifier.fillMaxWidth().navigationBarsPadding().height(68.dp).padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             for (t in Tab.entries) {
                 val on = t == current
-                val tint = if (on) Palette.accent else Palette.dim
-                Column(
-                    Modifier.weight(1f).fillMaxHeight()
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(bounded = false, radius = 32.dp),
-                        ) { onPick(t) }
-                        .semantics { role = Role.Tab; selected = on },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
+                Box(
+                    Modifier.weight(if (on) 1.7f else 1f).fillMaxHeight()
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onPick(t) }
+                        .semantics { role = Role.Tab; selected = on; contentDescription = t.label },
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Box(
-                        Modifier.clip(RoundedCornerShape(16.dp))
-                            .background(if (on) Palette.accentSoft else Color.Transparent)
-                            .padding(horizontal = 14.dp, vertical = 3.dp),
+                    Row(
+                        Modifier.height(44.dp).clip(RoundedCornerShape(22.dp))
+                            .background(if (on) Palette.accent else Color.Transparent)
+                            .padding(horizontal = if (on) 14.dp else 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(t.icon(), null, tint = tint, modifier = Modifier.size(22.dp))
+                        Icon(t.icon(), null, tint = if (on) Palette.onAccent else Palette.faint, modifier = Modifier.size(21.dp))
+                        if (on) {
+                            Spacer(Modifier.width(7.dp))
+                            Text(t.label, color = Palette.onAccent, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                        }
                     }
-                    Spacer(Modifier.height(3.dp))
-                    Text(t.label, color = tint, fontSize = 11.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                 }
             }
         }

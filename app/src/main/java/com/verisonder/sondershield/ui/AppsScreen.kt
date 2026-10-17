@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,18 +12,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -32,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -72,7 +74,7 @@ fun AppsScreen() {
     var apps by remember { mutableStateOf(appCache) }
     var bypass by remember { mutableStateOf(prefs.bypassApps) }
     var query by rememberSaveable { mutableStateOf("") }
-    var pending by remember { mutableStateOf(0) }
+    var pending by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         if (apps == null) apps = withContext(Dispatchers.IO) { loadApps(ctx) }
@@ -86,12 +88,11 @@ fun AppsScreen() {
     }
 
     Column(Modifier.fillMaxSize()) {
-        ScreenTitle("Apps")
-        Text(
-            "Apps switched on here skip SonderShield: their ads aren't blocked. Use it for an app that breaks.",
-            color = Palette.dim, fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp),
+        ScreenHeader(
+            "Apps", kicker = "Bypass",
+            sub = "Apps switched on here skip SonderShield, so their ads aren't blocked. Use it for an app that breaks.",
         )
-        Field(query, { query = it }, "Search apps", Modifier.fillMaxWidth().padding(horizontal = 16.dp), leading = Icons.search)
+        Field(query, { query = it }, "Search apps", Modifier.fillMaxWidth().padding(horizontal = Gutter).padding(top = 10.dp), leading = Icons.search)
         val list = apps
         if (list == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Palette.accent) }
@@ -100,6 +101,12 @@ fun AppsScreen() {
         // Bypassing apps first, then the rest alphabetically.
         val shown = list.filter { query.isBlank() || it.label.contains(query, true) || it.pkg.contains(query, true) }
             .sortedBy { if (it.pkg in bypass) 0 else 1 }
+        if (bypass.isNotEmpty() && query.isBlank()) {
+            Text(
+                "${bypass.size} bypassing", color = Palette.accentText, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp,
+                modifier = Modifier.padding(horizontal = Gutter).padding(top = 14.dp),
+            )
+        }
         LazyColumn(Modifier.fillMaxSize().padding(top = 6.dp)) {
             items(shown, key = { it.pkg }) { a ->
                 val on = a.pkg in bypass
@@ -108,23 +115,17 @@ fun AppsScreen() {
                     prefs.bypassApps = bypass
                     pending++
                 }
-                Row(
-                    Modifier.fillMaxWidth().clickable { flip() }.padding(horizontal = 18.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (a.icon != null) Image(a.icon, null, Modifier.size(36.dp)) else Spacer(Modifier.size(36.dp))
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(a.label, color = Palette.text, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(a.pkg, color = Palette.dim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Column(Modifier.fillMaxWidth().clickable { flip() }) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (a.icon != null) Image(a.icon, null, Modifier.size(38.dp)) else Spacer(Modifier.size(38.dp))
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(a.label, color = Palette.text, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(a.pkg, color = Palette.faint, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        Toggle(on) { flip() }
                     }
-                    Switch(
-                        checked = on, onCheckedChange = { flip() },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Palette.card, checkedTrackColor = Palette.warn,
-                            uncheckedThumbColor = Palette.dim, uncheckedTrackColor = Palette.cardHi, uncheckedBorderColor = Palette.line,
-                        ),
-                    )
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.line.copy(alpha = 0.7f)))
                 }
             }
         }

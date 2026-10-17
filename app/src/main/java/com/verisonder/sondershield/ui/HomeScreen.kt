@@ -14,18 +14,20 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,8 +42,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verisonder.sondershield.core.Phase
@@ -51,7 +56,7 @@ import com.verisonder.sondershield.data.Prefs
 import kotlinx.coroutines.delay
 
 @Composable
-fun HomeScreen(onToggle: () -> Unit, goTo: (Tab) -> Unit) {
+fun HomeScreen(onToggle: () -> Unit) {
     val ctx = LocalContext.current
     val prefs = remember { Prefs(ctx) }
     val phase by ShieldState.phase.collectAsState()
@@ -59,6 +64,7 @@ fun HomeScreen(onToggle: () -> Unit, goTo: (Tab) -> Unit) {
     val today by ShieldState.today.collectAsState()
     val domains by ShieldState.domains.collectAsState()
     var strictDns by remember { mutableStateOf<String?>(null) }
+    val on = phase != Phase.OFF
 
     LaunchedEffect(phase) {
         while (true) {
@@ -67,98 +73,104 @@ fun HomeScreen(onToggle: () -> Unit, goTo: (Tab) -> Unit) {
         }
     }
 
-    Column(Modifier.verticalScroll(rememberScrollState())) {
-        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Sonder", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Palette.text)
-            Text("Shield", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Palette.accent, modifier = Modifier.weight(1f))
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        // Top bar: mark + wordmark, DNS server.
+        Row(Modifier.fillMaxWidth().padding(start = Gutter, end = Gutter, top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Logo(26.dp, lit = on)
+            Spacer(Modifier.width(10.dp))
+            Box(Modifier.weight(1f)) { Wordmark() }
             val up = Upstreams.byId(prefs.upstreamId)?.name?.substringBefore(" (") ?: "Custom"
             Text(
-                up, fontSize = 12.sp, color = Palette.dim,
-                modifier = Modifier.clip(CircleShape).border(1.dp, Palette.line, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
+                up, color = Palette.text, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.clip(CircleShape).border(1.5.dp, Palette.line, CircleShape).padding(horizontal = 12.dp, vertical = 6.dp),
             )
         }
 
-        ShieldButton(phase, onToggle)
-
-        Text(
-            when (phase) { Phase.ON -> "Protected"; Phase.STARTING -> "Starting…"; Phase.OFF -> "Not protected" },
-            fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Palette.text, textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text(
-            if (phase == Phase.OFF) "Tap the shield to turn on" else "Tap the shield to turn off",
-            fontSize = 13.sp, color = Palette.dim, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-        )
-
-        problem?.let { p ->
-            Panel(Modifier.padding(top = 14.dp), onClick = { ShieldState.problem.value = null }) {
-                Text(p, color = Palette.warn, fontSize = 14.sp)
-                Text("Tap to dismiss", color = Palette.dim, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
-            }
+        // Hero.
+        Column(Modifier.padding(horizontal = Gutter).padding(top = 26.dp)) {
+            Kicker("DNS filter · every app", color = if (on) Palette.accentText else Palette.faint)
+            Text(
+                when (phase) { Phase.ON -> "Ads stop here."; Phase.STARTING -> "Starting up…"; Phase.OFF -> "Ads get through." },
+                style = display(34), color = Palette.text, modifier = Modifier.padding(top = 12.dp, bottom = 10.dp),
+            )
+            Text(
+                if (on) "Every app asks SonderShield first. ${if (domains > 0) domains.grouped() else "Thousands of"} ad and tracker domains get nothing back."
+                else "Tap the shield to block ads and trackers in every app on this phone.",
+                color = Palette.dim, fontSize = 15.sp, lineHeight = 22.sp,
+            )
         }
 
-        if (strictDns != null && phase != Phase.OFF) {
-            Panel(Modifier.padding(top = 10.dp), onClick = {
-                ctx.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            }) {
-                Text("Private DNS is set to $strictDns", color = Palette.warn, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Text(
-                    "Android sends DNS straight to it, past SonderShield, so nothing gets blocked. Set Private DNS to Automatic or Off. Tap to open settings.",
-                    color = Palette.dim, fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(top = 4.dp),
+        BigToggle(phase, onToggle)
+
+        // Under the swoosh: today's numbers and anything that needs attention.
+        val swooshColor by animateColorAsState(if (on) Palette.accent else Palette.off, label = "swoosh")
+        Swoosh(blade = swooshColor, below = Palette.panel, modifier = Modifier.padding(top = 18.dp))
+        Column(Modifier.fillMaxWidth().background(Palette.panel).padding(horizontal = Gutter).padding(top = 4.dp, bottom = 20.dp)) {
+            Kicker("Today")
+            Spacer(Modifier.height(12.dp))
+            val (total, blocked) = today
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LadderStep(total.grouped(), "DNS queries\ntoday", 0, onPanel = true)
+                LadderStep(blocked.grouped(), "ads and trackers\nblocked today", 1, onPanel = true)
+                LadderStep(
+                    if (total > 0) "%.1f%%".format(blocked * 100.0 / total) else "0%",
+                    "of everything your\napps asked for", 2, onPanel = true,
                 )
             }
-        }
 
-        val (total, blocked) = today
-        Row(Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 14.dp)) {
-            Stat(blocked.grouped(), "blocked today", Modifier.weight(1f))
-            Stat(total.grouped(), "queries today", Modifier.weight(1f))
-            Stat(if (total > 0) "%.1f%%".format(blocked * 100.0 / total) else "–", "blocked", Modifier.weight(1f))
+            problem?.let { p ->
+                Notice(p, "Tap to dismiss") { ShieldState.problem.value = null }
+            }
+            if (strictDns != null && on) {
+                Notice(
+                    "Private DNS is set to $strictDns. Android sends DNS straight there, past SonderShield, so nothing gets blocked. Set it to Automatic or Off.",
+                    "Open settings",
+                ) { ctx.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            }
         }
-
-        val enabled = prefs.enabledLists.size
-        InfoRow("Block lists", "$enabled on · ${if (domains > 0) domains.grouped() + " domains" else "not loaded"}", onClick = { goTo(Tab.Settings) })
-        InfoRow("Apps bypassing", prefs.bypassApps.size.toString(), onClick = { goTo(Tab.Apps) })
-        InfoRow("Your rules", "${lines(prefs.blockRules)} block · ${lines(prefs.allowRules)} allow", onClick = { goTo(Tab.Rules) })
-        InfoRow("Blocked in total", prefs.allTimeBlocked.grouped())
-        Spacer(Modifier.height(16.dp))
     }
 }
 
-private fun lines(s: String) = s.lines().count { it.isNotBlank() && !it.trimStart().startsWith("#") }
-
+/** Warning card on the panel: amber text, a call to action under it. */
 @Composable
-private fun Stat(value: String, label: String, modifier: Modifier) {
-    Column(
-        modifier.padding(horizontal = 5.dp).clip(cardShape).background(Palette.card).border(1.dp, Palette.line, cardShape)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-    ) {
-        Text(value, style = numberStyle, maxLines = 1)
-        Text(label, color = Palette.dim, fontSize = 11.sp, maxLines = 1)
+private fun Notice(text: String, action: String, onClick: () -> Unit) {
+    Spacer(Modifier.height(12.dp))
+    Block(color = Palette.card2, onClick = onClick) {
+        Text(text, color = Palette.warn, fontSize = 14.sp, lineHeight = 19.sp)
+        Text(action.uppercase(), color = Palette.text, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, modifier = Modifier.padding(top = 8.dp))
     }
 }
 
+/** The big on/off button: the logo itself, lit when on, with "PROTECTION ON / OFF" under it. */
 @Composable
-private fun ShieldButton(phase: Phase, onClick: () -> Unit) {
+private fun BigToggle(phase: Phase, onClick: () -> Unit) {
     val on = phase != Phase.OFF
-    val ring by animateColorAsState(if (on) Palette.accent else Palette.off, label = "ring")
     val pulse = rememberInfiniteTransition(label = "pulse")
-    val s by pulse.animateFloat(
-        1f, if (phase == Phase.ON) 1.06f else 1f,
-        infiniteRepeatable(tween(if (phase == Phase.STARTING) 600 else 1600), RepeatMode.Reverse), label = "s",
+    val glow by pulse.animateFloat(
+        0.85f, if (phase == Phase.ON) 1.08f else 0.85f,
+        infiniteRepeatable(tween(if (phase == Phase.STARTING) 600 else 1800), RepeatMode.Reverse), label = "glow",
     )
-    Box(Modifier.fillMaxWidth().padding(top = 26.dp, bottom = 14.dp), contentAlignment = Alignment.Center) {
-        Box(
-            Modifier.size(200.dp).scale(s).clip(CircleShape)
-                .background(Brush.radialGradient(listOf(ring.copy(alpha = 0.22f), ring.copy(alpha = 0.06f), ring.copy(alpha = 0f)))),
-        )
-        Box(
-            Modifier.size(140.dp).clip(CircleShape).background(Palette.card).border(2.dp, ring, CircleShape)
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.logo, "Toggle protection", tint = ring, modifier = Modifier.size(70.dp))
+    val accent = Palette.accent
+    Column(
+        Modifier.fillMaxWidth().padding(top = 18.dp)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+            .semantics { role = Role.Switch; contentDescription = if (on) "Protection on. Tap to turn off." else "Protection off. Tap to turn on." },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.size(210.dp), contentAlignment = Alignment.Center) {
+            if (on) {
+                Box(
+                    Modifier.size(210.dp).scale(glow).clip(CircleShape)
+                        .background(Brush.radialGradient(listOf(accent.copy(alpha = 0.34f), accent.copy(alpha = 0.10f), accent.copy(alpha = 0f)))),
+                )
+            }
+            Logo(140.dp, lit = on)
         }
+        Text(
+            if (phase == Phase.STARTING) "STARTING" else if (on) "PROTECTION ON" else "PROTECTION OFF",
+            color = if (on) Palette.accentText else Palette.faint, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 

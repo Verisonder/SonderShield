@@ -13,21 +13,47 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.verisonder.sondershield.R
 
-/** One theme's colours. Every screen reads them through [Palette]. */
+/**
+ * One theme's colours. The look: near-black, one loud accent, white "pills" for picked
+ * filters, panels a step lighter than the page. Every screen reads them through [Palette].
+ */
 data class ShieldColors(
-    val bg: Color, val card: Color, val cardHi: Color, val line: Color,
-    val text: Color, val dim: Color, val accent: Color, val accentSoft: Color, val onAccent: Color,
-    val blocked: Color, val warn: Color, val off: Color, val dark: Boolean,
+    val bg: Color,
+    /** The section under the swoosh, and cards on the page. */
+    val panel: Color,
+    /** Cards sitting on a panel. */
+    val card2: Color,
+    val line: Color,
+    val text: Color,
+    val dim: Color,
+    val faint: Color,
+    /** Fills: buttons, the last ladder step, the picked tab, toggles. */
+    val accent: Color,
+    /** The accent used as text on [bg]. Same as accent except on light themes. */
+    val accentText: Color,
+    val onAccent: Color,
+    /** Picked filter chip. */
+    val pill: Color,
+    val onPill: Color,
+    val warn: Color,
+    /** Logo top piece and swoosh when protection is off. */
+    val off: Color,
+    val dark: Boolean,
 )
 
 enum class ThemeMode(val id: String, val label: String) {
@@ -40,85 +66,119 @@ enum class ThemeMode(val id: String, val label: String) {
     }
 }
 
-/** The original look: deep slate, one teal accent, red only for "blocked". */
-val SlateColors = ShieldColors(
-    bg = Color(0xFF0E1116), card = Color(0xFF161B22), cardHi = Color(0xFF1C232C), line = Color(0xFF232A33),
-    text = Color(0xFFE6EDF3), dim = Color(0xFF8B97A5), accent = Color(0xFF2EE6C5), accentSoft = Color(0x222EE6C5),
-    onAccent = Color(0xFF00201A), blocked = Color(0xFFFF6B6B), warn = Color(0xFFFFC857), off = Color(0xFF4A5563), dark = true,
+/** The accent. One value: change it here to recolour the app. */
+val Electric = Color(0xFF3B82FF)
+
+val DefaultColors = ShieldColors(
+    bg = Color(0xFF0D0D0D), panel = Color(0xFF1C1C1C), card2 = Color(0xFF2A2A2A), line = Color(0xFF262626),
+    text = Color(0xFFFFFFFF), dim = Color(0xFFBDBDBD), faint = Color(0xFF8A8A8A),
+    accent = Electric, accentText = Electric, onAccent = Color(0xFF0D0D0D),
+    pill = Color(0xFFFFFFFF), onPill = Color(0xFF0D0D0D), warn = Color(0xFFFFB020), off = Color(0xFF3A3A3A), dark = true,
 )
 
-val OledColors = SlateColors.copy(
-    bg = Color(0xFF000000), card = Color(0xFF0B0D10), cardHi = Color(0xFF13171C), line = Color(0xFF1B2027),
+val OledColors = DefaultColors.copy(
+    bg = Color(0xFF000000), panel = Color(0xFF111111), card2 = Color(0xFF1E1E1E), line = Color(0xFF1A1A1A),
 )
 
 val LightColors = ShieldColors(
-    bg = Color(0xFFF4F6F8), card = Color(0xFFFFFFFF), cardHi = Color(0xFFEDF1F4), line = Color(0xFFDDE3E9),
-    text = Color(0xFF0E1116), dim = Color(0xFF5B6672), accent = Color(0xFF0B9E86), accentSoft = Color(0x1F0B9E86),
-    onAccent = Color(0xFFFFFFFF), blocked = Color(0xFFD63B3B), warn = Color(0xFFB7791F), off = Color(0xFF9AA5B1), dark = false,
+    bg = Color(0xFFF5F5F4), panel = Color(0xFFFFFFFF), card2 = Color(0xFFF0F0EE), line = Color(0xFFE2E2E0),
+    text = Color(0xFF0D0D0D), dim = Color(0xFF3A3A3A), faint = Color(0xFF6B6B6B),
+    accent = Electric, accentText = Color(0xFF1D5BD8), onAccent = Color(0xFF0D0D0D),
+    pill = Color(0xFF0D0D0D), onPill = Color(0xFFFFFFFF), warn = Color(0xFFB26A00), off = Color(0xFFC7C7C7), dark = false,
 )
 
 /** Material You: the wallpaper's colours, light or dark with the system. */
 private fun youColors(s: ColorScheme, dark: Boolean) = ShieldColors(
-    bg = s.surface, card = s.surfaceContainer, cardHi = s.surfaceContainerHigh, line = s.outlineVariant,
-    text = s.onSurface, dim = s.onSurfaceVariant, accent = s.primary, accentSoft = s.primary.copy(alpha = 0.14f),
-    onAccent = s.onPrimary, blocked = if (dark) Color(0xFFFF6B6B) else Color(0xFFD63B3B),
-    warn = if (dark) Color(0xFFFFC857) else Color(0xFFB7791F), off = s.outline, dark = dark,
+    bg = s.surface, panel = s.surfaceContainer, card2 = s.surfaceContainerHighest, line = s.outlineVariant,
+    text = s.onSurface, dim = s.onSurfaceVariant, faint = s.outline,
+    accent = s.primary, accentText = s.primary, onAccent = s.onPrimary,
+    pill = s.onSurface, onPill = s.surface, warn = if (dark) Color(0xFFFFB020) else Color(0xFFB26A00),
+    off = s.outlineVariant, dark = dark,
 )
 
-val LocalShieldColors = staticCompositionLocalOf { SlateColors }
+val LocalShieldColors = staticCompositionLocalOf { DefaultColors }
 
 /** Colours of the current theme. Read inside composables only. */
 object Palette {
     private val c: ShieldColors @Composable @ReadOnlyComposable get() = LocalShieldColors.current
     val bg @Composable @ReadOnlyComposable get() = c.bg
-    val card @Composable @ReadOnlyComposable get() = c.card
-    val cardHi @Composable @ReadOnlyComposable get() = c.cardHi
+    val panel @Composable @ReadOnlyComposable get() = c.panel
+    val card2 @Composable @ReadOnlyComposable get() = c.card2
     val line @Composable @ReadOnlyComposable get() = c.line
     val text @Composable @ReadOnlyComposable get() = c.text
     val dim @Composable @ReadOnlyComposable get() = c.dim
+    val faint @Composable @ReadOnlyComposable get() = c.faint
     val accent @Composable @ReadOnlyComposable get() = c.accent
-    val accentSoft @Composable @ReadOnlyComposable get() = c.accentSoft
+    val accentText @Composable @ReadOnlyComposable get() = c.accentText
     val onAccent @Composable @ReadOnlyComposable get() = c.onAccent
-    val blocked @Composable @ReadOnlyComposable get() = c.blocked
+    val pill @Composable @ReadOnlyComposable get() = c.pill
+    val onPill @Composable @ReadOnlyComposable get() = c.onPill
     val warn @Composable @ReadOnlyComposable get() = c.warn
     val off @Composable @ReadOnlyComposable get() = c.off
+    val dark @Composable @ReadOnlyComposable get() = c.dark
 }
+
+/** Unbounded: headings and numbers. */
+val Display = FontFamily(
+    Font(R.font.unbounded_bold, FontWeight.Bold),
+    Font(R.font.unbounded_extrabold, FontWeight.ExtraBold),
+)
+
+/** DM Sans: everything else. */
+val Body = FontFamily(
+    Font(R.font.dmsans_regular, FontWeight.Normal),
+    Font(R.font.dmsans_medium, FontWeight.Medium),
+    Font(R.font.dmsans_bold, FontWeight.Bold),
+)
+
+/** Big Unbounded heading, slightly tightened like the reference. */
+fun display(size: Int, weight: FontWeight = FontWeight.ExtraBold) = TextStyle(
+    fontFamily = Display, fontWeight = weight, fontSize = size.sp, lineHeight = (size * 1.08f).sp,
+    letterSpacing = (-0.025f * size).sp,
+)
 
 private fun schemeOf(c: ShieldColors): ColorScheme {
     val base = if (c.dark) darkColorScheme() else lightColorScheme()
     return base.copy(
-        primary = c.accent, onPrimary = c.onAccent, primaryContainer = c.accentSoft, onPrimaryContainer = c.accent,
+        primary = c.accent, onPrimary = c.onAccent, primaryContainer = c.accent, onPrimaryContainer = c.onAccent,
         secondary = c.accent, onSecondary = c.onAccent,
         background = c.bg, onBackground = c.text, surface = c.bg, onSurface = c.text,
-        surfaceVariant = c.card, onSurfaceVariant = c.dim,
-        surfaceContainer = c.card, surfaceContainerHigh = c.cardHi, surfaceContainerHighest = c.cardHi,
-        surfaceContainerLow = c.card, surfaceContainerLowest = c.bg,
-        outline = c.line, outlineVariant = c.line, error = c.blocked,
+        surfaceVariant = c.panel, onSurfaceVariant = c.dim,
+        surfaceContainer = c.panel, surfaceContainerHigh = c.panel, surfaceContainerHighest = c.card2,
+        surfaceContainerLow = c.panel, surfaceContainerLowest = c.bg,
+        outline = c.line, outlineVariant = c.line,
     )
 }
 
 private val type = Typography().let { t ->
+    fun TextStyle.body() = copy(fontFamily = Body)
     t.copy(
-        headlineLarge = t.headlineLarge.copy(fontWeight = FontWeight.Bold),
-        headlineSmall = t.headlineSmall.copy(fontWeight = FontWeight.Bold),
-        titleLarge = t.titleLarge.copy(fontWeight = FontWeight.Bold),
-        titleMedium = t.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+        displayLarge = t.displayLarge.copy(fontFamily = Display, fontWeight = FontWeight.ExtraBold),
+        displayMedium = t.displayMedium.copy(fontFamily = Display, fontWeight = FontWeight.ExtraBold),
+        displaySmall = t.displaySmall.copy(fontFamily = Display, fontWeight = FontWeight.ExtraBold),
+        headlineLarge = t.headlineLarge.copy(fontFamily = Display, fontWeight = FontWeight.ExtraBold),
+        headlineMedium = t.headlineMedium.copy(fontFamily = Display, fontWeight = FontWeight.ExtraBold),
+        headlineSmall = t.headlineSmall.copy(fontFamily = Display, fontWeight = FontWeight.Bold),
+        titleLarge = t.titleLarge.copy(fontFamily = Body, fontWeight = FontWeight.Bold),
+        titleMedium = t.titleMedium.copy(fontFamily = Body, fontWeight = FontWeight.Bold),
+        titleSmall = t.titleSmall.body(),
+        bodyLarge = t.bodyLarge.body(), bodyMedium = t.bodyMedium.body(), bodySmall = t.bodySmall.body(),
+        labelLarge = t.labelLarge.copy(fontFamily = Body, fontWeight = FontWeight.Bold),
+        labelMedium = t.labelMedium.body(), labelSmall = t.labelSmall.body(),
     )
 }
-
-val numberStyle: TextStyle @Composable get() = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.text)
 
 /** Resolves a theme setting to colours (Material You falls back to Default before Android 12). */
 @Composable
 fun colorsFor(mode: ThemeMode): ShieldColors = when (mode) {
-    ThemeMode.Default -> SlateColors
+    ThemeMode.Default -> DefaultColors
     ThemeMode.Light -> LightColors
     ThemeMode.Oled -> OledColors
     ThemeMode.You -> if (Build.VERSION.SDK_INT >= 31) {
         val ctx = LocalContext.current
         val dark = isSystemInDarkTheme()
         youColors(if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx), dark)
-    } else SlateColors
+    } else DefaultColors
 }
 
 @Composable
@@ -128,40 +188,47 @@ fun ShieldTheme(colors: ShieldColors, content: @Composable () -> Unit) {
     }
 }
 
-/** Small line icons from SVG paths (24×24), so nothing beyond material3 is needed. */
+/** Line icons from SVG paths (24×24), so nothing beyond material3 is needed. */
 object Icons {
-    private fun icon(name: String, vararg paths: String, stroke: Boolean = true): ImageVector {
+    private fun icon(name: String, vararg paths: String): ImageVector {
         val b = ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)
         for (p in paths) {
-            if (stroke) {
-                b.addPath(
-                    addPathNodes(p), stroke = SolidColor(Color.White), strokeLineWidth = 1.8f,
-                    strokeLineCap = androidx.compose.ui.graphics.StrokeCap.Round,
-                    strokeLineJoin = androidx.compose.ui.graphics.StrokeJoin.Round,
-                )
-            } else {
-                b.addPath(addPathNodes(p), fill = SolidColor(Color.White))
-            }
+            b.addPath(
+                addPathNodes(p), stroke = SolidColor(Color.White), strokeLineWidth = 2f,
+                strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round,
+            )
         }
         return b.build()
     }
 
-    /** The SonderShield mark: a hexagon crest with an S. */
-    val logo = icon("logo", "M12 2.8l7.6 4.4v9.6L12 21.2l-7.6-4.4V7.2z", "M13.9 7.5h-2.9a2.26 2.26 0 0 0 0 4.52h1.94a2.26 2.26 0 0 1 0 4.52H10.1")
-    val home = icon("home", "M3.5 10.5L12 4l8.5 6.5", "M5.5 9v10.5h13V9", "M10 19.5v-5h4v5")
+    val home = icon("home", "M3.5 10.5L12 4l8.5 6.5", "M5.5 9v10.5h13V9")
     val log = icon("log", "M8 6h12", "M8 12h12", "M8 18h12", "M4 6h.01", "M4 12h.01", "M4 18h.01")
     val rules = icon("rules", "M4 7h10", "M4 17h6", "M18 4v6", "M15 7h6", "M14 17h6")
     val apps = icon("apps", "M4 4h6v6H4z", "M14 4h6v6h-6z", "M4 14h6v6H4z", "M14 14h6v6h-6z")
     val settings = icon(
-        "settings",
-        "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
-        "M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z",
+        "settings", "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+        "M12 2v3", "M12 19v3", "M4.2 4.2l2.1 2.1", "M17.7 17.7l2.1 2.1", "M2 12h3", "M19 12h3", "M4.2 19.8l2.1-2.1", "M17.7 6.3l2.1-2.1",
     )
     val search = icon("search", "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z", "M20 20l-4-4")
     val plus = icon("plus", "M12 5v14", "M5 12h14")
     val close = icon("close", "M6 6l12 12", "M18 6L6 18")
-    val refresh = icon("refresh", "M20 11a8 8 0 1 0-2.3 5.7", "M20 4v7h-7")
     val trash = icon("trash", "M4 7h16", "M9 7V4h6v3", "M6 7l1 13h10l1-13")
-    val info = icon("info", "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z", "M12 11v5", "M12 8h.01")
     val chevron = icon("chevron", "M9 6l6 6-6 6")
+}
+
+/**
+ * The SonderShield mark: a shield cut in two by a swoosh. Drawn as two vectors so each
+ * piece takes its own tint (top = accent or off, bottom = text colour).
+ */
+object LogoParts {
+    private const val SHIELD = "M50 4L92 18V52C92 78 74 97 50 106C26 97 8 78 8 52V18Z"
+    private fun part(name: String, clip: String): ImageVector =
+        ImageVector.Builder(name, 100.dp, 110.dp, 100f, 110f)
+            .addGroup(name = name, clipPathData = addPathNodes(clip))
+            .addPath(addPathNodes(SHIELD), fill = SolidColor(Color.White))
+            .clearGroup()
+            .build()
+
+    val top = part("logoTop", "M0 0H100V30Q46 60 0 80Z")
+    val bottom = part("logoBottom", "M0 88Q52 70 100 45V110H0Z")
 }
