@@ -51,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -220,6 +221,8 @@ private fun BigToggle(phase: Phase, logo: Dp, onClick: () -> Unit) {
     var first by remember { mutableStateOf(true) }
     LaunchedEffect(phase) {
         if (first) { first = false; return@LaunchedEffect } // no show on opening the app
+        // Every branch ends with the pieces closed and the ring gone, even when a quick second
+        // tap cancels the previous animation halfway.
         when (phase) {
             Phase.ON -> {
                 launch { ring.snapTo(0f); ring.animateTo(1f, tween(900, easing = FastOutSlowInEasing)) }
@@ -227,10 +230,24 @@ private fun BigToggle(phase: Phase, logo: Dp, onClick: () -> Unit) {
                 split.animateTo(0f, spring(dampingRatio = 0.35f, stiffness = 380f))
             }
             Phase.OFF -> {
+                launch { if (ring.value < 1f) ring.animateTo(1f, tween(250)) }
                 split.animateTo(0.5f, tween(120))
                 split.animateTo(0f, spring(dampingRatio = 0.6f, stiffness = 500f))
             }
-            Phase.STARTING -> Unit
+            Phase.STARTING -> {
+                launch { if (ring.value < 1f) ring.animateTo(1f, tween(250)) }
+                split.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 500f))
+            }
+        }
+    }
+    // Ignore a second tap while starting up or right after a tap: on/off can't flip faster
+    // than the VPN comes up anyway, and quick double taps used to leave the animation stuck.
+    var lastTap by remember { mutableLongStateOf(0L) }
+    val guardedClick = {
+        val now = System.currentTimeMillis()
+        if (phase != Phase.STARTING && now - lastTap > 800) {
+            lastTap = now
+            onClick()
         }
     }
     val breathe = rememberInfiniteTransition(label = "breathe")
@@ -269,7 +286,7 @@ private fun BigToggle(phase: Phase, logo: Dp, onClick: () -> Unit) {
                 logo, lit = on, split = split.value,
                 modifier = Modifier
                     .clip(CircleShape)
-                    .clickable(interactionSource = press, indication = null, onClick = onClick)
+                    .clickable(interactionSource = press, indication = null, onClick = guardedClick)
                     .semantics { role = Role.Switch; contentDescription = if (on) "Protection on. Tap to turn off." else "Protection off. Tap to turn on." }
                     .graphicsLayer {
                     scaleX = pressScale; scaleY = pressScale
