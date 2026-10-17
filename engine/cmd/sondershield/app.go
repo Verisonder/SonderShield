@@ -172,6 +172,7 @@ func (a *App) applyConfig() {
 	}
 	a.eng.SetLists(paths)
 	a.plat.setFirewall(c.Firewall)
+	a.plat.setNetworkBlocks(c.NetBlocks)
 }
 
 func (a *App) running() bool {

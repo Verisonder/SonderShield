@@ -44,6 +44,9 @@ type platform interface {
 	// DoH resolvers), so apps and browsers can't use their own DNS to skip filtering.
 	// skipProvider is the upstream id whose servers must stay reachable for our own DNS.
 	setDNSLockdown(on bool, skipProvider string) error
+	// setNetworkBlocks replaces the block rules for raw addresses and ports (not tied to one
+	// app): outbound to an IP/CIDR, or to a TCP/UDP port.
+	setNetworkBlocks(rules []NetBlock) error
 }
 
 // Conn is one outbound connection the computer currently has open.
@@ -57,6 +60,13 @@ type Conn struct {
 	LocalPort  int    `json:"localPort"`
 	RemoteAddr string `json:"remoteAddr"`
 	RemotePort int    `json:"remotePort"`
+}
+
+// NetBlock is an outbound block by address or port, for all apps.
+type NetBlock struct {
+	Kind  string `json:"kind"` // "ip" or "port"
+	Value string `json:"value"`
+	Note  string `json:"note"`
 }
 
 // Program is one app the firewall can block.

@@ -17,8 +17,8 @@ import (
 // that owns it. No driver and no packet capture — just the OS's own connection table.
 
 var (
-	iphlpapi               = windows.NewLazySystemDLL("iphlpapi.dll")
-	procGetExtendedTcpTbl  = iphlpapi.NewProc("GetExtendedTcpTable")
+	iphlpapi              = windows.NewLazySystemDLL("iphlpapi.dll")
+	procGetExtendedTcpTbl = iphlpapi.NewProc("GetExtendedTcpTable")
 )
 
 const (
@@ -39,14 +39,14 @@ type tcpRow4 struct {
 
 // MIB_TCP6ROW_OWNER_PID.
 type tcpRow6 struct {
-	localAddr    [16]byte
-	localScope   uint32
-	localPort    uint32
-	remoteAddr   [16]byte
-	remoteScope  uint32
-	remotePort   uint32
-	state        uint32
-	owningPid    uint32
+	localAddr   [16]byte
+	localScope  uint32
+	localPort   uint32
+	remoteAddr  [16]byte
+	remoteScope uint32
+	remotePort  uint32
+	state       uint32
+	owningPid   uint32
 }
 
 var tcpStates = map[uint32]string{

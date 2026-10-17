@@ -551,8 +551,15 @@ async function renderApps() {
         <div class="panicsub">${kill ? 'Every app is cut off. SonderShield still works.' : 'Cut off every app on this PC at once. A panic switch.'}</div></div>
       <button class="pill ${kill ? 'filled' : 'danger'}" id="killbtn">${kill ? 'Restore internet' : 'Block everything'}</button>
     </div>
-    <div class="row" style="margin:16px 0 12px"><button class="pill" id="refreshprog">Refresh running apps</button></div>
+    <div class="seclabel" style="margin-top:28px"><span class="t">BLOCK BY ADDRESS OR PORT</span></div>
+    <div class="sub" style="margin-bottom:12px">Cut off outbound traffic to an IP address or range, or to a port, for every app. Applies while protection is on.</div>
+    <div class="row" style="margin-bottom:12px"><button class="pill" id="addnet">Add a block</button></div>
+    <div id="netlist"></div>
+    <div class="seclabel" style="margin-top:28px"><span class="t">RUNNING APPS</span></div>
+    <div class="row" style="margin:0 0 12px"><button class="pill" id="refreshprog">Refresh running apps</button></div>
     <div id="proglist"><div class="empty">Loading running apps…</div></div>`;
+  $('#addnet').onclick = addNetBlock;
+  drawNetBlocks();
   $('#killbtn').onclick = async () => {
     const on = !kill;
     if (on) { const ok = await ask({ title: 'Block all internet?', text: 'Every app on this PC loses internet until you switch this back off. SonderShield itself keeps working.', ok: 'Block everything', danger: true }); if (!ok) return; }
@@ -562,6 +569,42 @@ async function renderApps() {
   $('#refreshprog').onclick = async () => { programs = await api('programs'); drawPrograms(); };
   if (!programs) programs = await api('programs');
   drawPrograms();
+}
+function drawNetBlocks() {
+  const box = $('#netlist'); if (!box) return;
+  const rules = cfg.netBlocks || [];
+  if (!rules.length) { box.innerHTML = `<div class="empty">No address or port blocks yet.</div>`; return; }
+  box.innerHTML = rules.map((r, i) => `<div class="card"><div class="row"><div class="grow">
+      <div class="ctitle">${r.kind === 'port' ? 'Port ' : ''}${esc(r.value)}${r.kind === 'ip' ? '' : ''}</div>
+      <div class="cfaint">${r.kind === 'ip' ? 'IP address or range' : 'TCP & UDP port'}${r.note ? ' · ' + esc(r.note) : ''}</div></div>
+      <button class="pill danger" data-rm="${i}">Remove</button></div></div>`).join('');
+  box.querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => {
+    cfg.netBlocks = (cfg.netBlocks || []).filter((_, i) => i !== +b.dataset.rm);
+    await postConfig(cfg); drawNetBlocks();
+  });
+}
+function validNet(kind, v) {
+  v = v.trim();
+  if (kind === 'port') { const m = /^(\d{1,5})(-(\d{1,5}))?$/.exec(v); if (!m) return false; const a = +m[1], b = m[3] ? +m[3] : a; return a >= 1 && a <= 65535 && b >= a && b <= 65535; }
+  if (/^[0-9.]+(\/\d{1,2})?$/.test(v)) { const ip = v.split('/')[0].split('.'); return ip.length === 4 && ip.every(o => o !== '' && +o >= 0 && +o <= 255); }
+  if (/^[0-9a-fA-F:]+(\/\d{1,3})?$/.test(v) && v.includes(':')) return true;
+  return false;
+}
+async function addNetBlock() {
+  const kindAns = await ask({ title: 'Block what?', text: 'Choose an IP address / range, or a port.', ok: 'IP address', cancel: 'Port' });
+  const kind = kindAns ? 'ip' : 'port';
+  const r = await ask({
+    title: kind === 'ip' ? 'Block an IP address or range' : 'Block a port',
+    text: kind === 'ip' ? 'A single address or a CIDR range.' : 'A port number, or a range like 6881-6889. Blocks TCP and UDP.',
+    ok: 'Block', fields: [
+      { placeholder: kind === 'ip' ? 'e.g. 203.0.113.5  or  203.0.113.0/24' : 'e.g. 25  or  6881-6889' },
+      { placeholder: 'Note (optional)' },
+    ],
+    validate: v => validNet(kind, v[0]) ? '' : (kind === 'ip' ? 'Enter a valid IP or CIDR.' : 'Enter a port 1-65535, or a range.'),
+  });
+  if (!r) return;
+  cfg.netBlocks = [...(cfg.netBlocks || []), { kind, value: r[0].trim(), note: r[1] || '' }];
+  await postConfig(cfg); drawNetBlocks();
 }
 function drawPrograms() {
   const box = $('#proglist'); const blocked = new Set(cfg.firewall || []);

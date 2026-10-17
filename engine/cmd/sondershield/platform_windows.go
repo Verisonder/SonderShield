@@ -100,6 +100,7 @@ func (p *windowsPlatform) setFirewall(paths []string) error {
 
 func (p *windowsPlatform) clearFirewall() error {
 	run("netsh", "advfirewall", "firewall", "delete", "rule", "name="+p.rule+" Block")
+	run("netsh", "advfirewall", "firewall", "delete", "rule", "name="+p.netName())
 	return nil
 }
 
@@ -225,4 +226,30 @@ func (p *windowsPlatform) setKillSwitch(on bool) error {
 func (p *windowsPlatform) killSwitchOn() bool {
 	_, err := run("netsh", "advfirewall", "firewall", "show", "rule", "name="+p.killName())
 	return err == nil
+}
+
+// Network blocks: outbound block rules for raw addresses and ports, applied to every app.
+func (p *windowsPlatform) netName() string { return p.rule + " Net" }
+
+func (p *windowsPlatform) setNetworkBlocks(rules []NetBlock) error {
+	run("netsh", "advfirewall", "firewall", "delete", "rule", "name="+p.netName())
+	for _, nb := range rules {
+		switch nb.Kind {
+		case "ip":
+			if !validIPOrCIDR(nb.Value) {
+				continue
+			}
+			run("netsh", "advfirewall", "firewall", "add", "rule", "name="+p.netName(),
+				"dir=out", "action=block", "enable=yes", "remoteip="+nb.Value)
+		case "port":
+			if !validPort(nb.Value) {
+				continue
+			}
+			for _, proto := range []string{"TCP", "UDP"} {
+				run("netsh", "advfirewall", "firewall", "add", "rule", "name="+p.netName(),
+					"dir=out", "action=block", "enable=yes", "protocol="+proto, "remoteport="+nb.Value)
+			}
+		}
+	}
+	return nil
 }

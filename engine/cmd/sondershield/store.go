@@ -17,8 +17,9 @@ type Config struct {
 	Block          string       `json:"block"`
 	Allow          string       `json:"allow"`
 	FullTunnel     bool         `json:"fullTunnel"`
-	LockDNS        bool         `json:"lockDns"` // force all DNS through SonderShield
-	Firewall       []string     `json:"firewall"` // program paths with no internet
+	LockDNS        bool         `json:"lockDns"`   // force all DNS through SonderShield
+	NetBlocks      []NetBlock   `json:"netBlocks"` // block by IP/CIDR or port
+	Firewall       []string     `json:"firewall"`  // program paths with no internet
 	UpdateHours    int          `json:"updateHours"`
 	Theme          string       `json:"theme"`  // default, light, system
 	Accent         uint32       `json:"accent"` // ARGB
