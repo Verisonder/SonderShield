@@ -136,14 +136,14 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * Bottom bar: icon over label, each item the full width of its slot and 72 dp tall, so the
- * buttons are easy to hit with a thumb.
+ * Bottom bar: icon over label. Each item takes a full fifth of the width and the whole 64 dp
+ * height as its touch area; the visible pill stays small.
  */
 @Composable
 private fun BottomBar(current: Tab, onPick: (Tab) -> Unit) {
     Column(Modifier.fillMaxWidth().background(Palette.card)) {
         HorizontalDivider(color = Palette.line, thickness = 0.5.dp)
-        Row(Modifier.fillMaxWidth().navigationBarsPadding().height(72.dp)) {
+        Row(Modifier.fillMaxWidth().navigationBarsPadding().height(64.dp)) {
             for (t in Tab.entries) {
                 val on = t == current
                 val tint = if (on) Palette.accent else Palette.dim
@@ -151,7 +151,7 @@ private fun BottomBar(current: Tab, onPick: (Tab) -> Unit) {
                     Modifier.weight(1f).fillMaxHeight()
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(bounded = false, radius = 40.dp),
+                            indication = ripple(bounded = false, radius = 32.dp),
                         ) { onPick(t) }
                         .semantics { role = Role.Tab; selected = on },
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -160,12 +160,12 @@ private fun BottomBar(current: Tab, onPick: (Tab) -> Unit) {
                     Box(
                         Modifier.clip(RoundedCornerShape(16.dp))
                             .background(if (on) Palette.accentSoft else Color.Transparent)
-                            .padding(horizontal = 18.dp, vertical = 5.dp),
+                            .padding(horizontal = 14.dp, vertical = 3.dp),
                     ) {
-                        Icon(t.icon(), null, tint = tint, modifier = Modifier.size(24.dp))
+                        Icon(t.icon(), null, tint = tint, modifier = Modifier.size(22.dp))
                     }
-                    Spacer(Modifier.height(4.dp))
-                    Text(t.label, color = tint, fontSize = 12.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
+                    Spacer(Modifier.height(3.dp))
+                    Text(t.label, color = tint, fontSize = 11.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                 }
             }
         }
