@@ -82,6 +82,11 @@ val DefaultColors = ShieldColors(
     pill = Color(0xFFFFFFFF), onPill = Color(0xFF0D0D0D), warn = Color(0xFFFFB020), off = Color(0xFF3A3A3A), dark = true,
 )
 
+/** System theme at night: the original soft dark (near-black grey instead of pure black). */
+val SoftDarkColors = DefaultColors.copy(
+    bg = Color(0xFF0D0D0D), panel = Color(0xFF1C1C1C), card2 = Color(0xFF2A2A2A), line = Color(0xFF262626),
+)
+
 val LightColors = ShieldColors(
     bg = Color(0xFFF5F5F4), panel = Color(0xFFFFFFFF), card2 = Color(0xFFF0F0EE), line = Color(0xFFE2E2E0),
     text = Color(0xFF0D0D0D), dim = Color(0xFF3A3A3A), faint = Color(0xFF6B6B6B),
@@ -207,8 +212,8 @@ private fun ShieldColors.withAccent(a: Color) = copy(
 fun colorsFor(mode: ThemeMode, accent: Color = Electric): ShieldColors = when (mode) {
     ThemeMode.Default -> DefaultColors.withAccent(accent)
     ThemeMode.Light -> LightColors.withAccent(accent)
-    // Follows the phone's dark mode: the black default at night, light by day.
-    ThemeMode.System -> if (isSystemInDarkTheme()) DefaultColors.withAccent(accent) else LightColors.withAccent(accent)
+    // Follows the phone's dark mode: the soft grey dark at night, light by day.
+    ThemeMode.System -> if (isSystemInDarkTheme()) SoftDarkColors.withAccent(accent) else LightColors.withAccent(accent)
     ThemeMode.You -> if (Build.VERSION.SDK_INT >= 31) {
         val ctx = LocalContext.current
         val dark = isSystemInDarkTheme()
