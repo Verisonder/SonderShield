@@ -78,6 +78,23 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("ipv6", true)
         set(v) = sp.edit().putBoolean("ipv6", v).apply()
 
+    // Data plan: total mobile allowance, when the cycle started, and how many days it lasts.
+    // All three > 0 means a plan is set up.
+    var planTotalBytes: Long
+        get() = sp.getLong("plan.total", 0L)
+        set(v) = sp.edit().putLong("plan.total", v).apply()
+
+    var planStartMillis: Long
+        get() = sp.getLong("plan.start", 0L)
+        set(v) = sp.edit().putLong("plan.start", v).apply()
+
+    var planDays: Int
+        get() = sp.getInt("plan.days", 0)
+        set(v) = sp.edit().putInt("plan.days", v).apply()
+
+    val planActive: Boolean
+        get() = planTotalBytes > 0 && planStartMillis > 0 && planDays > 0
+
     /** Route all traffic through the engine, not only DNS (needed for WireGuard). */
     var fullTunnel: Boolean
         get() = sp.getBoolean("tunnel.full", false)

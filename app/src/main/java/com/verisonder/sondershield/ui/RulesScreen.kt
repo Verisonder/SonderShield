@@ -32,7 +32,7 @@ import com.verisonder.sondershield.core.ShieldState
 import com.verisonder.sondershield.data.Prefs
 
 @Composable
-fun RulesScreen() {
+fun RulesScreen(showHeader: Boolean = true) {
     val ctx = LocalContext.current
     val prefs = remember { Prefs(ctx) }
     var allowTab by rememberSaveable { mutableStateOf(false) }
@@ -68,7 +68,7 @@ fun RulesScreen() {
 
     LazyColumn(Modifier.fillMaxSize()) {
         item {
-            ScreenHeader(tr("Rules", "Règles", "Regeln"), kicker = tr("Yours win", "Les vôtres passent d'abord", "Deine gewinnen"))
+            if (showHeader) ScreenHeader(tr("Rules", "Règles", "Regeln"), kicker = tr("Yours win", "Les vôtres passent d'abord", "Deine gewinnen"))
             ChipRow(Modifier.padding(top = 4.dp)) {
                 Chip(tr("Block", "Bloquer", "Blockieren"), !allowTab) { allowTab = false }
                 Chip(tr("Allow", "Autoriser", "Erlauben"), allowTab) { allowTab = true }

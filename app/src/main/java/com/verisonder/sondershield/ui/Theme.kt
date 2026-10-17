@@ -252,6 +252,9 @@ object Icons {
     val chevron = icon("chevron", "M9 6l6 6-6 6")
     val filter = icon("filter", "M12 3.5l7.5 2.8v5.4c0 4.6-3.1 7.9-7.5 9.3-4.4-1.4-7.5-4.7-7.5-9.3V6.3z")
     val check = icon("check", "M5 12.5l4.5 4.5L19 7")
+    val data = icon("data", "M5 20V11", "M12 20V4", "M19 20V13")
+    val signal = icon("signal", "M12 21V11", "M8.2 13.2a5 5 0 0 1 7.6 0", "M5.5 10.5a9 9 0 0 1 13 0", "M12 8h.01")
+    val wifi = icon("wifi", "M3.5 9.5a13 13 0 0 1 17 0", "M7 13a8 8 0 0 1 10 0", "M10.5 16.5a3 3 0 0 1 3 0", "M12 20h.01")
 }
 
 /**
