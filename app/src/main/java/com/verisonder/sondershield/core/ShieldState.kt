@@ -3,6 +3,8 @@ package com.verisonder.sondershield.core
 import android.content.Context
 import com.verisonder.sondershield.data.ListStore
 import com.verisonder.sondershield.data.Prefs
+import com.verisonder.sondershield.data.Stats
+import com.verisonder.sondershield.data.StatsSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -51,6 +53,11 @@ object ShieldState {
     val theme = MutableStateFlow("default")
     /** Accent colour (ARGB) from Settings. */
     val accent = MutableStateFlow(0xFF3B82FF.toInt())
+    /** All-time numbers, hourly history and top blocked domains for Home. */
+    val stats = MutableStateFlow(StatsSnapshot())
+    /** When protection last came on (ms), 0 while off. */
+    val startedAt = MutableStateFlow(0L)
+    private var store: Stats? = null
 
     private const val LOG_MAX = 2000
     private val ring = ArrayDeque<LogEntry>()
@@ -66,6 +73,10 @@ object ShieldState {
                 if (ring.size > LOG_MAX) ring.removeLast()
                 ringDirty = true
             }
+            if (e.verdict != 2) {
+                val threat = e.reason.startsWith("list:") && e.reason.removePrefix("list:") in Stats.THREAT_LISTS
+                store?.record(e.domain, e.verdict == 1, threat, e.time)
+            }
         }
     }
 
@@ -76,6 +87,9 @@ object ShieldState {
         today.value = Prefs(app).todayCounts()
         theme.value = Prefs(app).theme
         accent.value = Prefs(app).accent
+        val st = Stats(app)
+        store = st
+        stats.value = st.snapshot()
     }
 
     /** Pushes rules, upstream and list files from settings into the engine. */
@@ -126,7 +140,9 @@ object ShieldState {
                     lastTotal = t
                     lastBlocked = b
                     today.value = prefs.todayCounts()
+                    store?.let { stats.value = it.snapshot() }
                 }
+                if (tick % 15 == 0) store?.save()
             }
         }
     }
@@ -134,6 +150,7 @@ object ShieldState {
     fun stopPublishing() {
         publisher?.cancel()
         publisher = null
+        store?.let { st -> scope.launch(Dispatchers.IO) { st.save() } }
     }
 
     fun clearLog() {
@@ -147,6 +164,7 @@ object ShieldState {
     fun resetStats() {
         Prefs(app).resetStats()
         today.value = 0L to 0L
+        store?.let { st -> scope.launch(Dispatchers.IO) { st.reset(); stats.value = st.snapshot() } }
     }
 
 }

@@ -152,6 +152,7 @@ class ShieldVpnService : VpnService() {
             return
         }
         ShieldState.phase.value = Phase.ON
+        if (ShieldState.startedAt.value == 0L) ShieldState.startedAt.value = System.currentTimeMillis()
         ShieldState.startPublishing()
         refreshTile()
         watchCounters()
@@ -173,6 +174,7 @@ class ShieldVpnService : VpnService() {
         ShieldState.engine.stop()
         ShieldState.stopPublishing()
         ShieldState.phase.value = Phase.OFF
+        ShieldState.startedAt.value = 0L
         refreshTile()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -191,6 +193,7 @@ class ShieldVpnService : VpnService() {
             ShieldState.engine.stop()
             ShieldState.stopPublishing()
             ShieldState.phase.value = Phase.OFF
+            ShieldState.startedAt.value = 0L
             refreshTile()
         }
         super.onDestroy()

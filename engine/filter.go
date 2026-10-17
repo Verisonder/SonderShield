@@ -10,16 +10,22 @@ import (
 // domainSet matches a name and every name under it: "ads.example.com" in the set
 // blocks "x.ads.example.com" too. A map keyed by the full name, walked label by label
 // from the left, costs one lookup per label and stays small enough for big lists.
-type domainSet map[string]struct{}
+// The value is the index of the list the entry came from (0 for your own rules).
+type domainSet map[string]uint16
 
 func (s domainSet) match(name string) (string, bool) {
+	m, _, ok := s.matchSrc(name)
+	return m, ok
+}
+
+func (s domainSet) matchSrc(name string) (string, uint16, bool) {
 	for {
-		if _, ok := s[name]; ok {
-			return name, true
+		if src, ok := s[name]; ok {
+			return name, src, true
 		}
 		i := strings.IndexByte(name, '.')
 		if i < 0 {
-			return "", false
+			return "", 0, false
 		}
 		name = name[i+1:]
 	}
@@ -31,6 +37,7 @@ type filter struct {
 	listAllow domainSet // @@ rules inside lists
 	userBlock domainSet
 	userAllow domainSet
+	listNames []string // list ids by index, for reasons like "list:stevenblack"
 }
 
 // verdicts
@@ -46,7 +53,7 @@ const (
 	reasonUserAllow = "your allow rule"
 	reasonUserBlock = "your block rule"
 	reasonListAllow = "list exception"
-	reasonList      = "block list"
+	reasonList      = "block list" // with list names: "list:<id>"
 )
 
 // decide: your allow rules win, then your block rules, then list exceptions, then lists.
@@ -63,7 +70,10 @@ func (f *filter) decide(name string) (bool, string, string) {
 	if m, ok := f.listAllow.match(name); ok {
 		return false, reasonListAllow, m
 	}
-	if m, ok := f.listBlock.match(name); ok {
+	if m, src, ok := f.listBlock.matchSrc(name); ok {
+		if int(src) < len(f.listNames) && f.listNames[src] != "" {
+			return true, "list:" + f.listNames[src], m
+		}
 		return true, reasonList, m
 	}
 	return false, reasonNone, ""
@@ -72,7 +82,7 @@ func (f *filter) decide(name string) (bool, string, string) {
 // parseList reads hosts files ("0.0.0.0 host"), AdBlock-style DNS rules
 // ("||host^", "@@||host^") and plain domain lists ("host", "*.host"), and adds to
 // block and allow. Rules that can't be expressed per domain are skipped.
-func parseList(r io.Reader, block, allow domainSet) (int, error) {
+func parseList(r io.Reader, block, allow domainSet, src uint16) (int, error) {
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 64*1024), 1024*1024)
 	n := 0
@@ -108,7 +118,7 @@ func parseList(r io.Reader, block, allow domainSet) (int, error) {
 			}
 			line = strings.TrimSuffix(strings.TrimSuffix(line, "|"), "^")
 			if d, ok := cleanDomain(line); ok {
-				target[d] = struct{}{}
+				target[d] = src
 				n++
 			}
 			continue
@@ -120,7 +130,7 @@ func parseList(r io.Reader, block, allow domainSet) (int, error) {
 		if len(fields) >= 2 && isIP(fields[0]) {
 			for _, h := range fields[1:] {
 				if d, ok := cleanDomain(h); ok && !localName(d) {
-					block[d] = struct{}{}
+					block[d] = src
 					n++
 				}
 			}
@@ -129,7 +139,7 @@ func parseList(r io.Reader, block, allow domainSet) (int, error) {
 		if len(fields) == 1 {
 			h := strings.TrimPrefix(fields[0], "*.")
 			if d, ok := cleanDomain(h); ok {
-				block[d] = struct{}{}
+				block[d] = src
 				n++
 			}
 		}
@@ -149,19 +159,19 @@ func parseRules(text string) domainSet {
 		line = strings.TrimSuffix(line, "^")
 		line = strings.TrimPrefix(line, "*.")
 		if d, ok := cleanDomain(line); ok {
-			s[d] = struct{}{}
+			s[d] = 0
 		}
 	}
 	return s
 }
 
-func loadListFile(path string, block, allow domainSet) (int, error) {
+func loadListFile(path string, block, allow domainSet, src uint16) (int, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, err
 	}
 	defer f.Close()
-	return parseList(f, block, allow)
+	return parseList(f, block, allow, src)
 }
 
 func okModifiers(m string) bool {

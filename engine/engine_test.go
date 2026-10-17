@@ -73,7 +73,7 @@ bad domain with spaces
 
 func TestParseList(t *testing.T) {
 	block, allow := domainSet{}, domainSet{}
-	n, err := parseList(strings.NewReader(sampleList), block, allow)
+	n, err := parseList(strings.NewReader(sampleList), block, allow, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,14 +101,14 @@ func TestDecide(t *testing.T) {
 	e, _ := newTestEngine(t, sampleList)
 	e.SetRules("myblock.com\n# comment\n*.extra.net", "ads.example.com")
 	cases := map[string]string{
-		"x.y.doubleclick.net":  "blocked|block list|doubleclick.net",
+		"x.y.doubleclick.net":  "blocked|list:list|doubleclick.net",
 		"good.doubleclick.net": "allowed|list exception|good.doubleclick.net",
 		"ads.example.com":      "allowed|your allow rule|ads.example.com",
 		"sub.ads.example.com":  "allowed|your allow rule|ads.example.com",
 		"a.myblock.com":        "blocked|your block rule|myblock.com",
 		"extra.net":            "blocked|your block rule|extra.net",
 		"example.com":          "allowed||",
-		"Wild.IO.":             "blocked|block list|wild.io",
+		"Wild.IO.":             "blocked|list:list|wild.io",
 		"nope":                 "invalid||",
 	}
 	for d, want := range cases {

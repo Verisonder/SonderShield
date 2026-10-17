@@ -100,11 +100,11 @@ fun LogScreen() {
             text = {
                 Column {
                     Text(
-                        when (e.verdict) { 1 -> "Blocked by ${e.reason}"; 2 -> "Failed: ${e.reason}"; else -> if (e.reason.isNotEmpty()) "Allowed (${e.reason})" else "Allowed" },
+                        when (e.verdict) { 1 -> "Blocked by ${reasonLabel(ctx, e.reason)}"; 2 -> "Failed: ${e.reason}"; else -> if (e.reason.isNotEmpty()) "Allowed (${e.reason})" else "Allowed" },
                         color = if (e.verdict == 1) Palette.accentText else Palette.dim, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                     )
                     Text("${e.typeName} · ${time(e.time)}${if (e.ms > 0) " · ${e.ms} ms" else ""}", color = Palette.faint, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
-                    if (e.verdict == 1 && e.reason == "block list") {
+                    if (e.verdict == 1 && isListReason(e.reason)) {
                         Text("Allowing it adds an allow rule, which wins over every list.", color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
                     }
                 }
@@ -140,6 +140,7 @@ fun LogScreen() {
 
 @Composable
 private fun LogRow(e: LogEntry, onClick: () -> Unit) {
+    val ctx = LocalContext.current
     val blocked = e.verdict == 1
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -154,7 +155,7 @@ private fun LogRow(e: LogEntry, onClick: () -> Unit) {
                 Text(
                     buildString {
                         append(e.typeName); append(" · "); append(time(e.time))
-                        if (blocked) { append(" · "); append(e.reason) }
+                        if (blocked) { append(" · "); append(reasonLabel(ctx, e.reason)) }
                     },
                     color = Palette.faint, fontSize = 12.sp, maxLines = 1,
                 )

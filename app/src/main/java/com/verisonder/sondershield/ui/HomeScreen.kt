@@ -43,7 +43,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -87,8 +90,13 @@ fun HomeScreen(onToggle: () -> Unit) {
         }
     }
 
-    // One screen, no scrolling: the button area takes whatever height is left.
-    Column(Modifier.fillMaxSize()) {
+    // The first screen fits exactly (the button area takes whatever height is left); scrolling
+    // past it, under the swoosh, shows the all-time stats.
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+    val screen = maxHeight
+    val scroll = rememberScrollState()
+    Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
+    Column(Modifier.fillMaxWidth().height(screen)) {
         // Top bar: mark + wordmark, DNS server.
         Row(Modifier.fillMaxWidth().padding(start = Gutter, end = Gutter, top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
             Logo(26.dp, lit = on)
@@ -161,7 +169,27 @@ fun HomeScreen(onToggle: () -> Unit) {
                     "Open settings",
                 ) { ctx.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             }
+            ScrollHint(visible = scroll.value < 8)
         }
+    }
+    HomeStats()
+    }
+    }
+}
+
+/** "MORE" with a bobbing chevron at the bottom of the first screen, until the user scrolls. */
+@Composable
+private fun ScrollHint(visible: Boolean) {
+    val alpha by animateFloatAsState(if (visible) 1f else 0f, tween(250), label = "hint")
+    val bob = rememberInfiniteTransition(label = "bob")
+    val dy by bob.animateFloat(0f, 4f, infiniteRepeatable(tween(700, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "dy")
+    Row(
+        Modifier.fillMaxWidth().padding(top = 10.dp).graphicsLayer { this.alpha = alpha; translationY = dy.dp.toPx() },
+        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("MORE", color = Palette.faint, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+        Spacer(Modifier.width(6.dp))
+        Icon(Icons.chevron, null, tint = Palette.faint, modifier = Modifier.size(14.dp).graphicsLayer { rotationZ = 90f })
     }
 }
 

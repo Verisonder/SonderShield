@@ -105,7 +105,7 @@ fun RulesScreen() {
                         )
                         if (verdict == "blocked" || verdict == "allowed") {
                             Text(
-                                if (reason.isNotEmpty()) "by $reason · $match" else "No list or rule matches it.",
+                                if (reason.isNotEmpty()) "by ${reasonLabel(ctx, reason)} · $match" else "No list or rule matches it.",
                                 color = if (blockedNow) Palette.onAccent else Palette.dim, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp),
                             )
                         }

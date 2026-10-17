@@ -6,6 +6,7 @@ package shield
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -24,6 +25,7 @@ type Engine struct {
 	lis  atomic.Pointer[listenerBox]
 
 	listBlock, listAllow domainSet // last loaded lists, reused when only rules change
+	listNames            []string
 	userBlock, userAllow domainSet
 	mu                   sync.Mutex // guards the four sets above
 
@@ -53,9 +55,11 @@ func NewEngine() *Engine {
 
 // SetLists loads block lists from files, one path per line, replacing the previous
 // lists. Returns how many entries were read. A file that fails to open is skipped and
-// reported in the error; the others still load.
+// reported in the error; the others still load. A list is named after its file
+// ("stevenblack.txt" -> "stevenblack"); blocks it causes report "list:<name>".
 func (e *Engine) SetLists(paths string) (int, error) {
 	block, allow := domainSet{}, domainSet{}
+	names := []string{""} // index 0: unnamed
 	total := 0
 	var errs []string
 	for _, p := range strings.Split(paths, "\n") {
@@ -63,14 +67,20 @@ func (e *Engine) SetLists(paths string) (int, error) {
 		if p == "" {
 			continue
 		}
-		n, err := loadListFile(p, block, allow)
+		name := strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
+		src := uint16(0)
+		if len(names) < 65535 {
+			src = uint16(len(names))
+			names = append(names, name)
+		}
+		n, err := loadListFile(p, block, allow, src)
 		total += n
 		if err != nil {
 			errs = append(errs, err.Error())
 		}
 	}
 	e.mu.Lock()
-	e.listBlock, e.listAllow = block, allow
+	e.listBlock, e.listAllow, e.listNames = block, allow, names
 	e.mu.Unlock()
 	e.rebuild()
 	if len(errs) > 0 {
@@ -81,7 +91,7 @@ func (e *Engine) SetLists(paths string) (int, error) {
 
 // CountList reads one list file and returns its entry count without loading it.
 func CountList(path string) (int, error) {
-	return loadListFile(path, domainSet{}, domainSet{})
+	return loadListFile(path, domainSet{}, domainSet{}, 0)
 }
 
 // SetRules sets your own rules, one domain per line. Allow wins over block.
@@ -94,7 +104,7 @@ func (e *Engine) SetRules(block, allow string) {
 
 func (e *Engine) rebuild() {
 	e.mu.Lock()
-	f := &filter{listBlock: e.listBlock, listAllow: e.listAllow, userBlock: e.userBlock, userAllow: e.userAllow}
+	f := &filter{listBlock: e.listBlock, listAllow: e.listAllow, userBlock: e.userBlock, userAllow: e.userAllow, listNames: e.listNames}
 	e.mu.Unlock()
 	e.filt.Store(f)
 	e.cache.clear()
