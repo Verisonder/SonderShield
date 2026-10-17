@@ -147,7 +147,7 @@ object Icons {
     }
 
     /** The SonderShield mark: a hexagon crest with an S. */
-    val logo = icon("logo", "M12 2.8l7.6 4.4v9.6L12 21.2l-7.6-4.4V7.2z", "M15 8.6h-4.2a2.1 2.1 0 0 0 0 4.2h2.4a2.1 2.1 0 0 1 0 4.2H9")
+    val logo = icon("logo", "M12 2.8l7.6 4.4v9.6L12 21.2l-7.6-4.4V7.2z", "M15 7.8h-4.2a2.1 2.1 0 0 0 0 4.2h2.4a2.1 2.1 0 0 1 0 4.2H9")
     val home = icon("home", "M3.5 10.5L12 4l8.5 6.5", "M5.5 9v10.5h13V9", "M10 19.5v-5h4v5")
     val log = icon("log", "M8 6h12", "M8 12h12", "M8 18h12", "M4 6h.01", "M4 12h.01", "M4 18h.01")
     val rules = icon("rules", "M4 7h10", "M4 17h6", "M18 4v6", "M15 7h6", "M14 17h6")
