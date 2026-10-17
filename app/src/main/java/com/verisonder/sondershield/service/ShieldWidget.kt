@@ -62,6 +62,7 @@ class ShieldWidget : AppWidgetProvider() {
         private fun tapIntent(ctx: Context, on: Boolean): PendingIntent {
             val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             return when {
+                on && ShieldState.alwaysOn.value -> PendingIntent.getActivity(ctx, 23, ShieldVpnService.vpnSettingsIntent(), flags)
                 on -> PendingIntent.getService(
                     ctx, 20, Intent(ctx, ShieldVpnService::class.java).setAction(ShieldVpnService.ACTION_STOP), flags,
                 )

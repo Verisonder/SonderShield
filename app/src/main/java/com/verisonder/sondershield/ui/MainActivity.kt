@@ -177,7 +177,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun toggle() {
-        if (ShieldState.phase.value == com.verisonder.sondershield.core.Phase.OFF) turnOn() else ShieldVpnService.stop(this)
+        when {
+            ShieldState.phase.value == com.verisonder.sondershield.core.Phase.OFF -> turnOn()
+            // Always-on VPN would just start it again: send the user to where it's switched off.
+            ShieldState.alwaysOn.value -> try { startActivity(ShieldVpnService.vpnSettingsIntent()) } catch (e: Exception) { }
+            else -> ShieldVpnService.stop(this)
+        }
     }
 
     private fun turnOn() {

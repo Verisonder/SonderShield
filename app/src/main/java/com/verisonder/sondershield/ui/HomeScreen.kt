@@ -87,6 +87,7 @@ fun HomeScreen(onToggle: () -> Unit, scroll: ScrollState) {
     val ctx = LocalContext.current
     val prefs = remember { Prefs(ctx) }
     val phase by ShieldState.phase.collectAsState()
+    val alwaysOn by ShieldState.alwaysOn.collectAsState()
     val problem by ShieldState.problem.collectAsState()
     val today by ShieldState.today.collectAsState()
     val domains by ShieldState.domains.collectAsState()
@@ -157,7 +158,7 @@ fun HomeScreen(onToggle: () -> Unit, scroll: ScrollState) {
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             // Logo as big as the space allows (its glow area is 1.5x, plus the label), 64 to 140 dp.
             val logo = ((maxHeight - 30.dp) / 1.5f).coerceIn(64.dp, 140.dp)
-            BigToggle(phase, logo, onToggle)
+            BigToggle(phase, logo, onToggle, alwaysOn = alwaysOn && phase == Phase.ON)
         }
 
         // Under the swoosh: today's numbers and anything that needs attention.
@@ -232,7 +233,7 @@ private fun Notice(text: String, action: String, onClick: () -> Unit) {
  * shut, a ring pulses out and the glow breathes; turning off, they settle grey.
  */
 @Composable
-private fun BigToggle(phase: Phase, logo: Dp, onClick: () -> Unit) {
+private fun BigToggle(phase: Phase, logo: Dp, onClick: () -> Unit, alwaysOn: Boolean = false) {
     val on = phase != Phase.OFF
     val accent = Palette.accent
     val press = remember { MutableInteractionSource() }
@@ -282,7 +283,8 @@ private fun BigToggle(phase: Phase, logo: Dp, onClick: () -> Unit) {
     val rock by breathe.animateFloat(-1f, 1f, infiniteRepeatable(tween(420), RepeatMode.Reverse), label = "rock")
     val glowAlpha by animateFloatAsState(if (on) 1f else 0f, tween(500), label = "glowAlpha")
 
-    val descOn = tr("Protection on. Tap to turn off.", "Protection activée. Touchez pour désactiver.", "Schutz an. Tippen zum Ausschalten.")
+    val descOn = if (alwaysOn) tr("Protection always on. Tap to open VPN settings.", "Protection toujours active. Touchez pour ouvrir les réglages VPN.", "Schutz immer an. Tippen öffnet die VPN-Einstellungen.")
+        else tr("Protection on. Tap to turn off.", "Protection activée. Touchez pour désactiver.", "Schutz an. Tippen zum Ausschalten.")
     val descOff = tr("Protection off. Tap to turn on.", "Protection désactivée. Touchez pour activer.", "Schutz aus. Tippen zum Einschalten.")
     // Only the shield itself is the button (a circle the logo's size), so taps beside it
     // or on the label don't toggle protection by accident.
@@ -319,18 +321,27 @@ private fun BigToggle(phase: Phase, logo: Dp, onClick: () -> Unit) {
             )
         }
         AnimatedContent(
-            targetState = phase,
+            targetState = phase to alwaysOn,
             transitionSpec = { fadeIn(tween(250)).togetherWith(fadeOut(tween(150))) },
             label = "state",
-        ) { p ->
-            Text(
-                when (p) {
-                    Phase.STARTING -> tr("STARTING", "DÉMARRAGE", "STARTET")
-                    Phase.ON -> tr("PROTECTION ON", "PROTECTION ACTIVÉE", "SCHUTZ AN")
-                    Phase.OFF -> tr("PROTECTION OFF", "PROTECTION DÉSACTIVÉE", "SCHUTZ AUS")
-                },
-                color = if (p != Phase.OFF) Palette.accentText else Palette.faint, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp,
-            )
+        ) { (p, always) ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    when {
+                        p == Phase.STARTING -> tr("STARTING", "DÉMARRAGE", "STARTET")
+                        p == Phase.ON && always -> tr("PROTECTION ALWAYS ON", "PROTECTION TOUJOURS ACTIVE", "SCHUTZ IMMER AN")
+                        p == Phase.ON -> tr("PROTECTION ON", "PROTECTION ACTIVÉE", "SCHUTZ AN")
+                        else -> tr("PROTECTION OFF", "PROTECTION DÉSACTIVÉE", "SCHUTZ AUS")
+                    },
+                    color = if (p != Phase.OFF) Palette.accentText else Palette.faint, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp,
+                )
+                if (p == Phase.ON && always) {
+                    Text(
+                        tr("Set by Always-on VPN. Tap the shield to change it.", "Activé par le VPN permanent. Touchez le bouclier pour le changer.", "Durch Always-on-VPN. Tippe aufs Schild, um es zu ändern."),
+                        color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+            }
         }
     }
 }

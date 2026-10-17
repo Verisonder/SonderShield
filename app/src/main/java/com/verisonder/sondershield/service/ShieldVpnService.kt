@@ -46,6 +46,10 @@ class ShieldVpnService : VpnService() {
         /** Rebuild the tunnel (bypass apps or IPv6 changed). */
         const val ACTION_RESTART = "com.verisonder.sondershield.RESTART"
 
+        /** The phone's VPN settings, where Always-on VPN is turned off. */
+        fun vpnSettingsIntent(): Intent =
+            Intent(android.provider.Settings.ACTION_VPN_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
         private const val CHANNEL = "shield"
         private const val NOTE_ID = 1
 
@@ -82,6 +86,7 @@ class ShieldVpnService : VpnService() {
     /** Root mode's iptables redirect is installed and must come out on stop. */
     @Volatile private var rootRules = false
     private var counterJob: Job? = null
+    private var alwaysJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -212,6 +217,7 @@ class ShieldVpnService : VpnService() {
         ShieldState.startPublishing()
         refreshTile()
         watchCounters()
+        watchAlwaysOn()
 
         // First start, or a list was just switched on: fetch what's missing, then reload.
         val store = ListStore(this)
@@ -227,6 +233,8 @@ class ShieldVpnService : VpnService() {
 
     private fun teardown() {
         counterJob?.cancel()
+        alwaysJob?.cancel()
+        ShieldState.alwaysOn.value = false
         if (rootRules) {
             Root.clear()
             rootRules = false
@@ -249,6 +257,8 @@ class ShieldVpnService : VpnService() {
 
     override fun onDestroy() {
         counterJob?.cancel()
+        alwaysJob?.cancel()
+        ShieldState.alwaysOn.value = false
         if (rootRules) {
             Root.clear()
             rootRules = false
@@ -308,6 +318,22 @@ class ShieldVpnService : VpnService() {
                     getSystemService(NotificationManager::class.java).notify(NOTE_ID, buildNote(blocked))
                     kotlinx.coroutines.delay(3000)
                 }
+            }
+        }
+    }
+
+    /** Keeps ShieldState.alwaysOn in step with the system setting while the VPN runs (the user
+     *  can flip it in Settings at any time). */
+    private fun watchAlwaysOn() {
+        alwaysJob?.cancel()
+        alwaysJob = ShieldState.scope.launch {
+            while (true) {
+                val v = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) !rootRules && isAlwaysOn else false
+                if (v != ShieldState.alwaysOn.value) {
+                    ShieldState.alwaysOn.value = v
+                    refreshTile()
+                }
+                kotlinx.coroutines.delay(4000)
             }
         }
     }

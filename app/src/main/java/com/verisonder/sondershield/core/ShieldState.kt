@@ -61,6 +61,9 @@ object ShieldState {
     val resumed = MutableStateFlow(0)
     /** When protection last came on (ms), 0 while off. */
     val startedAt = MutableStateFlow(0L)
+    /** Android's "Always-on VPN" is set for SonderShield: the system keeps it running, so
+     *  switching off has to happen in the phone's VPN settings. */
+    val alwaysOn = MutableStateFlow(false)
     private var store: Stats? = null
 
     private const val LOG_MAX = 2000

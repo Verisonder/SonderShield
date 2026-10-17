@@ -22,7 +22,9 @@ class ShieldTile : TileService() {
 
     override fun onClick() {
         super.onClick()
-        if (ShieldState.phase.value != Phase.OFF) {
+        if (ShieldState.phase.value != Phase.OFF && ShieldState.alwaysOn.value) {
+            openVpnSettings()
+        } else if (ShieldState.phase.value != Phase.OFF) {
             ShieldVpnService.stop(this)
         } else if (ShieldVpnService.needsConsent(this)) {
             // First time: the VPN permission dialog needs an activity.
@@ -31,6 +33,17 @@ class ShieldTile : TileService() {
             ShieldVpnService.start(this)
         }
         update()
+    }
+
+    @SuppressLint("StartActivityAndCollapseDeprecated")
+    private fun openVpnSettings() {
+        val i = ShieldVpnService.vpnSettingsIntent()
+        if (Build.VERSION.SDK_INT >= 34) {
+            startActivityAndCollapse(PendingIntent.getActivity(this, 3, i, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
+        } else {
+            @Suppress("DEPRECATION")
+            startActivityAndCollapse(i)
+        }
     }
 
     @SuppressLint("StartActivityAndCollapseDeprecated")
