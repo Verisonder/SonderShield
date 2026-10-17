@@ -395,12 +395,25 @@ async function showDiag() {
     </div>`).join('') || '<div class="cfaint">No active adapters found.</div>';
   let verdict, cls;
   if (!d.on) { verdict = 'Protection is off, so nothing is pointed at SonderShield yet.'; cls = ''; }
-  else if (d.receiving) { verdict = 'Windows is sending its DNS to SonderShield and queries are arriving. All good.'; cls = 'good'; }
+  else if (d.receiving) { verdict = 'Windows is sending its DNS to SonderShield and lookups are arriving. All good.'; cls = 'good'; }
   else if (d.allGood) { verdict = 'Every adapter is pointed at SonderShield, but no queries are arriving. The most likely cause is Windows Encrypted DNS (DoH): open Settings → Network & internet → your connection → DNS server assignment, and set DNS over HTTPS to Off. Another DNS app could also be intercepting.'; cls = 'warn'; }
   else { verdict = "One or more adapters below aren't pointed at SonderShield (✕). SonderShield should set them automatically — switch protection off and on. If an adapter keeps showing ✕, that adapter type may not be caught yet; tell me which one."; cls = 'warn'; }
+  // Lookups arrive but nothing is ever blocked: a browser is most likely doing its own
+  // encrypted DNS, which skips SonderShield.
+  if (d.on && d.seen > 40 && !(state.today && state.today[1]) && !cfg.lockDns) {
+    const tip = 'Nothing has been blocked yet, which usually means your browser uses its own secure DNS and skips SonderShield. Turn on <b>Settings › Force DNS through SonderShield</b>, or switch off "secure DNS" in the browser\'s settings.';
+    if (d.receiving) { verdict = 'Windows is sending its lookups to SonderShield. ' + tip; cls = 'warn'; }
+    else verdict += ' <br><br>' + tip;
+  }
+  const adapterNote = d.on && d.mode === 'adapter'
+    ? `<div class="diagnote">${d.portOwner
+        ? `Port 53 on this PC is taken by <b>${esc(d.portOwner)}</b>, so SonderShield answers on its own network adapter instead, which some setups don't use reliably. Close ${esc(d.portOwner)} or turn off its DNS feature, then turn protection off and on.`
+        : 'SonderShield is answering on its own network adapter because port 53 was busy when protection started. Turn protection off and on to try port 53 again.'}</div>`
+    : '';
   bg.innerHTML = `<div class="modal diag" role="dialog">
     <h3>DNS diagnostic</h3>
     <div class="diagverdict ${cls}">${verdict}</div>
+    ${adapterNote}
     <div class="diagmeta">Mode: <b>${d.mode === 'adapter' ? 'SonderShield adapter' : d.mode === 'local' ? 'This PC (port 53)' : '—'}</b> · SonderShield answers on: <b>${(d.expected || []).join(', ') || '—'}</b> · Queries arriving: <b>${d.receiving ? 'yes' : 'no'}</b></div>
     <div class="diagadapters">${adRows}</div>
     <div class="actions"><button class="pill" data-a="close">Close</button><button class="pill filled" data-a="refresh">Refresh</button></div>

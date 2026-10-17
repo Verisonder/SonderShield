@@ -182,8 +182,14 @@ func (a *App) active() bool {
 	if !a.on {
 		return false
 	}
+	// Windows caches answers, so a PC that isn't opening new sites can go quiet for a
+	// while with everything fine. Only warn when nothing at all has arrived for a minute
+	// after starting, or nothing for five minutes since.
 	now := time.Now().UnixMilli()
-	return now-a.lastQuery < 30_000 || now-a.startedAt < 15_000
+	if now-a.startedAt < 60_000 {
+		return true
+	}
+	return a.lastQuery >= a.startedAt && now-a.lastQuery < 300_000
 }
 
 var errNotRunning = errors.New("not running")

@@ -400,3 +400,5 @@ svg.chart.draw .plot { animation: sweep 1s cubic-bezier(.4,0,.2,1); }
 .sq.warnsq { background: var(--warn); }
 svg.cchart { height: 150px; }
 svg.chart .lw { fill: none; stroke: var(--warn); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+.diagnote { font-size: 13px; line-height: 1.55; color: var(--dim); border-left: 3px solid var(--warn); padding: 4px 0 4px 12px; margin: 0 0 12px; }
+.diagnote b { color: var(--text); }

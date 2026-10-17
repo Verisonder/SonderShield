@@ -57,6 +57,8 @@ type platform interface {
 	connCounts() (conns int, apps int)
 	// appIcon: the program's icon as a PNG (nil if it has none or isn't readable).
 	appIcon(path string) []byte
+	// port53Owner: the name of another program listening on DNS port 53 on this PC, if any.
+	port53Owner() string
 }
 
 // Conn is one outbound connection the computer currently has open.

@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/binary"
+	"os"
 	"unsafe"
 )
 
@@ -98,4 +99,52 @@ func (p *windowsPlatform) connCounts() (int, int) {
 		}
 	}
 	return conns, len(pids)
+}
+
+var procGetExtendedUdpTbl = iphlpapi.NewProc("GetExtendedUdpTable")
+
+const udpTableOwnerPid = 1
+
+// port53Owner finds who else is listening on UDP port 53 (IPv4 or IPv6), which is what makes
+// SonderShield fall back to its own adapter. Returns "" when nobody else has it.
+func (p *windowsPlatform) port53Owner() string {
+	self := uint32(os.Getpid())
+	find := func(af uint32, rowSize, portOff, pidOff int) uint32 {
+		var size uint32
+		procGetExtendedUdpTbl.Call(0, uintptr(unsafe.Pointer(&size)), 0, uintptr(af), udpTableOwnerPid, 0)
+		if size == 0 {
+			return 0
+		}
+		buf := make([]byte, size)
+		r, _, _ := procGetExtendedUdpTbl.Call(uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&size)), 0, uintptr(af), udpTableOwnerPid, 0)
+		if r != 0 || len(buf) < 4 {
+			return 0
+		}
+		n := int(binary.LittleEndian.Uint32(buf[:4]))
+		for i := 0; i < n; i++ {
+			off := 4 + i*rowSize
+			if off+rowSize > len(buf) {
+				break
+			}
+			row := buf[off : off+rowSize]
+			port := int(row[portOff])<<8 | int(row[portOff+1]) // network order in the low bytes
+			pid := binary.LittleEndian.Uint32(row[pidOff : pidOff+4])
+			if port == 53 && pid != self && pid != 0 {
+				return pid
+			}
+		}
+		return 0
+	}
+	// MIB_UDPROW_OWNER_PID: addr(4) port(4) pid(4). MIB_UDP6ROW_OWNER_PID: addr(16) scope(4) port(4) pid(4).
+	pid := find(afInet, 12, 4, 8)
+	if pid == 0 {
+		pid = find(afInet6, 28, 20, 24)
+	}
+	if pid == 0 {
+		return ""
+	}
+	if info, ok := pidNames()[pid]; ok && info.name != "" {
+		return info.name
+	}
+	return "process " + itoa(pid)
 }

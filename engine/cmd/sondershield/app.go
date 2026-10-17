@@ -157,6 +157,8 @@ type dnsDiag struct {
 	Receiving bool         `json:"receiving"`
 	AllGood   bool         `json:"allGood"`
 	Adapters  []AdapterDNS `json:"adapters"`
+	PortOwner string       `json:"portOwner"` // who holds port 53 (adapter mode)
+	Seen      int64        `json:"seen"`      // lookups since protection started
 }
 
 // diag builds the DNS diagnostic shown when queries aren't arriving.
@@ -189,7 +191,11 @@ func (a *App) diag() dnsDiag {
 			allGood = false
 		}
 	}
-	return dnsDiag{On: on, Mode: mode, Expected: expected, Receiving: a.active(), AllGood: allGood, Adapters: ads}
+	owner := ""
+	if mode == "adapter" {
+		owner = a.plat.port53Owner()
+	}
+	return dnsDiag{On: on, Mode: mode, Expected: expected, Receiving: a.active(), AllGood: allGood, Adapters: ads, PortOwner: owner, Seen: a.eng.Total()}
 }
 
 // setConfig replaces settings, saves them, and re-applies to a running engine.
