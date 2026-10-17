@@ -163,9 +163,9 @@ function renderHome() {
     ${warn ? `<div class="banner" style="margin-top:22px">Windows isn't sending its lookups to SonderShield yet. <button class="linkbtn" id="diagbtn">See why</button></div>` : ''}
     ${problem ? `<div class="banner" style="margin-top:22px">${esc(problem)}</div>` : ''}
     <div class="homebody ${fresh ? 'enter' : ''}">
-      <svg class="swoosh" viewBox="0 0 360 46" preserveAspectRatio="none">
-        <path class="blade ${phase === 'on' ? 'lit' : ''} ${snap ? 'sweep' : ''}" d="M0 46Q130 4 360 12L360 20Q155 16 0 46Z"/>
-        <path d="M0 46Q150 20 360 28L360 47L0 47Z" fill="var(--panel)"/>
+      <svg class="swoosh" height="46">
+        <path class="blade ${phase === 'on' ? 'lit' : ''} ${snap ? 'sweep' : ''}" d=""/>
+        <path class="swfill" d="" fill="var(--panel)"/>
       </svg>
       <div class="ladder panelgrid">
         <div class="todaycol">
@@ -210,6 +210,7 @@ function renderHome() {
     chartKey = ''; topKey = '';
     watchReveal(p, fresh);
     $('#shield').onclick = toggleProtection;
+    drawSwoosh();
     const db = $('#diagbtn'); if (db) db.onclick = showDiag;
   }
   const n = k => p.querySelector(`.num[data-k="${k}"]`);
@@ -332,6 +333,22 @@ function drawTop(animate) {
     box.querySelectorAll('.bar i').forEach((b, i) => { b.style.transitionDelay = (80 * (i + 1)) + 'ms'; b.style.width = b.dataset.w + '%'; });
   }));
 }
+
+// The swoosh is drawn at its real pixel width (not stretched), so its ends can be rounded:
+// the panel's top-right corner gets the same radius as the panel's other corners, the
+// top-left one is the panel's own rounded corner, and the blue blade ends in a round tip.
+function drawSwoosh() {
+  const sv = $('#page-home .swoosh');
+  if (!sv) return;
+  const W = Math.round(sv.getBoundingClientRect().width), R = 16, k = W / 360;
+  if (W < 60) return;
+  sv.setAttribute('viewBox', `0 0 ${W} 46`);
+  sv.querySelector('.swfill').setAttribute('d',
+    `M${R} 46Q${150 * k} 20 ${W - R} 28Q${W} 28 ${W} ${28 + R}L${W} 47L${R} 47Z`);
+  sv.querySelector('.blade').setAttribute('d',
+    `M${R} 46Q${130 * k} 4 ${W - 6} 12Q${W} 12 ${W} 16Q${W} 20 ${W - 6} 20Q${155 * k} 16 ${R} 46Z`);
+}
+addEventListener('resize', drawSwoosh);
 
 async function toggleProtection() {
   if (busy) return;

@@ -106,7 +106,7 @@ main { flex: 1; overflow-y: auto; overflow-x: hidden; }
 
 /* Swoosh + stats ladder */
 .swoosh { display: block; height: 46px; width: 100%; margin-top: 18px; }
-.ladder { overflow: hidden; background: var(--panel); border-radius: 0 0 22px 22px; padding: 16px 24px 24px; margin-top: -1px; }
+.ladder { overflow: hidden; background: var(--panel); border-radius: 16px 0 22px 22px; padding: 16px 24px 24px; margin-top: -1px; }
 .ladder h2 { font-size: 13px; font-weight: 700; letter-spacing: 1.5px; color: var(--faint); margin-bottom: 18px; }
 .steps { display: flex; flex-direction: column; gap: 14px; }
 .step { background: var(--card); border-radius: 16px; padding: 16px 20px; }
