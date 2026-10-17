@@ -96,7 +96,7 @@ func (u *udpUpstream) exchange(ctx context.Context, query []byte) ([]byte, error
 }
 
 func udpExchange(ctx context.Context, addr string, query []byte) ([]byte, error) {
-	d := net.Dialer{Timeout: 2 * time.Second}
+	d := net.Dialer{Timeout: 2 * time.Second, Control: dialControl}
 	c, err := d.DialContext(ctx, "udp", addr)
 	if err != nil {
 		return nil, err
@@ -124,7 +124,7 @@ func udpExchange(ctx context.Context, addr string, query []byte) ([]byte, error)
 }
 
 func tcpExchange(ctx context.Context, addr string, query []byte) ([]byte, error) {
-	d := net.Dialer{Timeout: 3 * time.Second}
+	d := net.Dialer{Timeout: 3 * time.Second, Control: dialControl}
 	c, err := d.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return nil, err
@@ -157,7 +157,7 @@ type dohUpstream struct {
 func newDoH(u string, ips []string, tlsConf *tls.Config) *dohUpstream {
 	d := &dohUpstream{url: u, ips: ips}
 	var next atomic.Uint32
-	dialer := &net.Dialer{Timeout: 3 * time.Second, KeepAlive: 30 * time.Second}
+	dialer := &net.Dialer{Timeout: 3 * time.Second, KeepAlive: 30 * time.Second, Control: dialControl}
 	tr := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			_, port, err := net.SplitHostPort(addr)

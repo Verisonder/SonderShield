@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux || windows
 
 package shield
 
@@ -31,7 +31,7 @@ func (e *Engine) makeOutbound() (outbound, error) {
 	}
 	c := e.wg.Load()
 	if c == nil {
-		return &directOut{}, nil
+		return e.directOut(), nil
 	}
 	cfg, err := c.ipc()
 	if err != nil {
@@ -41,7 +41,9 @@ func (e *Engine) makeOutbound() (outbound, error) {
 	if err != nil {
 		return nil, err
 	}
-	dev := device.NewDevice(tunDev, conn.NewDefaultBind(), device.NewLogger(device.LogLevelSilent, ""))
+	bind := conn.NewDefaultBind()
+	e.bindOutside(bind)
+	dev := device.NewDevice(tunDev, bind, device.NewLogger(device.LogLevelSilent, ""))
 	if err := dev.IpcSet(cfg); err != nil {
 		dev.Close()
 		return nil, err
