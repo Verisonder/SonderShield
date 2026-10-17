@@ -78,18 +78,31 @@ func run(name string, args ...string) (string, error) {
 	return string(out), nil
 }
 
-func (p *windowsPlatform) setFirewall(paths []string) error {
+func (p *windowsPlatform) setAppRules(rules []AppRule) error {
 	p.clearFirewall()
+	name := p.rule + " Block"
 	var errs []string
-	for _, path := range paths {
-		if path == "" {
+	block := func(dir, path string, extra ...string) {
+		args := []string{"advfirewall", "firewall", "add", "rule", "name=" + name,
+			"dir=" + dir, "action=block", "program=" + path, "enable=yes"}
+		args = append(args, extra...)
+		if _, err := run("netsh", args...); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	for _, r := range rules {
+		if r.Path == "" {
 			continue
 		}
-		for _, dir := range []string{"out", "in"} {
-			if _, err := run("netsh", "advfirewall", "firewall", "add", "rule",
-				"name="+p.rule+" Block", "dir="+dir, "action=block", "program="+path, "enable=yes"); err != nil {
-				errs = append(errs, err.Error())
-			}
+		switch r.Mode {
+		case "in": // block only incoming connections to this app
+			block("in", r.Path)
+		case "lan": // block this app from the local network, in and out
+			block("out", r.Path, "remoteip=LocalSubnet")
+			block("in", r.Path, "remoteip=LocalSubnet")
+		default: // "block": no internet at all
+			block("out", r.Path)
+			block("in", r.Path)
 		}
 	}
 	if len(errs) > 0 {

@@ -545,7 +545,7 @@ async function renderApps() {
   const p = $('#page-apps');
   const kill = state.kill;
   p.innerHTML = `<div class="kicker">FIREWALL</div><h1>Firewall</h1>
-    <div class="sub">Switch an app on here to cut off its internet completely — on Wi-Fi and Ethernet. Uses Windows Firewall.</div>
+    <div class="sub">Control what each app can reach — block it entirely, block only incoming connections, or keep it off the local network. Uses Windows Firewall.</div>
     <div class="panic ${kill ? 'on' : ''}">
       <div class="panictext"><div class="panicttl">${kill ? 'All internet is blocked' : 'Block all internet'}</div>
         <div class="panicsub">${kill ? 'Every app is cut off. SonderShield still works.' : 'Cut off every app on this PC at once. A panic switch.'}</div></div>
@@ -607,23 +607,26 @@ async function addNetBlock() {
   await postConfig(cfg); drawNetBlocks();
 }
 function drawPrograms() {
-  const box = $('#proglist'); const blocked = new Set(cfg.firewall || []);
+  const box = $('#proglist');
   if (!programs || !programs.length) { box.innerHTML = `<div class="empty">No apps found. (On Linux this list is empty.)</div>`; return; }
-  const sorted = [...programs].sort((a, b) => (blocked.has(b.path) ? 1 : 0) - (blocked.has(a.path) ? 1 : 0) || a.name.localeCompare(b.name));
-  let h = '';
-  for (const pr of sorted) {
-    const on = blocked.has(pr.path);
-    h += `<div class="card"><div class="row"><div class="grow">
+  const modeOf = p => { const r = (cfg.appRules || []).find(x => x.path === p); return r ? (r.mode || 'block') : ''; };
+  const MODES = [['', 'Allow'], ['block', 'Block all'], ['in', 'No incoming'], ['lan', 'No LAN']];
+  const sorted = [...programs].sort((a, b) => (modeOf(b.path) ? 1 : 0) - (modeOf(a.path) ? 1 : 0) || a.name.localeCompare(b.name));
+  box.innerHTML = sorted.map(pr => {
+    const m = modeOf(pr.path);
+    const chips = MODES.map(([v, l]) => `<button class="chip sm ${m === v ? (v ? 'active warnon' : 'active') : ''}" data-mode="${v}" data-path="${escapeAttr(pr.path)}">${l}</button>`).join('');
+    return `<div class="card approw ${m ? 'ruled' : ''}"><div class="row"><div class="grow">
       <div class="ctitle">${esc(pr.name)}</div><div class="cfaint">${esc(pr.path)}</div></div>
-      <div class="sw ${on ? 'on' : ''}" data-path="${escapeAttr(pr.path)}"><div class="knob"></div></div></div></div>`;
-  }
-  box.innerHTML = h;
-  box.querySelectorAll('.sw[data-path]').forEach(s => s.onclick = async () => {
-    const path = s.dataset.path; const set = new Set(cfg.firewall || []);
-    set.has(path) ? set.delete(path) : set.add(path);
-    cfg.firewall = [...set]; await postConfig(cfg); drawPrograms();
+      <div class="modechips">${chips}</div></div></div>`;
+  }).join('');
+  box.querySelectorAll('.chip[data-mode]').forEach(c => c.onclick = async () => {
+    const path = c.dataset.path, mode = c.dataset.mode;
+    let rules = (cfg.appRules || []).filter(x => x.path !== path);
+    if (mode) rules.push({ path, mode });
+    cfg.appRules = rules; await postConfig(cfg); drawPrograms();
   });
 }
+
 
 // ---- Settings ----
 const ACCENTS = [0xFF3B82FF, 0xFF38B6FF, 0xFF5B6CFF, 0xFF00D1FF, 0xFF22C55E, 0xFFF97316, 0xFFEF4444, 0xFFEC4899, 0xFFA855F7, 0xFFFACC15];

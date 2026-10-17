@@ -22,9 +22,9 @@ type platform interface {
 	// startTunDNS: serve DNS on SonderShield's own network adapter instead of port 53 on
 	// this PC. Returns the DNS addresses to point Windows at.
 	startTunDNS(e *shield.Engine) (v4, v6 string, err error)
-	// setFirewall replaces our block rules with one per program path (full paths of .exe
-	// files that should get no internet). Empty clears them.
-	setFirewall(paths []string) error
+	// setAppRules replaces the per-app firewall rules: each app blocked fully, incoming-only,
+	// or from the local network. Empty clears them.
+	setAppRules(rules []AppRule) error
 	clearFirewall() error
 	// outsideInterfaces: the interface indexes that reach the internet, so the engine's
 	// own sockets (upstream DNS, relays) don't loop back when the full tunnel is up.

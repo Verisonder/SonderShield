@@ -19,13 +19,21 @@ type Config struct {
 	FullTunnel     bool         `json:"fullTunnel"`
 	LockDNS        bool         `json:"lockDns"`   // force all DNS through SonderShield
 	NetBlocks      []NetBlock   `json:"netBlocks"` // block by IP/CIDR or port
-	Firewall       []string     `json:"firewall"`  // program paths with no internet
+	Firewall       []string     `json:"firewall"`  // legacy: blocked program paths (migrated to AppRules)
+	AppRules       []AppRule    `json:"appRules"`  // per-app firewall mode
 	UpdateHours    int          `json:"updateHours"`
 	Theme          string       `json:"theme"`  // default, light, system
 	Accent         uint32       `json:"accent"` // ARGB
 	Lang           string       `json:"lang"`   // "" follows Windows, else en / fr / de
 	Autostart      bool         `json:"autostart"`
 	Onboarded      bool         `json:"onboarded"`
+}
+
+// AppRule is how one app is firewalled: Mode is "block" (no internet), "in" (block
+// incoming only) or "lan" (no local-network access).
+type AppRule struct {
+	Path string `json:"path"`
+	Mode string `json:"mode"`
 }
 
 type customList struct {

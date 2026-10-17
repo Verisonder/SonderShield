@@ -66,6 +66,12 @@ func newApp(plat platform) *App {
 	if a.cfg.Lists == nil {
 		a.cfg.Lists = defaultLists(lang, country)
 	}
+	if len(a.cfg.AppRules) == 0 && len(a.cfg.Firewall) > 0 {
+		for _, p := range a.cfg.Firewall {
+			a.cfg.AppRules = append(a.cfg.AppRules, AppRule{Path: p, Mode: "block"})
+		}
+		a.cfg.Firewall = nil
+	}
 	st.load("stats.json", a.stats)
 	a.eng.SetListener(listener{a})
 	return a
@@ -119,8 +125,10 @@ func (a *App) connections() []connView {
 	cs := a.plat.listConnections()
 	c := a.config()
 	blocked := map[string]bool{}
-	for _, p := range c.Firewall {
-		blocked[strings.ToLower(p)] = true
+	for _, r := range c.AppRules {
+		if r.Mode == "" || r.Mode == "block" {
+			blocked[strings.ToLower(r.Path)] = true
+		}
 	}
 	out := make([]connView, 0, len(cs))
 	for _, cn := range cs {
@@ -171,7 +179,7 @@ func (a *App) applyConfig() {
 		}
 	}
 	a.eng.SetLists(paths)
-	a.plat.setFirewall(c.Firewall)
+	a.plat.setAppRules(c.AppRules)
 	a.plat.setNetworkBlocks(c.NetBlocks)
 }
 

@@ -294,3 +294,11 @@ svg.chart.draw .plot { animation: sweep 1s cubic-bezier(.4,0,.2,1); }
 .panic.on .panicttl { color: var(--warn); }
 .panicsub { color: var(--dim); font-size: 12.5px; margin-top: 2px; }
 .banner.danger { border-color: var(--warn); color: var(--warn); }
+
+/* Per-app firewall modes */
+.modechips { display: flex; gap: 6px; flex-shrink: 0; }
+.chip.sm { font-size: 12px; padding: 6px 12px; }
+.chip.sm.active { background: var(--accent); color: var(--on-accent); }
+.chip.sm.active.warnon { background: var(--warn); color: #000; }
+.approw.ruled { border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent); }
+@media (max-width: 760px) { .approw .row { flex-wrap: wrap; } .modechips { margin-top: 10px; } }
