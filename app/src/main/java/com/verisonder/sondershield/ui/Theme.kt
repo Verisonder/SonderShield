@@ -178,8 +178,14 @@ val AccentChoices = listOf(
     "Pink" to Color(0xFFFF4FA3), "Purple" to Color(0xFFA66BFF), "White" to Color(0xFFF2F2F2),
 )
 
-/** Black or white, whichever reads better on [c]. */
-fun onColor(c: Color): Color = if (c.luminance() > 0.33f) Color(0xFF0D0D0D) else Color.White
+/** Black or white, whichever has more contrast on [c] (WCAG ratio). */
+fun onColor(c: Color): Color {
+    val l = c.luminance()
+    val black = Color(0xFF0D0D0D)
+    val withBlack = (l + 0.05f) / (black.luminance() + 0.05f)
+    val withWhite = 1.05f / (l + 0.05f)
+    return if (withBlack >= withWhite) black else Color.White
+}
 
 /** The accent tuned to read as text on a page: darker on light pages, lighter on dark ones. */
 private fun accentAsText(a: Color, dark: Boolean): Color {

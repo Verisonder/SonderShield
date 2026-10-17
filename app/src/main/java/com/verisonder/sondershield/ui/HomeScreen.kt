@@ -147,9 +147,9 @@ fun HomeScreen(onToggle: () -> Unit) {
             if (on) { sweep.snapTo(0f); sweep.animateTo(1f, tween(700, easing = FastOutSlowInEasing)) }
         }
         Swoosh(blade = swooshColor, below = Palette.panel, progress = sweep.value)
-        Column(Modifier.fillMaxWidth().background(Palette.panel).padding(horizontal = Gutter).padding(top = 2.dp, bottom = 14.dp)) {
+        Column(Modifier.fillMaxWidth().background(Palette.panel).padding(horizontal = Gutter).padding(top = 4.dp, bottom = 16.dp)) {
             Kicker("Today")
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
             val (total, blocked) = today
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 LadderStep(total.toDouble(), { it.toLong().grouped() }, "DNS queries\ntoday", 0, onPanel = true)

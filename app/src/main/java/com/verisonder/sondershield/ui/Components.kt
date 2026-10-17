@@ -343,7 +343,7 @@ fun LadderStep(target: Double, format: (Double) -> String, label: String, index:
         Modifier.padding(start = (18 * index).dp).fillMaxWidth()
             .graphicsLayer { translationX = (1f - enter.value) * 120.dp.toPx(); alpha = enter.value.coerceIn(0f, 1f) }
             .clip(blockShape).background(bg)
-            .padding(horizontal = 18.dp, vertical = 12.dp),
+            .padding(horizontal = 18.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
