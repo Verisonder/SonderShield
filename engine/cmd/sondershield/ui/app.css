@@ -58,7 +58,7 @@ nav .spacer { flex: 1; }
 .statuschip.warn .dot { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
 
 main { flex: 1; overflow-y: auto; overflow-x: hidden; }
-.page { display: none; padding: 32px 40px 48px; max-width: 920px; }
+.page { display: none; padding: 32px 40px 48px; max-width: 980px; margin: 0 auto; }
 .page.active { display: block; }
 .page h1 { font-size: 38px; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; }
 .kicker { color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: 1.5px; margin-bottom: 14px; }
@@ -94,15 +94,15 @@ main { flex: 1; overflow-y: auto; overflow-x: hidden; }
 .shieldbtn { background: none; border: none; cursor: pointer; width: 150px; height: 165px; position: relative; transition: transform .15s; }
 .shieldbtn:hover { transform: scale(1.03); }
 .shieldbtn:active { transform: scale(.97); }
-.shieldbtn.on { filter: drop-shadow(0 0 22px rgba(59,130,255,.5)); }
+
 .shieldlabel { font-family: 'Unbounded'; font-weight: 700; font-size: 13px; letter-spacing: 1.5px; margin-top: 18px; color: var(--faint); }
 .shieldlabel.on { color: var(--accent); }
 .headline { font-family: 'Unbounded'; font-weight: 800; font-size: 30px; text-align: center; margin: 4px 0 2px; letter-spacing: -.5px; }
 .headsub { text-align: center; color: var(--dim); font-size: 13.5px; max-width: 420px; margin: 0 auto; }
 
 /* Swoosh + stats ladder */
-.swoosh { height: 40px; width: 100%; margin-top: 10px; }
-.ladder { background: var(--panel); border-radius: 22px; padding: 24px; margin-top: -2px; }
+.swoosh { display: block; height: 46px; width: 100%; margin-top: 18px; }
+.ladder { background: var(--panel); border-radius: 0 0 22px 22px; padding: 16px 24px 24px; margin-top: -1px; }
 .ladder h2 { font-size: 13px; font-weight: 700; letter-spacing: 1.5px; color: var(--faint); margin-bottom: 18px; }
 .steps { display: flex; flex-direction: column; gap: 14px; }
 .step { background: var(--card); border-radius: 16px; padding: 16px 20px; }
@@ -159,3 +159,41 @@ textarea.field { resize: vertical; min-height: 90px; font-family: 'DM Sans'; }
 .modal .err { color: var(--warn); font-size: 13px; margin-top: 10px; min-height: 1em; }
 @keyframes fade { from { opacity: 0 } }
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.98) } }
+
+/* Selectable rows (DNS server) */
+.picks { display: flex; flex-direction: column; gap: 8px; }
+.pick { display: flex; align-items: center; gap: 14px; background: var(--panel); border-radius: 16px; padding: 14px 18px; cursor: pointer; transition: background .15s; }
+.pick:hover { background: var(--card); }
+.pick.sel { background: var(--accent); color: var(--on-accent); }
+.pick.sel .csub { color: var(--on-accent); opacity: .8; }
+.pick .radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--faint); flex-shrink: 0; }
+.pick.sel .radio { border-color: var(--on-accent); background: radial-gradient(circle, var(--on-accent) 0 4px, transparent 5px); }
+.pick .grow { flex: 1; min-width: 0; }
+
+/* Shield states */
+.shieldstage { position: relative; width: 150px; height: 165px; }
+.shieldbtn:disabled { cursor: progress; }
+.shieldbtn:disabled:hover { transform: none; }
+.shieldbtn svg { display: block; overflow: visible; transform-origin: 50% 60%; }
+.shieldbtn .top, .shieldbtn .bot { transform-box: fill-box; transition: fill .3s; }
+.shieldbtn.on svg { animation: breathe 3.2s ease-in-out infinite; }
+.shieldbtn.starting svg, .shieldbtn.stopping svg { animation: rock .9s ease-in-out infinite; }
+.shieldbtn.starting .top { animation: pulse .9s ease-in-out infinite; }
+.shieldbtn.stopping { opacity: .75; }
+.shieldbtn.snap .top { animation: liftTop .6s cubic-bezier(.3,1.7,.5,1); }
+.shieldbtn.snap .bot { animation: dropBot .6s cubic-bezier(.3,1.7,.5,1); }
+.shieldlabel.starting, .shieldlabel.stopping { color: var(--accent); animation: pulse .9s ease-in-out infinite; }
+.shieldlabel.on { color: var(--accent); }
+.ring { position: absolute; left: 50%; top: 50%; width: 170px; height: 170px; margin: -85px 0 0 -85px; border-radius: 50%; border: 3px solid var(--accent); opacity: 0; pointer-events: none; }
+.ring.go { animation: ring .9s ease-out; }
+.blade { fill: var(--card); transition: fill .4s; }
+.blade.lit { fill: var(--accent); }
+.blade.sweep { animation: sweep .7s ease-out; }
+@keyframes breathe { 0%,100% { filter: drop-shadow(0 0 14px color-mix(in srgb, var(--accent) 35%, transparent)); } 50% { filter: drop-shadow(0 0 28px color-mix(in srgb, var(--accent) 60%, transparent)); } }
+@keyframes rock { 0%,100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+@keyframes pulse { 50% { opacity: .4; } }
+@keyframes liftTop { 0% { transform: none; } 35% { transform: translate(-5px,-9px); } 100% { transform: none; } }
+@keyframes dropBot { 0% { transform: none; } 35% { transform: translate(5px,9px); } 100% { transform: none; } }
+@keyframes ring { 0% { transform: scale(.55); opacity: .7; } 100% { transform: scale(1.5); opacity: 0; } }
+@keyframes sweep { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@media (prefers-reduced-motion: reduce) { .shieldbtn svg, .shieldbtn .top, .shieldbtn .bot, .ring, .blade, .shieldlabel { animation: none !important; } }

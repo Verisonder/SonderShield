@@ -13,7 +13,7 @@ async function api(path, opts = {}) {
 }
 const postConfig = c => api('config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) });
 
-let state = null, cfg = null, lastLogSeq = 0, logs = [], tab = 'home';
+let state = null, cfg = null, lastLogSeq = 0, logs = [], tab = 'home', homeKey = '';
 
 // ---- shell ----
 document.querySelectorAll('nav .tab[data-tab]').forEach(b => b.onclick = () => setTab(b.dataset.tab));
@@ -52,6 +52,7 @@ function setTab(t) {
   tab = t;
   document.querySelectorAll('nav .tab[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + t));
+  homeKey = '';
   render();
 }
 
@@ -61,12 +62,15 @@ async function poll() {
     cfg = state.config;
     applyTheme();
     renderStatus();
-    if (tab === 'home' || tab === 'settings' || tab === 'filter') render();
+    // Only Home follows live numbers; other pages redraw when you change something there
+    // (redrawing them every second closed menus and lost your place).
+    const key = JSON.stringify([state.on, state.active, state.problem, state.domains, state.today, state.stats.blocked, state.stats.threats, cfg.theme, cfg.accent]);
+    if (tab === 'home' && !busy && key !== homeKey) { homeKey = key; renderHome(); }
     const newLogs = await api('log?after=' + lastLogSeq);
     if (newLogs && newLogs.length) {
       for (const e of newLogs) { logs.unshift(e); lastLogSeq = Math.max(lastLogSeq, e.seq); }
       if (logs.length > 2000) logs.length = 2000;
-      if (tab === 'filter' && filterView === 'log') renderLog();
+      if (tab === 'filter' && filterView === 'log') drawLog();
     }
   } catch (e) { /* server starting or gone */ }
 }
@@ -91,30 +95,47 @@ function render() {
 }
 
 // ---- Home ----
-function shieldSVG(on) {
+// Home's shield has four looks: off (grey top), starting/stopping (rocking, top pulsing),
+// on (blue, glowing), and a one-off "snap" when protection has just come on: the two
+// halves spring apart and close, a ring pulses out and the blue blade sweeps across.
+let busy = null, justOn = false;
+function shieldSVG(phase) {
+  const top = phase === 'off' ? 'var(--faint)' : 'var(--accent)';
   return `<svg viewBox="0 0 100 110" width="150" height="165"><clipPath id="hsh"><path d="M50 4L92 18V52C92 78 74 97 50 106C26 97 8 78 8 52V18Z"/></clipPath>
     <g clip-path="url(#hsh)">
-      <path d="M0 0H100V30Q46 60 0 80Z" fill="${on ? 'var(--accent)' : 'var(--faint)'}"/>
-      <path d="M0 88Q52 70 100 45V110H0Z" fill="var(--text)"/>
+      <path class="top" d="M0 0H100V30Q46 60 0 80Z" fill="${top}"/>
+      <path class="bot" d="M0 88Q52 70 100 45V110H0Z" fill="var(--text)"/>
     </g></svg>`;
 }
 function renderHome() {
   const s = state.stats, on = state.on;
+  const phase = busy || (on ? 'on' : 'off');
   const total = state.today[0], blocked = state.today[1];
   const rate = total ? Math.round(blocked / total * 100) : 0;
+  const label = { off: 'PROTECTION OFF', on: 'PROTECTION ON', starting: 'STARTING…', stopping: 'TURNING OFF…' }[phase];
+  const head = { off: 'Ads get through.', on: 'Ads stop here.', starting: 'Starting up…', stopping: 'Turning off…' }[phase];
+  const sub = phase === 'starting' ? 'Downloading lists and pointing Windows at SonderShield. This takes a few seconds.'
+    : phase === 'stopping' ? 'Putting Windows back to its usual DNS.'
+    : on ? (state.domains ? fmt(state.domains) + ' ad and tracker domains get nothing back.' : 'Loading block lists…')
+    : 'Turn on to block ads and trackers for every app on this PC.';
+  const snap = justOn; justOn = false;
   const p = $('#page-home');
   p.innerHTML = `
     <div class="shieldwrap">
-      <button class="shieldbtn ${on ? 'on' : ''}" id="shield">${shieldSVG(on)}</button>
-      <div class="shieldlabel ${on ? 'on' : ''}">${on ? 'PROTECTION ON' : 'PROTECTION OFF'}</div>
+      <div class="shieldstage">
+        <div class="ring ${snap ? 'go' : ''}"></div>
+        <button class="shieldbtn ${phase} ${snap ? 'snap' : ''}" id="shield" ${busy ? 'disabled' : ''} title="${on ? 'Turn protection off' : 'Turn protection on'}">${shieldSVG(phase)}</button>
+      </div>
+      <div class="shieldlabel ${phase}">${label}</div>
     </div>
-    <div class="headline">${on ? 'Ads stop here.' : 'Ads get through.'}</div>
-    <div class="headsub">${on
-      ? (state.domains ? fmt(state.domains) + ' ad and tracker domains get nothing back.' : 'Loading block lists…')
-      : 'Turn on to block ads and trackers for every app on this PC.'}</div>
-    ${state.on && !state.active ? `<div class="banner" style="margin-top:22px">Windows isn't sending its lookups to SonderShield yet. If this stays, another DNS tool may be set, or a VPN is overriding DNS.</div>` : ''}
-    ${state.problem ? `<div class="banner" style="margin-top:22px">${state.problem}</div>` : ''}
-    <svg class="swoosh" viewBox="0 0 360 40" preserveAspectRatio="none"><path d="M0 40 Q130 2 360 10 L360 40 Z" fill="var(--panel)"/></svg>
+    <div class="headline">${head}</div>
+    <div class="headsub">${sub}</div>
+    ${!busy && state.on && !state.active ? `<div class="banner" style="margin-top:22px">Windows isn't sending its lookups to SonderShield yet. If this stays, another DNS tool may be set, or a VPN is overriding DNS.</div>` : ''}
+    ${!busy && state.problem ? `<div class="banner" style="margin-top:22px">${esc(state.problem)}</div>` : ''}
+    <svg class="swoosh" viewBox="0 0 360 46" preserveAspectRatio="none">
+      <path class="blade ${phase === 'on' ? 'lit' : ''} ${snap ? 'sweep' : ''}" d="M0 46Q130 4 360 12L360 20Q155 16 0 46Z"/>
+      <path d="M0 46Q150 20 360 28L360 47L0 47Z" fill="var(--panel)"/>
+    </svg>
     <div class="ladder">
       <h2>TODAY</h2>
       <div class="steps">
@@ -128,7 +149,24 @@ function renderHome() {
       <div class="tile"><div class="num">${fmt(s.threats)}</div><div class="lbl">threats blocked\nmalware & phishing</div></div>
       <div class="tile"><div class="num">${fmt(state.domains)}</div><div class="lbl">domains\non the lists</div></div>
     </div>`;
-  $('#shield').onclick = async () => { await api('toggle', { method: 'POST' }); poll(); };
+  $('#shield').onclick = toggleProtection;
+}
+
+async function toggleProtection() {
+  if (busy) return;
+  const wasOn = state.on;
+  busy = wasOn ? 'stopping' : 'starting';
+  renderHome();
+  try { await api('toggle', { method: 'POST' }); } catch (e) {}
+  const started = Date.now();
+  await poll();
+  // Keep the "starting" look on screen for at least a moment so it doesn't just flash.
+  const wait = Math.max(0, 700 - (Date.now() - started));
+  setTimeout(() => {
+    busy = null;
+    justOn = !wasOn && state.on;
+    homeKey = ''; renderHome();
+  }, wait);
 }
 
 // ---- Filter ----
@@ -151,6 +189,7 @@ async function renderFilter() {
 function switchFilter() {
   $('#fv-lists').classList.toggle('active', filterView === 'lists');
   $('#fv-log').classList.toggle('active', filterView === 'log');
+  $('#filter-body').innerHTML = '';
   if (filterView === 'lists') renderLists(); else renderLog();
 }
 
@@ -223,21 +262,28 @@ async function addListDialog() {
 
 function renderLog() {
   const body = $('#filter-body');
+  // Build the search bar and chips once; afterwards only the list below them changes, so
+  // typing in the search box isn't interrupted by new lookups arriving.
+  if (!$('#loglist')) {
+    body.innerHTML = `<div class="row" style="gap:10px;margin-bottom:6px">
+        <input class="field grow" id="logsearch" placeholder="Search domains" value="${escapeAttr(logSearch)}">
+        <button class="pill" id="clearlog">Clear</button></div>
+      <div class="subtabs" id="logchips">
+        <button class="chip" data-f="0">All</button><button class="chip" data-f="1">Blocked</button><button class="chip" data-f="2">Allowed</button></div>
+      <div id="loglist"></div>`;
+    $('#logsearch').oninput = e => { logSearch = e.target.value; drawLog(); };
+    $('#clearlog').onclick = async () => { await api('clear-log', { method: 'POST' }); logs = []; drawLog(); };
+    body.querySelectorAll('.chip[data-f]').forEach(c => c.onclick = () => { logFilter = +c.dataset.f; drawLog(); });
+  }
+  drawLog();
+}
+function drawLog() {
+  const list = $('#loglist'); if (!list) return;
+  document.querySelectorAll('#logchips .chip').forEach(c => c.classList.toggle('active', +c.dataset.f === logFilter));
   const q = logSearch.toLowerCase();
   const shown = logs.filter(e => (logFilter === 0 || (logFilter === 1 && e.verdict === 1) || (logFilter === 2 && e.verdict !== 1)) && (!q || e.domain.toLowerCase().includes(q))).slice(0, 600);
-  let h = `<div class="row" style="gap:10px;margin-bottom:6px">
-      <input class="field grow" id="logsearch" placeholder="Search domains" value="${escapeAttr(logSearch)}">
-      <button class="pill" id="clearlog">Clear</button></div>
-    <div class="subtabs">
-      <button class="chip ${logFilter === 0 ? 'active' : ''}" data-f="0">All</button>
-      <button class="chip ${logFilter === 1 ? 'active' : ''}" data-f="1">Blocked</button>
-      <button class="chip ${logFilter === 2 ? 'active' : ''}" data-f="2">Allowed</button></div>`;
-  if (!shown.length) h += `<div class="empty">${state.on ? 'Nothing yet. Open an app or a website.' : 'Turn protection on to see queries here.'}</div>`;
-  else { h += '<div>'; for (const e of shown) h += logRow(e); h += '</div>'; }
-  body.innerHTML = h;
-  const si = $('#logsearch'); si.oninput = () => { logSearch = si.value; const pos = si.selectionStart; renderLog(); const ni = $('#logsearch'); ni.focus(); ni.setSelectionRange(pos, pos); };
-  $('#clearlog').onclick = async () => { await api('clear-log', { method: 'POST' }); logs = []; renderLog(); };
-  body.querySelectorAll('.chip[data-f]').forEach(c => c.onclick = () => { logFilter = +c.dataset.f; renderLog(); });
+  list.innerHTML = shown.length ? shown.map(logRow).join('')
+    : `<div class="empty">${state && state.on ? 'Nothing yet. Open an app or a website.' : 'Turn protection on to see queries here.'}</div>`;
 }
 function logRow(e) {
   const blocked = e.verdict === 1, failed = e.verdict === 2;
@@ -301,12 +347,14 @@ const ACCENTS = [0xFF3B82FF, 0xFF38B6FF, 0xFF5B6CFF, 0xFF00D1FF, 0xFF22C55E, 0xF
 async function renderSettings() {
   const cat = await api('catalog');
   const p = $('#page-settings');
-  const ups = cat.upstreams.map(u => `<option value="${u.id}" ${cfg.upstream === u.id ? 'selected' : ''}>${esc(u.name)}</option>`).join('') + `<option value="custom" ${cfg.upstream === 'custom' ? 'selected' : ''}>Custom…</option>`;
+  const upRow = (id, name, sub) => `<div class="pick ${cfg.upstream === id ? 'sel' : ''}" data-up="${id}"><div class="grow"><div class="ctitle">${esc(name)}</div><div class="csub">${esc(sub)}</div></div><div class="radio"></div></div>`;
+  const split = n => { const m = /^(.*?) \((.*)\)$/.exec(n); return m ? [m[1], m[2].charAt(0).toUpperCase() + m[2].slice(1)] : [n, '']; };
+  const ups = cat.upstreams.map(u => upRow(u.id, ...split(u.name))).join('') + upRow('custom', 'Your own server', 'Plain or encrypted (DoH)');
   const auto = await api('autostart');
   p.innerHTML = `<div class="kicker">SETTINGS</div><h1>Settings</h1>
     <div class="seclabel"><span class="t">01 DNS SERVER</span></div>
-    <div class="card"><select class="field" id="upstream">${ups}</select>
-      <input class="field ${cfg.upstream === 'custom' ? '' : 'hidden'}" id="customup" placeholder="udp 9.9.9.9  or  doh https://host/dns-query 1.2.3.4" value="${escapeAttr(cfg.customUpstream || '')}" style="margin-top:10px"></div>
+    <div class="picks">${ups}</div>
+    <div><input class="field ${cfg.upstream === 'custom' ? '' : 'hidden'}" id="customup" placeholder="udp 9.9.9.9  or  doh https://host/dns-query 1.2.3.4" value="${escapeAttr(cfg.customUpstream || '')}" style="margin-top:10px"></div>
     <div class="seclabel"><span class="t">02 UPDATE LISTS AUTOMATICALLY</span></div>
     <div class="card"><div class="subtabs" style="margin:0">
       ${[[0, 'Off'], [12, '12 h'], [24, '24 h'], [48, '48 h']].map(([h, l]) => `<button class="chip ${cfg.updateHours === h ? 'active' : ''}" data-h="${h}">${l}</button>`).join('')}
@@ -333,7 +381,12 @@ async function renderSettings() {
       <div class="csub" style="margin-top:6px">By Verisonder. Free and open source under GPL-3.0. Everything stays on this PC: no account, no analytics.</div>
       <div class="csub" style="margin-top:8px">Blocks ads, trackers and malware by DNS, and can cut off any app's internet.${state.on ? (state.mode === 'adapter' ? ' Filtering through the SonderShield network adapter.' : ' Filtering on this PC (port 53).') : ''}</div>
       <div style="margin-top:12px"><button class="pill" id="src">Source code</button></div></div>`;
-  const up = $('#upstream'); up.onchange = () => { cfg.upstream = up.value; $('#customup').classList.toggle('hidden', up.value !== 'custom'); save(); };
+  p.querySelectorAll('.pick[data-up]').forEach(r => r.onclick = () => {
+    cfg.upstream = r.dataset.up; save();
+    p.querySelectorAll('.pick[data-up]').forEach(x => x.classList.toggle('sel', x === r));
+    $('#customup').classList.toggle('hidden', cfg.upstream !== 'custom');
+    if (cfg.upstream === 'custom') $('#customup').focus();
+  });
   $('#customup').onchange = () => { cfg.customUpstream = $('#customup').value; save(); };
   p.querySelectorAll('.chip[data-h]').forEach(c => c.onclick = () => { cfg.updateHours = +c.dataset.h; save(); renderSettings(); });
   p.querySelectorAll('.chip[data-theme]').forEach(c => c.onclick = () => { cfg.theme = c.dataset.theme; save(); applyTheme(); renderSettings(); });
