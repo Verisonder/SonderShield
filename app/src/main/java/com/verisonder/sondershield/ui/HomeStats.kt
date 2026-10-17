@@ -62,7 +62,7 @@ private const val BYTES_PER_BLOCK = 30_000L
  * plays when the user gets there, not off-screen.
  */
 @Composable
-private fun Modifier.onSeen(seen: MutableState<Boolean>): Modifier {
+internal fun Modifier.onSeen(seen: MutableState<Boolean>): Modifier {
     return this.onGloballyPositioned { c ->
         if (!seen.value && c.isAttached) {
             val window = c.findRootCoordinates().size.height
@@ -73,7 +73,7 @@ private fun Modifier.onSeen(seen: MutableState<Boolean>): Modifier {
 
 /** Slides up and fades in once [seen], [order] steps after the others in its group. */
 @Composable
-private fun Modifier.reveal(seen: Boolean, order: Int = 0): Modifier {
+internal fun Modifier.reveal(seen: Boolean, order: Int = 0): Modifier {
     val e = remember { Animatable(0f) }
     LaunchedEffect(seen) {
         if (seen) { delay(70L * order); e.animateTo(1f, spring(dampingRatio = 0.75f, stiffness = 240f)) }
@@ -83,7 +83,7 @@ private fun Modifier.reveal(seen: Boolean, order: Int = 0): Modifier {
 
 /** Counts from 0 up to [target] the first time [seen], then follows changes smoothly. */
 @Composable
-private fun counted(target: Double, seen: Boolean): Double {
+internal fun counted(target: Double, seen: Boolean): Double {
     val v = remember { Animatable(0f) }
     var started by remember { mutableStateOf(false) }
     LaunchedEffect(seen, target) {

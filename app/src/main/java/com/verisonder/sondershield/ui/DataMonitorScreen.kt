@@ -2,7 +2,12 @@ package com.verisonder.sondershield.ui
 
 import android.app.DatePickerDialog
 import android.content.Context
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -44,6 +50,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.verisonder.sondershield.data.DataUsage
 import com.verisonder.sondershield.data.Prefs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -87,8 +94,8 @@ fun DataMonitorScreen() {
     var access by remember { mutableStateOf(DataUsage.hasAccess(ctx)) }
     var refresh by remember { mutableIntStateOf(0) }
 
-    // Re-check access and numbers whenever the screen comes back to the foreground (the user
-    // may have just granted Usage access in system settings).
+    // Re-check access and numbers whenever the screen comes back (the user may have just
+    // granted Usage access in system settings).
     val owner = LocalLifecycleOwner.current
     DisposableEffect(owner) {
         val obs = LifecycleEventObserver { _, e ->
@@ -104,17 +111,33 @@ fun DataMonitorScreen() {
     if (!access) {
         LazyColumn(Modifier.fillMaxSize()) {
             item {
-                Section(1, tr("Usage access needed", "Accès à l'utilisation requis", "Nutzungszugriff nötig"), first = true) {
-                    Text(
-                        tr(
-                            "SonderShield needs Usage access to read how much data this phone uses. It only reads totals on this device — nothing leaves the phone.",
-                            "SonderShield a besoin de l'accès à l'utilisation pour lire la consommation de données. Il ne lit que les totaux sur cet appareil — rien ne quitte le téléphone.",
-                            "SonderShield braucht Nutzungszugriff, um den Datenverbrauch zu lesen. Es liest nur Summen auf diesem Gerät — nichts verlässt das Handy.",
-                        ),
-                        color = Palette.dim, fontSize = 14.sp, lineHeight = 20.sp,
-                    )
-                    Spacer(Modifier.height(14.dp))
-                    PillButton(tr("Grant access", "Autoriser", "Zugriff erlauben")) { DataUsage.openAccessSettings(ctx) }
+                val seen = remember { mutableStateOf(false) }
+                Column(Modifier.padding(horizontal = Gutter).padding(top = 14.dp)) {
+                    Kicker(tr("Usage access", "Accès à l'utilisation", "Nutzungszugriff"), Modifier.onSeen(seen).reveal(seen.value))
+                    Spacer(Modifier.height(12.dp))
+                    Column(
+                        Modifier.fillMaxWidth().reveal(seen.value, 1).clip(blockShape).background(Palette.accent)
+                            .padding(horizontal = 18.dp, vertical = 18.dp),
+                    ) {
+                        Text(tr("One switch to go.", "Plus qu'un réglage.", "Noch ein Schalter."), style = display(22), color = Palette.onAccent)
+                        Text(
+                            tr(
+                                "SonderShield reads this phone's own data counters. Allow Usage access once — nothing leaves the phone.",
+                                "SonderShield lit les compteurs de données de ce téléphone. Autorisez l'accès à l'utilisation une fois — rien ne quitte le téléphone.",
+                                "SonderShield liest die Datenzähler dieses Handys. Erlaube einmal den Nutzungszugriff — nichts verlässt das Handy.",
+                            ),
+                            color = Palette.onAccent, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 6.dp, bottom = 14.dp),
+                        )
+                        val src = remember { MutableInteractionSource() }
+                        Box(
+                            Modifier.height(44.dp).pressScale(src).clip(CircleShape).background(Palette.onAccent)
+                                .clickable(interactionSource = src, indication = null) { DataUsage.openAccessSettings(ctx) }
+                                .padding(horizontal = 20.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(tr("Allow access", "Autoriser", "Erlauben"), color = Palette.accent, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                    }
                 }
             }
         }
@@ -128,89 +151,138 @@ fun DataMonitorScreen() {
     val d = data
     var editing by rememberSaveable { mutableStateOf(false) }
 
+    val todaySeen = remember { mutableStateOf(false) }
+    val planSeen = remember { mutableStateOf(false) }
+    val weekSeen = remember { mutableStateOf(false) }
+    // Numbers only count up once the data is in, so they don't count to zero first.
+    val loaded = d != null
+
     LazyColumn(Modifier.fillMaxSize()) {
         item {
-            Section(1, tr("Today's data usage", "Données aujourd'hui", "Datenverbrauch heute"), first = true) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    UsageCard(Icons.signal, Palette.accent, tr("Mobile", "Mobile", "Mobil"), d?.todayMobile, Modifier.weight(1f))
-                    UsageCard(Icons.wifi, WifiGreen, tr("Wi-Fi", "Wi-Fi", "WLAN"), d?.todayWifi, Modifier.weight(1f))
+            Column(Modifier.padding(horizontal = Gutter).padding(top = 14.dp)) {
+                Kicker(tr("Today", "Aujourd'hui", "Heute"), Modifier.onSeen(todaySeen).reveal(todaySeen.value))
+                Spacer(Modifier.height(12.dp))
+                val seen = todaySeen.value && loaded
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    UsageCard(Icons.signal, Palette.accent, tr("mobile data", "données mobiles", "mobile Daten"), d?.todayMobile, seen, 1, Modifier.weight(1f))
+                    UsageCard(Icons.wifi, WifiGreen, "Wi-Fi", d?.todayWifi, seen, 2, Modifier.weight(1f))
                 }
             }
         }
         item {
-            Section(2, tr("Monthly plan", "Forfait mensuel", "Monatstarif")) {
+            Column(Modifier.padding(horizontal = Gutter).padding(top = 28.dp)) {
+                Kicker(tr("Monthly plan", "Forfait mensuel", "Monatstarif"), Modifier.onSeen(planSeen).reveal(planSeen.value))
+                Spacer(Modifier.height(12.dp))
                 if (!prefs.planActive || editing) {
-                    PlanSetup(prefs, onDone = { editing = false; refresh++ }, onCancel = { editing = false })
+                    Box(Modifier.reveal(planSeen.value, 1)) {
+                        PlanSetup(prefs, onDone = { editing = false; refresh++ }, onCancel = { editing = false })
+                    }
                 } else {
-                    PlanSummary(prefs, d?.cycleMobile ?: 0L) { editing = true }
+                    PlanSummary(prefs, d?.cycleMobile ?: 0L, planSeen.value && loaded) { editing = true }
                 }
             }
         }
         item {
-            Section(3, tr("This week's overview", "Aperçu de la semaine", "Diese Woche")) {
+            Column(Modifier.padding(horizontal = Gutter).padding(top = 28.dp, bottom = 28.dp)) {
+                Kicker(tr("This week", "Cette semaine", "Diese Woche"), Modifier.onSeen(weekSeen).reveal(weekSeen.value))
+                Spacer(Modifier.height(12.dp))
                 val week = d?.week
-                if (week != null) WeekChart(week)
+                if (week != null) Box(Modifier.reveal(weekSeen.value, 1)) { WeekChart(week, weekSeen.value) }
                 else Text(tr("Reading…", "Lecture…", "Wird gelesen…"), color = Palette.faint, fontSize = 13.sp)
             }
         }
-        item { Spacer(Modifier.height(24.dp)) }
     }
 }
 
+/** One of the two Today tiles, styled like Home's stat tiles: accent number that counts up. */
 @Composable
-private fun UsageCard(icon: ImageVector, tint: Color, label: String, u: DataUsage.Usage?, modifier: Modifier) {
-    Column(modifier.clip(blockShape).background(Palette.card2).padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(fmtBytes(u?.total ?: 0L), style = display(22), color = Palette.text, maxLines = 1)
+private fun UsageCard(icon: ImageVector, tint: Color, label: String, u: DataUsage.Usage?, seen: Boolean, order: Int, modifier: Modifier) {
+    val total = counted((u?.total ?: 0L).toDouble(), seen).toLong()
+    val tx = counted((u?.tx ?: 0L).toDouble(), seen).toLong()
+    val rx = counted((u?.rx ?: 0L).toDouble(), seen).toLong()
+    Column(modifier.reveal(seen, order).clip(blockShape).background(Palette.card2).padding(horizontal = 16.dp, vertical = 14.dp)) {
+        Box(Modifier.size(30.dp).clip(CircleShape).background(tint.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = tint, modifier = Modifier.size(17.dp))
         }
-        Text(label, color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+        Text(fmtBytes(total), style = display(22), color = Palette.accentText, maxLines = 1, modifier = Modifier.padding(top = 10.dp))
+        Text(label, color = Palette.dim, fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(top = 2.dp))
         Spacer(Modifier.height(12.dp))
         Row {
             Column(Modifier.weight(1f)) {
-                Text(fmtBytes(u?.tx ?: 0L), color = Palette.dim, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                Text(tr("Sent", "Envoyé", "Gesendet"), color = Palette.faint, fontSize = 11.sp)
+                Text(fmtBytes(tx), color = Palette.text, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(tr("sent", "envoyé", "gesendet"), color = Palette.faint, fontSize = 11.sp)
             }
             Column(Modifier.weight(1f)) {
-                Text(fmtBytes(u?.rx ?: 0L), color = Palette.dim, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                Text(tr("Received", "Reçu", "Empfangen"), color = Palette.faint, fontSize = 11.sp)
+                Text(fmtBytes(rx), color = Palette.text, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(tr("received", "reçu", "empfangen"), color = Palette.faint, fontSize = 11.sp)
             }
         }
     }
 }
 
+/** Plan at a glance: the filled accent block (like Home's block rate), a bar that fills in, tiles. */
 @Composable
-private fun PlanSummary(prefs: Prefs, usedBytes: Long, onEdit: () -> Unit) {
+private fun PlanSummary(prefs: Prefs, usedBytes: Long, seen: Boolean, onEdit: () -> Unit) {
     val total = prefs.planTotalBytes
-    val remaining = (total - usedBytes).coerceAtLeast(0)
+    val remainingTarget = (total - usedBytes).coerceAtLeast(0L)
     val dailyQuota = if (prefs.planDays > 0) total / prefs.planDays else 0L
     val validTill = prefs.planStartMillis + prefs.planDays.toLong() * 86_400_000L
-    val daysLeft = ceil((validTill - System.currentTimeMillis()) / 86_400_000.0).toLong().coerceAtLeast(0)
+    val daysLeft = ceil((validTill - System.currentTimeMillis()) / 86_400_000.0).toLong().coerceAtLeast(0L)
     val frac = if (total > 0) (usedBytes.toFloat() / total).coerceIn(0f, 1f) else 0f
 
+    val remaining = counted(remainingTarget.toDouble(), seen).toLong()
+    val used = counted(usedBytes.toDouble(), seen).toLong()
+    val grow = remember { Animatable(0f) }
+    LaunchedEffect(seen, frac) {
+        if (seen) { delay(160); grow.animateTo(frac, tween(900, easing = FastOutSlowInEasing)) }
+    }
+    val low = frac > 0.9f
+
     Column {
-        Text(tr("Monthly plan active", "Forfait mensuel actif", "Monatstarif aktiv"), style = display(18), color = Palette.text)
-        Spacer(Modifier.height(12.dp))
-        Box(Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(5.dp)).background(Palette.panel)) {
-            Box(Modifier.fillMaxWidth(frac).height(10.dp).clip(RoundedCornerShape(5.dp)).background(if (frac > 0.9f) Palette.warn else Palette.accent))
+        Row(
+            Modifier.fillMaxWidth().reveal(seen, 1).clip(blockShape).background(if (low) Palette.warn else Palette.accent)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(fmtBytes(remaining), style = display(28), color = Palette.onAccent, maxLines = 1, modifier = Modifier.weight(1f))
+            Text(
+                tr("left of", "restants sur", "übrig von") + "\n" + fmtBytes(total),
+                color = Palette.onAccent, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium,
+            )
         }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            fmtBytes(usedBytes) + " " + tr("used", "utilisés", "genutzt") + "  |  " + fmtBytes(remaining) + " " + tr("remaining", "restants", "übrig"),
-            color = Palette.text, fontSize = 15.sp, fontWeight = FontWeight.Bold,
-        )
-        Text(
-            tr("Daily quota:", "Quota quotidien :", "Tageskontingent:") + " " + fmtBytes(dailyQuota),
-            color = Palette.dim, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp),
-        )
-        Text(
-            tr("Valid till", "Valable jusqu'au", "Gültig bis") + " " + ordinalDate(validTill) + "  |  " +
-                daysLeft + " " + tr("day(s) remaining", "jour(s) restant(s)", "Tag(e) übrig"),
-            color = Palette.dim, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp),
-        )
-        Spacer(Modifier.height(14.dp))
-        PillButton(tr("Edit plan", "Modifier", "Bearbeiten"), filled = false, onClick = onEdit)
+        Spacer(Modifier.height(8.dp))
+        // Used share of the plan, as a bar that fills in.
+        Box(Modifier.fillMaxWidth().reveal(seen, 2).clip(blockShape).background(Palette.card2).padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(fmtBytes(used) + " " + tr("used", "utilisés", "genutzt"), color = Palette.text, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text("${(frac * 100).toInt()}%", color = Palette.dim, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+                Box(Modifier.padding(top = 10.dp).fillMaxWidth().height(6.dp).clip(CircleShape).background(Palette.line)) {
+                    Box(Modifier.fillMaxWidth(grow.value.coerceIn(0.001f, 1f)).height(6.dp).clip(CircleShape).background(if (low) Palette.warn else Palette.accent))
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatTile(fmtBytes(dailyQuota), tr("daily quota", "quota quotidien", "Tageskontingent"), Modifier.weight(1f).reveal(seen, 3))
+            StatTile(
+                "$daysLeft " + tr("days", "jours", "Tage"),
+                tr("left, valid till", "restants, jusqu'au", "übrig, gültig bis") + "\n" + ordinalDate(validTill),
+                Modifier.weight(1f).reveal(seen, 4),
+            )
+        }
+        Box(Modifier.padding(top = 12.dp).reveal(seen, 5)) {
+            PillButton(tr("Edit plan", "Modifier", "Bearbeiten"), filled = false, onClick = onEdit)
+        }
+    }
+}
+
+@Composable
+private fun StatTile(value: String, label: String, modifier: Modifier = Modifier) {
+    Column(modifier.clip(blockShape).background(Palette.card2).padding(horizontal = 16.dp, vertical = 14.dp)) {
+        Text(value, style = display(20), color = Palette.accentText, maxLines = 1)
+        Text(label, color = Palette.dim, fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(top = 4.dp))
     }
 }
 
@@ -219,17 +291,19 @@ private fun PlanSetup(prefs: Prefs, onDone: () -> Unit, onCancel: () -> Unit) {
     val ctx = LocalContext.current
     var amount by rememberSaveable { mutableStateOf(if (prefs.planTotalBytes > 0) trimNum(prefs.planTotalBytes / 1_000_000_000.0) else "") }
     var unitGb by rememberSaveable { mutableStateOf(true) }
-    var days by rememberSaveable { mutableStateOf(if (prefs.planDays > 0) prefs.planDays.toString() else "28") }
+    var days by rememberSaveable { mutableStateOf(if (prefs.planDays > 0) prefs.planDays.toString() else "30") }
     var start by rememberSaveable { mutableStateOf(if (prefs.planStartMillis > 0) prefs.planStartMillis else DataUsage.startOfToday()) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    Column {
-        if (!prefs.planActive) {
-            Text(
-                tr("Set up your mobile plan to track what's left.", "Configurez votre forfait mobile pour suivre ce qu'il reste.", "Richte deinen Mobilfunktarif ein, um den Rest zu verfolgen."),
-                color = Palette.dim, fontSize = 13.sp, modifier = Modifier.padding(bottom = 12.dp),
-            )
-        }
+    Column(Modifier.fillMaxWidth().clip(blockShape).background(Palette.card2).padding(16.dp)) {
+        Text(
+            if (prefs.planActive) tr("Edit your plan", "Modifier le forfait", "Tarif bearbeiten") else tr("Track your mobile plan", "Suivez votre forfait", "Tarif verfolgen"),
+            style = display(18), color = Palette.text,
+        )
+        Text(
+            tr("How much data you get, and for how long.", "Combien de données, et pour combien de temps.", "Wie viele Daten, und wie lange."),
+            color = Palette.dim, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 14.dp),
+        )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Field(amount, { amount = it; error = null }, tr("Data, e.g. 20", "Données, ex. 20", "Daten, z. B. 20"), Modifier.weight(1f), keyboard = KeyboardType.Decimal)
             Spacer(Modifier.width(8.dp))
@@ -238,25 +312,24 @@ private fun PlanSetup(prefs: Prefs, onDone: () -> Unit, onCancel: () -> Unit) {
             Chip("MB", !unitGb) { unitGb = false }
         }
         Spacer(Modifier.height(10.dp))
-        Field(days, { days = it }, tr("Days in cycle", "Jours dans le cycle", "Tage im Zyklus"), Modifier.fillMaxWidth(), keyboard = KeyboardType.Number)
+        Field(days, { days = it; error = null }, tr("Days it lasts", "Durée en jours", "Dauer in Tagen"), Modifier.fillMaxWidth(), keyboard = KeyboardType.Number)
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(tr("Cycle started:", "Début du cycle :", "Zyklusbeginn:"), color = Palette.dim, fontSize = 13.sp)
-            Spacer(Modifier.width(10.dp))
+            Text(tr("Started", "Début", "Beginn"), color = Palette.dim, fontSize = 13.sp, modifier = Modifier.weight(1f))
             PillButton(ordinalDate(start), filled = false) { pickDate(ctx, start) { start = it } }
         }
         error?.let { Text(it, color = Palette.warn, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)) }
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            PillButton(tr("Save plan", "Enregistrer", "Speichern")) {
+            PillButton(tr("Save", "Enregistrer", "Speichern")) {
                 val amt = amount.trim().replace(',', '.').toDoubleOrNull()
                 if (amt == null || amt <= 0) {
-                    error = trc(ctx, "Enter the data amount.", "Entrez la quantité de données.", "Gib die Datenmenge ein.")
+                    error = trc(ctx, "Enter how much data the plan has.", "Entrez la quantité de données du forfait.", "Gib die Datenmenge des Tarifs ein.")
                     return@PillButton
                 }
                 val dys = days.trim().toIntOrNull()
                 if (dys == null || dys <= 0) {
-                    error = trc(ctx, "Enter the cycle length in days.", "Entrez la durée du cycle en jours.", "Gib die Zykluslänge in Tagen ein.")
+                    error = trc(ctx, "Enter how many days it lasts.", "Entrez la durée en jours.", "Gib die Dauer in Tagen ein.")
                     return@PillButton
                 }
                 prefs.planTotalBytes = (amt * if (unitGb) 1_000_000_000.0 else 1_000_000.0).toLong()
@@ -272,34 +345,46 @@ private fun PlanSetup(prefs: Prefs, onDone: () -> Unit, onCancel: () -> Unit) {
     }
 }
 
+/** Seven days, mobile stacked on Wi-Fi. Bars grow up one after another when seen, like Home's chart. */
 @Composable
-private fun WeekChart(week: List<DayUsage>) {
+private fun WeekChart(week: List<DayUsage>, seen: Boolean) {
     val max = (week.maxOfOrNull { it.total } ?: 1L).coerceAtLeast(1L)
+    val totalM = week.sumOf { it.mobile }
+    val totalW = week.sumOf { it.wifi }
     Column(Modifier.fillMaxWidth().clip(blockShape).background(Palette.card2).padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            LegendDot(Palette.accent, tr("Mobile", "Mobile", "Mobil"))
-            Spacer(Modifier.width(18.dp))
-            LegendDot(WifiGreen, tr("Wi-Fi", "Wi-Fi", "WLAN"))
+            LegendDot(Palette.accent, tr("Mobile", "Mobile", "Mobil") + " " + fmtBytes(totalM))
+            Spacer(Modifier.width(16.dp))
+            LegendDot(WifiGreen, "Wi-Fi " + fmtBytes(totalW))
         }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-            for (day in week) {
-                val mH = if (day.mobile > 0) (day.mobile.toFloat() / max * 150f).dp.coerceAtLeast(3.dp) else 0.dp
-                val wH = if (day.wifi > 0) (day.wifi.toFloat() / max * 150f).dp.coerceAtLeast(3.dp) else 0.dp
+            week.forEachIndexed { i, day ->
+                val grow = remember { Animatable(0f) }
+                LaunchedEffect(seen) {
+                    if (seen) { delay(70L * i); grow.animateTo(1f, tween(700, easing = FastOutSlowInEasing)) }
+                }
+                val g = grow.value
+                val mH = if (day.mobile > 0) ((day.mobile.toFloat() / max * 140f).coerceAtLeast(3f) * g).dp else 0.dp
+                val wH = if (day.wifi > 0) ((day.wifi.toFloat() / max * 140f).coerceAtLeast(3f) * g).dp else 0.dp
+                val isToday = i == week.lastIndex
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(if (day.total > 0) shortBytes(day.total) else "", color = Palette.faint, fontSize = 9.sp, modifier = Modifier.padding(bottom = 3.dp))
-                    Box(Modifier.height(150.dp).width(22.dp), contentAlignment = Alignment.BottomCenter) {
+                    Text(if (day.total > 0) shortBytes(day.total) else "", color = Palette.faint, fontSize = 9.sp, maxLines = 1, modifier = Modifier.padding(bottom = 4.dp))
+                    Box(Modifier.height(140.dp).width(20.dp), contentAlignment = Alignment.BottomCenter) {
                         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.Bottom) {
-                            if (mH > 0.dp) Box(Modifier.fillMaxWidth().height(mH).clip(RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp)).background(Palette.accent))
+                            if (mH > 0.dp) Box(Modifier.fillMaxWidth().height(mH).clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)).background(Palette.accent))
                             if (wH > 0.dp) {
-                                val shape = if (mH > 0.dp) RectangleShape else RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp)
+                                val shape = if (mH > 0.dp) RectangleShape else RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
                                 Box(Modifier.fillMaxWidth().height(wH).clip(shape).background(WifiGreen))
                             }
-                            if (mH <= 0.dp && wH <= 0.dp) Box(Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(Palette.panel))
+                            if (day.total == 0L) Box(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(Palette.line))
                         }
                     }
-                    Spacer(Modifier.height(6.dp))
-                    Text(day.label, color = Palette.faint, fontSize = 11.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        day.label, color = if (isToday) Palette.accentText else Palette.faint, fontSize = 11.sp,
+                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                    )
                 }
             }
         }
@@ -342,8 +427,8 @@ private fun fmtBytes(b: Long): String {
     return when {
         b >= gb -> "%.2f GB".format(b / gb)
         b >= mb -> "%.2f MB".format(b / mb)
-        b >= kb -> "%.2f KB".format(b / kb)
-        else -> "%.2f MB".format(b / mb)
+        b >= kb -> "%.0f KB".format(b / kb)
+        else -> "0 MB"
     }
 }
 
@@ -358,7 +443,7 @@ private fun shortBytes(b: Long): String {
 }
 
 private fun trimNum(v: Double): String {
-    val s = "%.2f".format(v)
+    val s = "%.2f".format(Locale.US, v)
     return s.trimEnd('0').trimEnd('.')
 }
 
@@ -366,10 +451,11 @@ private fun ordinalDate(ms: Long): String {
     val c = Calendar.getInstance()
     c.timeInMillis = ms
     val day = c.get(Calendar.DAY_OF_MONTH)
+    val month = SimpleDateFormat("MMMM", Locale.getDefault()).format(Date(ms))
+    if (Locale.getDefault().language != "en") return "$day $month"
     val suffix = if (day in 11..13) "th" else when (day % 10) {
         1 -> "st"; 2 -> "nd"; 3 -> "rd"; else -> "th"
     }
-    val month = SimpleDateFormat("MMMM", Locale.getDefault()).format(Date(ms))
     return "$day$suffix $month"
 }
 
