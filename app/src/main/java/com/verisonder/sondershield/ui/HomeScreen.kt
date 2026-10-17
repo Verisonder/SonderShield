@@ -98,7 +98,7 @@ fun HomeScreen(onToggle: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
     Column(Modifier.fillMaxWidth().height(screen)) {
         // Top bar: mark + wordmark, DNS server.
-        Row(Modifier.fillMaxWidth().padding(start = Gutter, end = Gutter, top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(start = Gutter, end = Gutter, top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
             Logo(26.dp, lit = on)
             Spacer(Modifier.width(10.dp))
             Box(Modifier.weight(1f)) { Wordmark() }
@@ -110,7 +110,7 @@ fun HomeScreen(onToggle: () -> Unit) {
         }
 
         // Hero: the headline rolls over when the state changes.
-        Column(Modifier.padding(horizontal = Gutter).padding(top = 22.dp)) {
+        Column(Modifier.padding(horizontal = Gutter).padding(top = 14.dp)) {
             val kickerColor by animateColorAsState(if (on) Palette.accentText else Palette.faint, tween(400), label = "kicker")
             Kicker("DNS filter · every app", color = kickerColor)
             AnimatedContent(
@@ -124,7 +124,7 @@ fun HomeScreen(onToggle: () -> Unit) {
                 Text(
                     when (p) { Phase.ON -> "Ads stop here."; Phase.STARTING -> "Starting up…"; Phase.OFF -> "Ads get through." },
                     style = display(34), color = Palette.text, maxLines = 1, softWrap = false,
-                    modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                    modifier = Modifier.padding(top = 8.dp, bottom = 6.dp),
                 )
             }
             Text(
