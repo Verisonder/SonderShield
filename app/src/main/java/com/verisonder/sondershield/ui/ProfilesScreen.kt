@@ -6,6 +6,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -130,6 +131,7 @@ internal fun ProfilesPane(header: @Composable (String, String, @Composable RowSc
     var editing by remember { mutableStateOf<Profile?>(null) }
     var creating by remember { mutableStateOf(false) }
     var scheduling by remember { mutableStateOf<String?>(null) }
+    var menuFor by remember { mutableStateOf<String?>(null) } // custom profile whose Edit/Delete is open
     val lang = lang()
 
     fun changed() {
@@ -161,7 +163,7 @@ internal fun ProfilesPane(header: @Composable (String, String, @Composable RowSc
             item { SectionLabel(tr("PROFILES", "PROFILS", "PROFILE")) }
             items(profiles.filter { !it.custom }, key = { it.id }) { p ->
                 ProfileRow(p, prefs.profileLists(p).size, lang, p.id == chosen, active.second && active.first == p.id, schedules.count { it.profile == p.id && it.on },
-                    onPick = { prefs.profileId = p.id; changed() }, onSchedule = { scheduling = p.id }, onEdit = null)
+                    onPick = { menuFor = null; prefs.profileId = p.id; changed() }, onSchedule = { scheduling = p.id })
             }
             item {
                 Row(Modifier.fillMaxWidth().padding(horizontal = Gutter).padding(top = 22.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -171,12 +173,16 @@ internal fun ProfilesPane(header: @Composable (String, String, @Composable RowSc
             }
             items(profiles.filter { it.custom }, key = { it.id }) { p ->
                 ProfileRow(p, p.lists.size, lang, p.id == chosen, active.second && active.first == p.id, schedules.count { it.profile == p.id && it.on },
-                    onPick = { prefs.profileId = p.id; changed() }, onSchedule = { scheduling = p.id }, onEdit = { editing = p })
+                    onPick = { menuFor = null; prefs.profileId = p.id; changed() }, onSchedule = { scheduling = p.id },
+                    menuOpen = menuFor == p.id,
+                    onLongPress = { menuFor = if (menuFor == p.id) null else p.id },
+                    onEdit = { menuFor = null; editing = p },
+                    onDelete = { menuFor = null; deleteProfile(prefs, p.id); changed() })
             }
             item(key = "own") {
                 ProfileRow(
                     Profile(Profiles.OWN, "", icon = "own", lists = prefs.enabledLists), prefs.enabledLists.size, lang, chosen == Profiles.OWN, false, 0,
-                    onPick = { prefs.profileId = Profiles.OWN; changed() }, onSchedule = null, onEdit = null,
+                    onPick = { menuFor = null; prefs.profileId = Profiles.OWN; changed() }, onSchedule = null,
                     about = tr("Exactly the lists you switch on in Lists.", "Exactement les listes activées dans Listes.", "Genau die Listen, die du unter Listen einschaltest."),
                 )
             }
@@ -223,14 +229,22 @@ private fun SectionLabel(text: String) {
         modifier = Modifier.padding(horizontal = Gutter).padding(top = 22.dp, bottom = 8.dp))
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun ProfileRow(
     p: Profile, count: Int, lang: String, chosen: Boolean, bySchedule: Boolean, scheduleCount: Int,
-    onPick: () -> Unit, onSchedule: (() -> Unit)?, onEdit: (() -> Unit)?, about: String? = null,
+    onPick: () -> Unit, onSchedule: (() -> Unit)?, about: String? = null,
+    menuOpen: Boolean = false, onLongPress: (() -> Unit)? = null, onEdit: () -> Unit = {}, onDelete: () -> Unit = {},
 ) {
     val badge by animateColorAsState(if (chosen) Palette.accent else Palette.card2, label = "pbadge")
     val badgeFg = if (chosen) Palette.onAccent else Palette.text
-    Column(Modifier.fillMaxWidth().clickable(onClick = onPick)) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    Column(
+        Modifier.fillMaxWidth().combinedClickable(
+            onClick = onPick,
+            onLongClick = onLongPress?.let { f -> { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); f() } },
+        ),
+    ) {
         Row(Modifier.fillMaxWidth().padding(start = Gutter, end = 14.dp, top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(48.dp).clip(CircleShape).background(badge), contentAlignment = Alignment.Center) {
                 Icon(profileIcon(p.icon), null, tint = badgeFg, modifier = Modifier.size(24.dp))
@@ -250,11 +264,11 @@ private fun ProfileRow(
                 val extra = if (scheduleCount > 0) " · " + tr("$scheduleCount schedule", "$scheduleCount horaire", "$scheduleCount Zeitplan") + (if (scheduleCount > 1) tr("s", "s", "e") else "") else ""
                 Text(tr("$count lists", "$count listes", "$count Listen") + extra, color = Palette.faint, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 3.dp))
             }
-            if (onEdit != null) RoundIcon(Icons.edit, tr("Edit", "Modifier", "Bearbeiten"), false, onEdit)
             if (onSchedule != null) RoundIcon(Icons.clock, tr("Schedule", "Horaires", "Zeitplan"), scheduleCount > 0, onSchedule)
             Spacer(Modifier.width(6.dp))
             CheckDot(chosen)
         }
+        if (onLongPress != null) RowActions(menuOpen, onEdit, onDelete, Modifier.padding(start = Gutter + 62.dp, end = Gutter, bottom = 14.dp))
         Box(Modifier.fillMaxWidth().padding(horizontal = Gutter).height(1.dp).background(Palette.line.copy(alpha = 0.7f)))
     }
 }
@@ -433,4 +447,56 @@ private fun ScheduleDialog(prefs: Prefs, pid: String, name: String, lang: String
         },
         confirmButton = { PillButton(tr("Done", "Terminé", "Fertig"), onClick = onClose) },
     )
+}
+
+/** Removes one of your profiles with its schedules; back to Default if it was in use. */
+internal fun deleteProfile(prefs: Prefs, id: String) {
+    prefs.customProfiles = prefs.customProfiles.filter { it.id != id }
+    prefs.schedules = prefs.schedules.filter { it.profile != id }
+    if (prefs.profileId == id) prefs.profileId = Profiles.DEFAULT
+}
+
+/**
+ * Edit / Delete for one of your profiles, shown after a long press. Opens with a spring;
+ * Delete asks for a second tap.
+ */
+@Composable
+internal fun RowActions(open: Boolean, onEdit: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, onDark: Boolean = false) {
+    var confirm by remember(open) { mutableStateOf(false) }
+    androidx.compose.animation.AnimatedVisibility(
+        visible = open,
+        enter = androidx.compose.animation.expandVertically(androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 500f)) +
+            androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)),
+        exit = androidx.compose.animation.shrinkVertically(androidx.compose.animation.core.tween(180)) +
+            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)),
+    ) {
+        Row(modifier.padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            ActionPill(Icons.edit, tr("Edit", "Modifier", "Bearbeiten"), false, onDark, Modifier.reveal(open, 0), onEdit)
+            ActionPill(
+                Icons.trash,
+                if (confirm) tr("Tap to delete", "Touchez pour supprimer", "Tippen zum Löschen") else tr("Delete", "Supprimer", "Löschen"),
+                true, onDark, Modifier.reveal(open, 1),
+            ) { if (confirm) onDelete() else confirm = true }
+        }
+    }
+}
+
+@Composable
+private fun ActionPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, danger: Boolean, onDark: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val fg = when {
+        onDark -> Palette.onAccent
+        danger -> Palette.warn
+        else -> Palette.text
+    }
+    val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    Row(
+        modifier.height(38.dp).pressScale(src).clip(CircleShape).border(1.5.dp, fg.copy(alpha = 0.55f), CircleShape)
+            .clickable(interactionSource = src, indication = androidx.compose.material3.ripple(), onClick = onClick)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = fg, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(text, color = fg, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    }
 }

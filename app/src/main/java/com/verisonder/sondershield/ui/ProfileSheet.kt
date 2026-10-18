@@ -14,6 +14,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -138,6 +139,7 @@ private fun ProfileSheet(navBar: androidx.compose.ui.unit.Dp, onClose: () -> Uni
     var editing by remember { mutableStateOf<Profile?>(null) }
     var creating by remember { mutableStateOf(false) }
     var closing by remember { mutableStateOf(false) }
+    var menuFor by remember { mutableStateOf<String?>(null) }
     val lang = lang()
 
     val shown = remember { Animatable(0f) }
@@ -201,12 +203,21 @@ private fun ProfileSheet(navBar: androidx.compose.ui.unit.Dp, onClose: () -> Uni
                         profiles.forEachIndexed { i, p ->
                             SheetRow(
                                 p, prefs.profileLists(p).size, lang, p.id == chosen, active.second && active.first == p.id, i,
-                                onPick = { pick(p.id) }, onEdit = if (p.custom) ({ editing = p }) else null,
+                                onPick = { menuFor = null; pick(p.id) },
+                                menuOpen = menuFor == p.id,
+                                onLongPress = if (p.custom) ({ menuFor = if (menuFor == p.id) null else p.id }) else null,
+                                onEdit = { menuFor = null; editing = p },
+                                onDelete = {
+                                    menuFor = null
+                                    deleteProfile(prefs, p.id)
+                                    rev++
+                                    applyProfileChange(ctx, scope, phase)
+                                },
                             )
                         }
                         SheetRow(
                             Profile(Profiles.OWN, "", icon = "own", lists = prefs.enabledLists), prefs.enabledLists.size, lang,
-                            chosen == Profiles.OWN, false, profiles.size, onPick = { pick(Profiles.OWN) }, onEdit = null,
+                            chosen == Profiles.OWN, false, profiles.size, onPick = { menuFor = null; pick(Profiles.OWN) },
                             about = tr("Exactly the lists you switch on in Filter › Lists.", "Exactement les listes activées dans Filtre › Listes.", "Genau die Listen unter Filter › Listen."),
                         )
                     }
@@ -228,21 +239,27 @@ private fun ProfileSheet(navBar: androidx.compose.ui.unit.Dp, onClose: () -> Uni
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun SheetRow(
     p: Profile, count: Int, lang: String, chosen: Boolean, bySchedule: Boolean, order: Int,
-    onPick: () -> Unit, onEdit: (() -> Unit)?, about: String? = null,
+    onPick: () -> Unit, about: String? = null,
+    menuOpen: Boolean = false, onLongPress: (() -> Unit)? = null, onEdit: () -> Unit = {}, onDelete: () -> Unit = {},
 ) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     val bg by animateColorAsState(if (chosen) Palette.accent else Palette.card2, tween(260), label = "rowBg")
     val fg by animateColorAsState(if (chosen) Palette.onAccent else Palette.text, tween(260), label = "rowFg")
     val sub = if (chosen) Palette.onAccent.copy(alpha = 0.8f) else Palette.dim
     val src = remember { MutableInteractionSource() }
-    Row(
+    Column(
         Modifier.fillMaxWidth().padding(bottom = 8.dp).reveal(true, order).pressScale(src).clip(blockShape).background(bg)
-            .clickable(interactionSource = src, indication = androidx.compose.material3.ripple(), onClick = onPick)
+            .combinedClickable(
+                interactionSource = src, indication = androidx.compose.material3.ripple(), onClick = onPick,
+                onLongClick = onLongPress?.let { f -> { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); f() } },
+            )
             .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier.size(44.dp).clip(CircleShape).background(if (chosen) Palette.onAccent.copy(alpha = 0.16f) else Palette.panel),
             contentAlignment = Alignment.Center,
@@ -260,13 +277,10 @@ private fun SheetRow(
             if (line.isNotEmpty()) Text(line, color = sub, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
             Text(tr("$count lists", "$count listes", "$count Listen"), color = sub, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
         }
-        if (onEdit != null) {
-            Box(Modifier.size(38.dp).clip(CircleShape).clickable(onClick = onEdit), contentAlignment = Alignment.Center) {
-                Icon(Icons.edit, tr("Edit", "Modifier", "Bearbeiten"), tint = sub, modifier = Modifier.size(19.dp))
-            }
-        }
         Spacer(Modifier.width(6.dp))
         SheetCheck(chosen)
+    }
+    if (onLongPress != null) RowActions(menuOpen, onEdit, onDelete, Modifier.padding(start = 56.dp, top = 10.dp), onDark = chosen)
     }
 }
 
