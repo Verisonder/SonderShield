@@ -23,6 +23,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.launch
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -112,3 +115,36 @@ internal fun DrawScope.drawThreat(kind: Kind, pos: Offset, s: Float, deg: Float,
     }
 }
 
+
+/**
+ * The SonderShield mark that hides the game: seven quick taps start Shield-Man. Each tap
+ * wiggles it; from the fourth the phone ticks. Used on Home and in Settings › About.
+ */
+@androidx.compose.runtime.Composable
+fun SecretLogo(size: androidx.compose.ui.unit.Dp, lit: Boolean) {
+    val taps = androidx.compose.runtime.remember { SecretTaps() }
+    var egg by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val wiggle = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(0f) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
+    var at by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Pair<Offset, Float>?>(null) }
+    Logo(
+        size, lit = lit,
+        modifier = Modifier
+            .onGloballyPositioned { c ->
+                val p = c.positionInWindow()
+                at = Offset(p.x + c.size.width / 2f, p.y + c.size.height / 2f) to c.size.width.toFloat()
+            }
+            .graphicsLayer { rotationZ = wiggle.value }
+            .clickable(interactionSource = androidx.compose.runtime.remember { MutableInteractionSource() }, indication = null) {
+                val n = taps.tap()
+                if (n >= 4) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                scope.launch {
+                    wiggle.snapTo(if (n % 2 == 0) -2f * n else 2f * n)
+                    wiggle.animateTo(0f, spring(dampingRatio = 0.3f, stiffness = 600f))
+                }
+                if (n >= 7) { taps.reset(); egg = true }
+            },
+    )
+    if (egg) ShieldManGame(from = at, onClose = { egg = false })
+}

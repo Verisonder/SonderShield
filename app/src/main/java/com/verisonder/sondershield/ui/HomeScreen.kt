@@ -116,31 +116,7 @@ fun HomeScreen(onToggle: () -> Unit, scroll: ScrollState) {
         // Top bar: mark + wordmark, protection profile.
         Row(Modifier.fillMaxWidth().padding(start = Gutter, end = Gutter, top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
             // Seven quick taps on the little shield: the easter egg.
-            val taps = remember { SecretTaps() }
-            var egg by remember { mutableStateOf(false) }
-            val wiggle = remember { Animatable(0f) }
-            val eggScope = androidx.compose.runtime.rememberCoroutineScope()
-            val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
-            var logoAt by remember { mutableStateOf<Pair<androidx.compose.ui.geometry.Offset, Float>?>(null) }
-            Logo(
-                26.dp, lit = on,
-                modifier = Modifier
-                    .onGloballyPositioned { c ->
-                        val p = c.positionInWindow()
-                        logoAt = androidx.compose.ui.geometry.Offset(p.x + c.size.width / 2f, p.y + c.size.height / 2f) to c.size.width.toFloat()
-                    }
-                    .graphicsLayer { rotationZ = wiggle.value }
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
-                        val n = taps.tap()
-                        if (n >= 4) haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                        eggScope.launch {
-                            wiggle.snapTo(if (n % 2 == 0) -6f * n / 3f else 6f * n / 3f)
-                            wiggle.animateTo(0f, spring(dampingRatio = 0.3f, stiffness = 600f))
-                        }
-                        if (n >= 7) { taps.reset(); egg = true }
-                    },
-            )
-            if (egg) ShieldManGame(from = logoAt, onClose = { egg = false })
+            SecretLogo(26.dp, lit = on)
             Spacer(Modifier.width(10.dp))
             Box(Modifier.weight(1f).clipToBounds()) { Wordmark() }
             Spacer(Modifier.width(8.dp))

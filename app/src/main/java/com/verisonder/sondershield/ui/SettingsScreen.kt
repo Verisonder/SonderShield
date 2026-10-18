@@ -396,7 +396,7 @@ private fun SettingsContent(onReload: () -> Unit) {
         Section(8, tr("About", "À propos", "Über")) {
             Block {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Logo(30.dp, lit = true)
+                    SecretLogo(30.dp, lit = true)
                     Spacer(Modifier.width(12.dp))
                     Column {
                         Wordmark(17)
