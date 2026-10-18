@@ -56,6 +56,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -161,8 +162,15 @@ private val Pop = CubicBezierEasing(0.2f, 0.9f, 0.3f, 1.15f)
 fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
     // The game window gets no system-bar sizes of its own; read them here (from Home's window).
     val dens = LocalDensity.current
-    val topBar = with(dens) { androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(dens).toDp() }
-    val bottomBar = with(dens) { androidx.compose.foundation.layout.WindowInsets.navigationBars.getBottom(dens).toDp() }
+    val root = androidx.core.view.ViewCompat.getRootWindowInsets(androidx.compose.ui.platform.LocalView.current)
+    val sysBars = root?.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+    val topBar = with(dens) {
+        max(sysBars?.top ?: 0, androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(dens)).toDp()
+    }.coerceAtLeast(24.dp)
+    // Gesture bar or buttons; at least 34 dp so the bottom row always clears the gesture line.
+    val bottomBar = with(dens) {
+        max(sysBars?.bottom ?: 0, androidx.compose.foundation.layout.WindowInsets.navigationBars.getBottom(dens)).toDp()
+    }.coerceAtLeast(34.dp)
     val ctx = LocalContext.current
     val prefs = remember { Prefs(ctx) }
     val haptic = LocalHapticFeedback.current
@@ -187,6 +195,8 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
     val leaving = remember { Animatable(0f) }
     var closing by remember { mutableStateOf(false) }
     var facingLeft by remember { mutableStateOf(false) }
+    // 0 = plain shield, 1 = teeth out and chomping (only while powered up). Eased each frame.
+    var jaw by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
 
     LaunchedEffect(Unit) { intro.animateTo(1f, tween(1500)) }
     LaunchedEffect(Unit) {
@@ -196,6 +206,8 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
             val dt = (now - last) / 1_000_000_000f
             last = now
             clock += dt
+            val target = if (game.powerLeft > 0f && game.state == ChompGame.State.PLAY) 1f else 0f
+            jaw += (target - jaw) * min(1f, dt * 9f)
             if (intro.value >= 1f && !closing) game.tick(dt)
             if (game.shield.dir == Dir.LEFT) facingLeft = true else if (game.shield.dir == Dir.RIGHT) facingLeft = false
             while (game.events.isNotEmpty()) {
@@ -364,16 +376,11 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
                 val fly = Pop.transform((i / 0.6f).coerceIn(0f, 1f))
                 val pos = if (i < 1f) Offset(fromPos.x + (startPos.x - fromPos.x) * fly, fromPos.y + (startPos.y - fromPos.y) * fly) else startPos
                 val size = if (i < 1f) fromSize + (manSize - fromSize) * fly + manSize * 0.9f * sin((fly * 3.14159f).coerceIn(0f, 3.14159f)) * 0.35f else manSize
-                val teeth = ((i - 0.4f) / 0.25f).coerceIn(0f, 1f)
+                // Teeth and the chomping mouth only while powered up; otherwise a plain shield.
+                val teeth = if (i < 1f) 0f else jaw
                 val moving = game.state == ChompGame.State.PLAY && game.shield.dir != Dir.NONE
-                val introChomp = if (i in 0.6f..0.98f) abs(sin((i - 0.6f) / 0.38f * 3.14159f * 2f)) else 0f
                 val bite = if (game.sinceBite < 0.18f) 1f - game.sinceBite / 0.18f else 0f
-                val open = when {
-                    i < 1f -> introChomp
-                    game.state == ChompGame.State.DYING -> 1f
-                    moving -> max(0.15f + 0.85f * abs(sin(clock * 14f)), bite)
-                    else -> 0.25f
-                }
+                val open = if (i < 1f) 0f else jaw * if (moving) max(0.15f + 0.85f * abs(sin(clock * 14f)), bite) else 0.25f
                 val dyingQ = if (game.state == ChompGame.State.DYING) (game.stateTime / 1.2f).coerceIn(0f, 1f) else 0f
                 // All white until you take a power shield; then the top turns blue (and blinks
                 // white in its last two seconds, like the scared malware).
@@ -413,7 +420,7 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
                 }
             }
             Row(
-                Modifier.align(Alignment.BottomCenter).padding(bottom = bottomBar + 16.dp).graphicsLayer { alpha = hud },
+                Modifier.align(Alignment.BottomCenter).padding(bottom = bottomBar + 18.dp).graphicsLayer { alpha = hud },
                 horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
             ) {
                 @Suppress("UNUSED_EXPRESSION") frame
