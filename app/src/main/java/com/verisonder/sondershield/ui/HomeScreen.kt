@@ -67,6 +67,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -114,7 +115,8 @@ fun HomeScreen(onToggle: () -> Unit, scroll: ScrollState) {
         Row(Modifier.fillMaxWidth().padding(start = Gutter, end = Gutter, top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
             Logo(26.dp, lit = on)
             Spacer(Modifier.width(10.dp))
-            Box(Modifier.weight(1f)) { Wordmark() }
+            Box(Modifier.weight(1f).clipToBounds()) { Wordmark() }
+            Spacer(Modifier.width(8.dp))
             // The profile in use; tap to switch or make your own.
             ProfileChip()
         }

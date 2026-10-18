@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -45,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -77,6 +77,8 @@ internal fun ProfileChip() {
     var open by remember { mutableStateOf(false) }
     val lang = lang()
     val src = remember { MutableInteractionSource() }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val navBar = with(density) { androidx.compose.foundation.layout.WindowInsets.navigationBars.getBottom(density).toDp() }
 
     // Re-read now and then: a schedule can switch the profile while Home is open.
     LaunchedEffect(Unit) {
@@ -90,7 +92,7 @@ internal fun ProfileChip() {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AnimatedContent(
-            targetState = (p?.icon ?: "own") to profileName(p, lang),
+            targetState = (p?.icon ?: "own") to chipName(p, lang),
             transitionSpec = {
                 (slideInVertically(tween(320, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(260)))
                     .togetherWith(slideOutVertically(tween(220)) { -it } + fadeOut(tween(180)))
@@ -100,7 +102,7 @@ internal fun ProfileChip() {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(profileIcon(icon), null, tint = Palette.accent, modifier = Modifier.size(15.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(name, color = Palette.text, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 120.dp))
+                Text(name, color = Palette.text, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 96.dp))
             }
         }
         if (active.second) {
@@ -112,12 +114,17 @@ internal fun ProfileChip() {
         Icon(Icons.chevron, null, tint = Palette.dim, modifier = Modifier.size(12.dp).rotate(turn))
     }
 
-    if (open) ProfileSheet(onClose = { open = false; rev++ })
+    if (open) ProfileSheet(navBar, onClose = { open = false; rev++ })
 }
+
+/** Short name for the chip, so it never pushes into the wordmark. */
+private fun chipName(p: Profile?, lang: String): String =
+    if (p == null || p.id == Profiles.OWN) when (lang) { "fr" -> "Mes listes"; "de" -> "Eigene"; else -> "Own picks" }
+    else profileName(p, lang)
 
 /** Slides up from the bottom under a swoosh: pick a profile, or make your own. */
 @Composable
-private fun ProfileSheet(onClose: () -> Unit) {
+private fun ProfileSheet(navBar: androidx.compose.ui.unit.Dp, onClose: () -> Unit) {
     val ctx = LocalContext.current
     val prefs = remember { Prefs(ctx) }
     val scope = rememberCoroutineScope()
@@ -167,10 +174,14 @@ private fun ProfileSheet(onClose: () -> Unit) {
                     .graphicsLayer { translationY = (1f - shown.value) * size.height },
             ) {
                 Swoosh(blade = Palette.accent, below = Palette.panel, progress = sweep.value)
-                Column(Modifier.fillMaxWidth().background(Palette.panel).navigationBarsPadding().padding(bottom = 14.dp)) {
+                Column(Modifier.fillMaxWidth().background(Palette.panel).padding(bottom = navBar + 16.dp)) {
                     Column(Modifier.padding(horizontal = Gutter).padding(top = 4.dp, bottom = 10.dp)) {
                         Kicker(tr("Protection profile", "Profil de protection", "Schutzprofil"))
                         Text(tr("How much to block", "Que bloquer", "Wie viel blocken"), style = display(26), color = Palette.text, modifier = Modifier.padding(top = 10.dp))
+                        Text(
+                            tr("Only changes which block lists are on.", "Change seulement les listes actives.", "Ändert nur, welche Listen aktiv sind."),
+                            color = Palette.dim, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp),
+                        )
                         if (active.second) {
                             Text(
                                 tr("A schedule has ${profileName(prefs.profileById(active.first), lang)} on right now.",
@@ -180,7 +191,11 @@ private fun ProfileSheet(onClose: () -> Unit) {
                             )
                         }
                     }
-                    Column(Modifier.heightIn(max = 430.dp).verticalScroll(rememberScrollState()).padding(horizontal = 14.dp)) {
+                    val listScroll = rememberScrollState()
+                    Column(
+                        Modifier.heightIn(max = 400.dp).fadeEdges(listScroll).verticalScroll(listScroll)
+                            .padding(horizontal = 14.dp).padding(top = 10.dp, bottom = 6.dp),
+                    ) {
                         profiles.forEachIndexed { i, p ->
                             SheetRow(
                                 p, prefs.profileLists(p).size, lang, p.id == chosen, active.second && active.first == p.id, i,
@@ -193,15 +208,8 @@ private fun ProfileSheet(onClose: () -> Unit) {
                             about = tr("Exactly the lists you switch on in Filter › Lists.", "Exactement les listes activées dans Filtre › Listes.", "Genau die Listen unter Filter › Listen."),
                         )
                     }
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = Gutter).padding(top = 14.dp).reveal(true, profiles.size + 1),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically,
-                    ) {
+                    Box(Modifier.fillMaxWidth().padding(horizontal = Gutter).padding(top = 10.dp).reveal(true, profiles.size + 1), contentAlignment = Alignment.Center) {
                         PillButton(tr("+ Make your own", "+ Créer le vôtre", "+ Eigenes erstellen")) { creating = true }
-                        Text(
-                            tr("Starts from the lists in use now.", "Part des listes utilisées.", "Startet mit den aktiven Listen."),
-                            color = Palette.faint, fontSize = 12.sp, modifier = Modifier.weight(1f),
-                        )
                     }
                 }
             }
@@ -247,7 +255,7 @@ private fun SheetRow(
                 }
             }
             val line = about ?: profileAbout(p, lang)
-            if (line.isNotEmpty()) Text(line, color = sub, fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(top = 2.dp))
+            if (line.isNotEmpty()) Text(line, color = sub, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
             Text(tr("$count lists", "$count listes", "$count Listen"), color = sub, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
         }
         if (onEdit != null) {
@@ -272,3 +280,22 @@ private fun SheetCheck(on: Boolean) {
         ) { Icon(Icons.check, null, tint = Palette.accent, modifier = Modifier.size(16.dp)) }
     }
 }
+
+/** Fades the top and bottom of a scrolling list instead of cutting rows off hard. */
+private fun Modifier.fadeEdges(scroll: androidx.compose.foundation.ScrollState, edge: androidx.compose.ui.unit.Dp = 22.dp): Modifier =
+    this.graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            val e = edge.toPx()
+            val top = if (scroll.value > 0) e else 0f
+            val bottom = if (scroll.value < scroll.maxValue) e else 0f
+            if (top > 0f) drawRect(
+                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black), startY = 0f, endY = top),
+                size = androidx.compose.ui.geometry.Size(size.width, top), blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+            )
+            if (bottom > 0f) drawRect(
+                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = size.height - bottom, endY = size.height),
+                topLeft = androidx.compose.ui.geometry.Offset(0f, size.height - bottom),
+                size = androidx.compose.ui.geometry.Size(size.width, bottom), blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+            )
+        }
