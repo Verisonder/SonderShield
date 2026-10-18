@@ -360,8 +360,17 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
                     else -> 0.25f
                 }
                 val dyingQ = if (game.state == ChompGame.State.DYING) (game.stateTime / 1.2f).coerceIn(0f, 1f) else 0f
+                // All white until you take a power shield; then the top turns blue (and blinks
+                // white in its last two seconds, like the scared malware).
+                val powered = i >= 1f && game.powerLeft > 0f
+                val fading = game.powerLeft in 0.01f..2f && ((clock * 6f).toInt() % 2 == 0)
+                val topColor = when {
+                    i < 1f -> androidx.compose.ui.graphics.lerp(accent, text, ((i - 0.4f) / 0.3f).coerceIn(0f, 1f))
+                    powered && !fading -> accent
+                    else -> text
+                }
                 shieldMan(
-                    pos, size, open, facingLeft, teeth, accent, text,
+                    pos, size, open, facingLeft, teeth, topColor, text,
                     scale = 1f - dyingQ, spin = dyingQ * 540f,
                 )
             }
