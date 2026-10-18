@@ -22,7 +22,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -78,7 +80,7 @@ internal fun ProfileChip() {
     val lang = lang()
     val src = remember { MutableInteractionSource() }
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val navBar = with(density) { androidx.compose.foundation.layout.WindowInsets.navigationBars.getBottom(density).toDp() }
+    val navBar: androidx.compose.ui.unit.Dp = with(density) { WindowInsets.navigationBars.getBottom(density).toDp() }
 
     // Re-read now and then: a schedule can switch the profile while Home is open.
     LaunchedEffect(Unit) {
