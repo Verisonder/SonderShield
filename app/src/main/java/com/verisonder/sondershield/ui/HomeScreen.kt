@@ -337,12 +337,6 @@ private fun BigToggle(phase: Phase, logo: Dp, onClick: () -> Unit, alwaysOn: Boo
                     },
                     color = if (p != Phase.OFF) Palette.accentText else Palette.faint, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp,
                 )
-                if (p == Phase.ON && always) {
-                    Text(
-                        tr("Set by Always-on VPN. Tap the shield to change it.", "Activé par le VPN permanent. Touchez le bouclier pour le changer.", "Durch Always-on-VPN. Tippe aufs Schild, um es zu ändern."),
-                        color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp),
-                    )
-                }
             }
         }
     }
