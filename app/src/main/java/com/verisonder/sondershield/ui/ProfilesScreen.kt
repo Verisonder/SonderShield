@@ -269,7 +269,7 @@ private fun ProfileRow(
             if (scheduleCount > 0) Icon(Icons.clock, null, tint = Palette.accent, modifier = Modifier.padding(end = 10.dp).size(18.dp))
             CheckDot(chosen)
         }
-        if (onLongPress != null) RowActions(menuOpen, onSchedule, onEdit, onDelete, Modifier.padding(start = Gutter + 62.dp, end = Gutter, bottom = 14.dp))
+        if (onLongPress != null) RowActions(menuOpen, onSchedule, onEdit, onDelete, Modifier.padding(start = Gutter, end = Gutter, bottom = 14.dp))
         Box(Modifier.fillMaxWidth().padding(horizontal = Gutter).height(1.dp).background(Palette.line.copy(alpha = 0.7f)))
     }
 }
@@ -474,18 +474,19 @@ internal fun RowActions(
         exit = androidx.compose.animation.shrinkVertically(androidx.compose.animation.core.tween(180)) +
             androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)),
     ) {
+        // Equal widths that always fit the row: nothing gets cut off at the sides.
         Row(
-            modifier.padding(top = 2.dp).horizontalScroll(rememberScrollState()),
+            modifier.fillMaxWidth().padding(top = 2.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
         ) {
             var i = 0
-            if (onSchedule != null) ActionPill(Icons.clock, tr("Schedule", "Horaires", "Zeitplan"), false, onDark, Modifier.reveal(open, i++), onSchedule)
-            if (onEdit != null) ActionPill(Icons.edit, tr("Edit", "Modifier", "Bearbeiten"), false, onDark, Modifier.reveal(open, i++), onEdit)
+            if (onSchedule != null) ActionPill(Icons.clock, tr("Schedule", "Horaires", "Zeitplan"), false, onDark, Modifier.weight(1f).reveal(open, i++), onSchedule)
+            if (onEdit != null) ActionPill(Icons.edit, tr("Edit", "Modifier", "Bearbeiten"), false, onDark, Modifier.weight(1f).reveal(open, i++), onEdit)
             if (onDelete != null) {
                 ActionPill(
                     Icons.trash,
-                    if (confirm) tr("Tap to delete", "Touchez pour supprimer", "Tippen zum Löschen") else tr("Delete", "Supprimer", "Löschen"),
-                    true, onDark, Modifier.reveal(open, i),
+                    if (confirm) tr("Sure?", "Sûr ?", "Sicher?") else tr("Delete", "Supprimer", "Löschen"),
+                    true, onDark, Modifier.weight(1f).reveal(open, i),
                 ) { if (confirm) onDelete() else confirm = true }
             }
         }
@@ -503,11 +504,12 @@ private fun ActionPill(icon: androidx.compose.ui.graphics.vector.ImageVector, te
     Row(
         modifier.height(38.dp).pressScale(src).clip(CircleShape).border(1.5.dp, fg.copy(alpha = 0.55f), CircleShape)
             .clickable(interactionSource = src, indication = androidx.compose.material3.ripple(), onClick = onClick)
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, null, tint = fg, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(text, color = fg, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Icon(icon, null, tint = fg, modifier = Modifier.size(15.dp))
+        Spacer(Modifier.width(5.dp))
+        Text(text, color = fg, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

@@ -287,7 +287,7 @@ private fun SheetRow(
         Spacer(Modifier.width(6.dp))
         SheetCheck(chosen)
     }
-    if (onLongPress != null) RowActions(menuOpen, onSchedule, onEdit, onDelete, Modifier.padding(start = 56.dp, top = 10.dp), onDark = chosen)
+    if (onLongPress != null) RowActions(menuOpen, onSchedule, onEdit, onDelete, Modifier.padding(top = 10.dp), onDark = chosen)
     }
 }
 
