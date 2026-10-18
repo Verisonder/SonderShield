@@ -1,0 +1,362 @@
+package com.verisonder.sondershield.ui
+
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.verisonder.sondershield.core.ChompGame
+import com.verisonder.sondershield.core.Dir
+import com.verisonder.sondershield.core.EnemyKind
+import com.verisonder.sondershield.data.Prefs
+import kotlin.math.abs
+import kotlin.math.hypot
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.sin
+import kotlin.math.sqrt
+import kotlinx.coroutines.launch
+
+/*
+ * Shield-Man, the easter-egg game (rules in core/ChompGame.kt). The little shield from the
+ * Home bar flies to the middle, grows teeth, and the maze draws itself in around it.
+ */
+
+/** The SonderShield mark as paths in its 100 × 110 box, plus the two cut edges (for the teeth). */
+private object ManParts {
+    val shield: Path = PathParser().parsePathString("M50 4L92 18V52C92 78 74 97 50 106C26 97 8 78 8 52V18Z").toPath()
+    val top: Path = PathParser().parsePathString("M0 0H100V30Q46 60 0 80Z").toPath()
+    val bottom: Path = PathParser().parsePathString("M0 88Q52 70 100 45V110H0Z").toPath()
+
+    /** Point and unit normal on a quadratic curve at t. */
+    fun quad(t: Float, p0: Offset, c: Offset, p1: Offset): Pair<Offset, Offset> {
+        val u = 1f - t
+        val p = Offset(u * u * p0.x + 2 * u * t * c.x + t * t * p1.x, u * u * p0.y + 2 * u * t * c.y + t * t * p1.y)
+        val d = Offset(2 * u * (c.x - p0.x) + 2 * t * (p1.x - c.x), 2 * u * (c.y - p0.y) + 2 * t * (p1.y - c.y))
+        val l = sqrt(d.x * d.x + d.y * d.y)
+        return p to Offset(-d.y / l, d.x / l) // left normal: points down on the top edge
+    }
+}
+
+/**
+ * Draws the shield with its mouth [open] (0 shut … 1 wide) and sharp teeth along the cut.
+ * [left] mirrors it to face left.
+ */
+private fun DrawScope.shieldMan(center: Offset, size: Float, open: Float, left: Boolean, teeth: Float, top: Color, bottom: Color, scale: Float = 1f, spin: Float = 0f) {
+    val box = size / 100f
+    val gap = 12f * open // in shield units, along the cut's normal
+    withTransform({
+        translate(center.x, center.y)
+        rotate(spin, Offset.Zero)
+        scale(if (left) -scale else scale, scale, Offset.Zero)
+        translate(-50f * box, -55f * box)
+        scale(box, box, Offset.Zero)
+    }) {
+        // Upper jaw.
+        withTransform({ translate(-gap * 0.5f, -gap) }) {
+            clipPath(ManParts.top) { drawPath(ManParts.shield, top) }
+            if (teeth > 0f) teethRow(Offset(0f, 80f), Offset(46f, 60f), Offset(100f, 30f), down = true, color = Color.White.copy(alpha = teeth))
+        }
+        // Lower jaw.
+        withTransform({ translate(gap * 0.5f, gap) }) {
+            clipPath(ManParts.bottom) { drawPath(ManParts.shield, bottom) }
+            if (teeth > 0f) teethRow(Offset(0f, 88f), Offset(52f, 70f), Offset(100f, 45f), down = false, color = Color.White.copy(alpha = teeth))
+        }
+    }
+}
+
+/** Five sharp triangles along a cut edge, inside the shield's width. */
+private fun DrawScope.teethRow(p0: Offset, c: Offset, p1: Offset, down: Boolean, color: Color) {
+    val n = 5
+    for (k in 0 until n) {
+        val a = 0.2f + k * (0.6f / (n - 1))
+        val (p, nrm) = ManParts.quad(a, p0, c, p1)
+        val (pl, _) = ManParts.quad(a - 0.055f, p0, c, p1)
+        val (pr, _) = ManParts.quad(a + 0.055f, p0, c, p1)
+        val s = if (down) 1f else -1f
+        val tip = Offset(p.x + nrm.x * 11f * s, p.y + nrm.y * 11f * s)
+        val path = Path().apply { moveTo(pl.x, pl.y); lineTo(tip.x, tip.y); lineTo(pr.x, pr.y); close() }
+        drawPath(path, color)
+    }
+}
+
+/** Fast out, slight overshoot. */
+private val Pop = CubicBezierEasing(0.2f, 0.9f, 0.3f, 1.15f)
+
+/**
+ * The game. [from] is where the little Home shield sits on screen (centre, px) and its size,
+ * so the intro can fly it from there.
+ */
+@Composable
+fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
+    val ctx = LocalContext.current
+    val prefs = remember { Prefs(ctx) }
+    val haptic = LocalHapticFeedback.current
+    val game = remember { ChompGame() }
+    var best by remember { mutableStateOf(prefs.sp.getInt("egg.best", 0)) }
+    var frame by remember { mutableLongStateOf(0L) }
+    var clock by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    val intro = remember { Animatable(0f) }
+    val leaving = remember { Animatable(0f) }
+    var closing by remember { mutableStateOf(false) }
+    var facingLeft by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) { intro.animateTo(1f, tween(1500)) }
+    LaunchedEffect(Unit) {
+        var last = androidx.compose.runtime.withFrameNanos { it }
+        while (true) {
+            val now = androidx.compose.runtime.withFrameNanos { it }
+            val dt = (now - last) / 1_000_000_000f
+            last = now
+            clock += dt
+            if (intro.value >= 1f && !closing) game.tick(dt)
+            if (game.shield.dir == Dir.LEFT) facingLeft = true else if (game.shield.dir == Dir.RIGHT) facingLeft = false
+            while (game.events.isNotEmpty()) {
+                when (game.events.removeFirst()) {
+                    ChompGame.Event.AD, ChompGame.Event.MALWARE, ChompGame.Event.POWER -> haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    ChompGame.Event.DIED -> haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    ChompGame.Event.OVER -> if (game.score > best) { best = game.score; prefs.sp.edit().putInt("egg.best", best).apply() }
+                    else -> {}
+                }
+            }
+            frame++
+        }
+    }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    fun close() {
+        if (closing) return
+        closing = true
+        if (game.score > best) prefs.sp.edit().putInt("egg.best", game.score).apply()
+        scope.launch { leaving.animateTo(1f, tween(320)); onClose() }
+    }
+
+    val accent = Palette.accent
+    val text = Palette.text
+    val warn = Palette.warn
+    val dim = Palette.dim
+    val faint = Palette.faint
+    val bg = Palette.bg
+    val measurer = rememberTextMeasurer()
+    val adLabel = remember(measurer) { measurer.measure("AD", TextStyle(color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, fontFamily = Display)) }
+    val density = LocalDensity.current
+
+    Dialog(onDismissRequest = { close() }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        BoxWithConstraints(
+            Modifier.fillMaxSize().graphicsLayer { alpha = 1f - leaving.value }
+                .pointerInput(Unit) {
+                    var acc = Offset.Zero
+                    val step = 22.dp.toPx()
+                    detectDragGestures(onDragStart = { acc = Offset.Zero }) { change, drag ->
+                        change.consume()
+                        acc += drag
+                        if (abs(acc.x) > step || abs(acc.y) > step) {
+                            game.steer(if (abs(acc.x) > abs(acc.y)) (if (acc.x > 0) Dir.RIGHT else Dir.LEFT) else (if (acc.y > 0) Dir.DOWN else Dir.UP))
+                            acc = Offset.Zero
+                        }
+                    }
+                },
+        ) {
+            val wPx = with(density) { maxWidth.toPx() }
+            val hPx = with(density) { maxHeight.toPx() }
+            // Maze size: full width less margins, leaving room for the HUD above and below.
+            val tile = min((wPx - with(density) { 24.dp.toPx() }) / game.w, (hPx - with(density) { 230.dp.toPx() }) / game.h)
+            val mazeW = tile * game.w
+            val mazeH = tile * game.h
+            val ox = (wPx - mazeW) / 2f
+            val oy = (hPx - mazeH) / 2f + with(density) { 16.dp.toPx() }
+            val manSize = tile * 1.6f
+            val i = intro.value
+
+            Canvas(Modifier.fillMaxSize()) {
+                @Suppress("UNUSED_EXPRESSION") frame
+                // Background fades in over Home.
+                drawRect(bg.copy(alpha = (i / 0.35f).coerceIn(0f, 1f)))
+                fun at(x: Float, y: Float) = Offset(ox + (x + 0.5f) * tile, oy + (y + 0.5f) * tile)
+                val startPos = at(game.shield.x, game.shield.y)
+                // The maze draws in from the shield outwards.
+                val reveal = ((i - 0.45f) / 0.5f).coerceIn(0f, 1f)
+                val maxR = hypot(mazeW, mazeH)
+                val r = maxR * reveal
+                // Solid colour (accent over the background), so overlapping wall pieces don't show seams.
+                val wallColor = androidx.compose.ui.graphics.lerp(bg, accent, 0.32f)
+                val inset = tile * 0.18f
+                clipRect(ox, oy, ox + mazeW, oy + mazeH) {
+                    for (y in 0 until game.h) for (x in 0 until game.w) {
+                        val c = at(x.toFloat(), y.toFloat())
+                        val dc = (c - startPos).getDistance()
+                        if (dc > r) continue
+                        val a = ((r - dc) / (tile * 3f)).coerceIn(0f, 1f)
+                        if (game.wall(x, y)) {
+                            val tl = Offset(ox + x * tile, oy + y * tile)
+                            drawRoundRect(wallColor.copy(alpha = a), Offset(tl.x + inset, tl.y + inset), Size(tile - 2 * inset, tile - 2 * inset), CornerRadius(tile * 0.25f))
+                            // Bridges to wall neighbours, so walls read as one shape.
+                            if (game.wall(x + 1, y) && x + 1 < game.w) drawRect(wallColor.copy(alpha = a), Offset(tl.x + tile / 2, tl.y + inset), Size(tile, tile - 2 * inset))
+                            if (game.wall(x, y + 1)) drawRect(wallColor.copy(alpha = a), Offset(tl.x + inset, tl.y + tile / 2), Size(tile - 2 * inset, tile))
+                        } else if (game.door(x, y)) {
+                            drawRect(warn.copy(alpha = 0.6f * a), Offset(ox + x * tile, oy + y * tile + tile * 0.42f), Size(tile, tile * 0.16f))
+                        }
+                        val k = y * game.w + x
+                        if (game.dots[k]) drawCircle(text.copy(alpha = 0.55f * a), tile * 0.09f, c)
+                        if (game.powers[k]) {
+                            val pulse = 1f + 0.12f * sin(clock * 6f)
+                            shieldMan(c, tile * 0.8f * pulse, 0f, false, 0f, accent.copy(alpha = a), text.copy(alpha = a))
+                        }
+                    }
+                    if (i >= 1f) {
+                        // Enemies.
+                        val scared = game.powerLeft > 0f
+                        val blink = game.powerLeft in 0.01f..2f && ((clock * 6f).toInt() % 2 == 0)
+                        for (e in game.enemies) {
+                            if (e.away > 0f) continue
+                            val p = at(e.m.x, e.m.y)
+                            val bob = sin(clock * 8f + e.index) * tile * 0.06f
+                            when (e.kind) {
+                                EnemyKind.AD -> drawThreat(Kind.AD, Offset(p.x, p.y + bob), tile * 0.44f / 22.dp.toPx(), sin(clock * 5f + e.index) * 10f, accent, warn, adLabel)
+                                EnemyKind.MALWARE -> drawThreat(
+                                    Kind.MALWARE, Offset(p.x, p.y + bob), tile * 0.4f / 22.dp.toPx(), sin(clock * 9f) * 8f, accent, warn, adLabel,
+                                    bugColor = if (scared) (if (blink) Color.White else Color(0xFF6B7CFF)) else Color(0xFF4ADE80),
+                                )
+                            }
+                        }
+                        // Points floating up.
+                        game.popup?.let { (px, py, pts) ->
+                            if (game.popupTime < 0.9f) {
+                                val q = game.popupTime / 0.9f
+                                val pos = at(px, py - q * 1.2f)
+                                val l = measurer.measure("+$pts", TextStyle(color = accent.copy(alpha = 1f - q), fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, fontFamily = Display))
+                                drawText(l, topLeft = Offset(pos.x - l.size.width / 2f, pos.y - l.size.height / 2f))
+                            }
+                        }
+                    }
+                }
+                // The shield: in the intro it flies from the Home bar to its start tile.
+                val (fromPos, fromSize) = from ?: (Offset(wPx * 0.12f, with(density) { 60.dp.toPx() }) to with(density) { 26.dp.toPx() })
+                val fly = Pop.transform((i / 0.6f).coerceIn(0f, 1f))
+                val pos = if (i < 1f) Offset(fromPos.x + (startPos.x - fromPos.x) * fly, fromPos.y + (startPos.y - fromPos.y) * fly) else startPos
+                val size = if (i < 1f) fromSize + (manSize - fromSize) * fly + manSize * 0.9f * sin((fly * 3.14159f).coerceIn(0f, 3.14159f)) * 0.35f else manSize
+                val teeth = ((i - 0.4f) / 0.25f).coerceIn(0f, 1f)
+                val moving = game.state == ChompGame.State.PLAY && game.shield.dir != Dir.NONE
+                val introChomp = if (i in 0.6f..0.98f) abs(sin((i - 0.6f) / 0.38f * 3.14159f * 2f)) else 0f
+                val bite = if (game.sinceBite < 0.18f) 1f - game.sinceBite / 0.18f else 0f
+                val open = when {
+                    i < 1f -> introChomp
+                    game.state == ChompGame.State.DYING -> 1f
+                    moving -> max(0.15f + 0.85f * abs(sin(clock * 14f)), bite)
+                    else -> 0.25f
+                }
+                val dyingQ = if (game.state == ChompGame.State.DYING) (game.stateTime / 1.2f).coerceIn(0f, 1f) else 0f
+                shieldMan(
+                    pos, size, open, facingLeft, teeth, accent, text,
+                    scale = 1f - dyingQ, spin = dyingQ * 540f,
+                )
+            }
+
+            // HUD.
+            val hud = ((i - 0.8f) / 0.2f).coerceIn(0f, 1f)
+            Column(Modifier.fillMaxWidth().systemBarsPadding().padding(horizontal = Gutter, vertical = 10.dp).graphicsLayer { alpha = hud }) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Kicker(tr("Shield-Man", "Shield-Man", "Shield-Man"), Modifier.weight(1f))
+                    Box(
+                        Modifier.size(40.dp).clip(CircleShape).clickable { close() },
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Icons.close, tr("Close", "Fermer", "Schließen"), tint = text, modifier = Modifier.size(20.dp)) }
+                }
+                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.Bottom) {
+                    @Suppress("UNUSED_EXPRESSION") frame
+                    Text("${game.score}", style = display(30), color = text)
+                    Spacer(Modifier.width(10.dp))
+                    Text(tr("LEVEL ${game.level}", "NIVEAU ${game.level}", "LEVEL ${game.level}"), color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, modifier = Modifier.padding(bottom = 6.dp))
+                    Spacer(Modifier.weight(1f))
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(tr("BEST", "RECORD", "REKORD"), color = faint, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                        Text("${max(best, game.score)}", color = dim, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+            Row(
+                Modifier.align(Alignment.BottomCenter).systemBarsPadding().padding(bottom = 22.dp).graphicsLayer { alpha = hud },
+                horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
+            ) {
+                @Suppress("UNUSED_EXPRESSION") frame
+                repeat(game.lives.coerceAtLeast(0)) { Logo(18.dp, lit = true) }
+                Spacer(Modifier.width(10.dp))
+                Text("${game.eatenAds} " + tr("ads", "pubs", "Werbung") + " · ${game.eatenMalware} malware", color = faint, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+
+            // Messages over the maze.
+            @Suppress("UNUSED_EXPRESSION") frame
+            val msg: Pair<String, String>? = when (game.state) {
+                ChompGame.State.READY -> if (i >= 1f) (tr("Ready?", "Prêt ?", "Bereit?") to tr("Swipe to move. Eat the ads, dodge the malware.", "Glissez pour bouger. Mangez les pubs, évitez les malwares.", "Wische zum Bewegen. Friss Werbung, meide Malware.")) else null
+                ChompGame.State.CLEAR -> tr("Clean!", "Propre !", "Sauber!") to tr("Level ${game.level + 1} next", "Niveau ${game.level + 1}", "Gleich Level ${game.level + 1}")
+                ChompGame.State.OVER -> tr("Game over", "Perdu", "Game over") to tr("Tap to play again", "Touchez pour rejouer", "Tippen für neue Runde")
+                else -> null
+            }
+            if (msg != null) {
+                Column(
+                    Modifier.align(Alignment.Center).padding(top = 60.dp).clip(blockShape).background(Palette.panel.copy(alpha = 0.92f))
+                        .let { if (game.state == ChompGame.State.OVER) it.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { game.restart() } else it }
+                        .padding(horizontal = 22.dp, vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(msg.first, style = display(26), color = text)
+                    Text(msg.second, color = dim, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+                    if (game.state == ChompGame.State.OVER && game.score >= best && game.score > 0) {
+                        Text(tr("New best!", "Nouveau record !", "Neuer Rekord!"), color = accent, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp))
+                    }
+                }
+            }
+        }
+    }
+}

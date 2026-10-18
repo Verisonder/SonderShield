@@ -67,6 +67,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
@@ -119,9 +121,15 @@ fun HomeScreen(onToggle: () -> Unit, scroll: ScrollState) {
             val wiggle = remember { Animatable(0f) }
             val eggScope = androidx.compose.runtime.rememberCoroutineScope()
             val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+            var logoAt by remember { mutableStateOf<Pair<androidx.compose.ui.geometry.Offset, Float>?>(null) }
             Logo(
                 26.dp, lit = on,
-                modifier = Modifier.graphicsLayer { rotationZ = wiggle.value }
+                modifier = Modifier
+                    .onGloballyPositioned { c ->
+                        val p = c.positionInWindow()
+                        logoAt = androidx.compose.ui.geometry.Offset(p.x + c.size.width / 2f, p.y + c.size.height / 2f) to c.size.width.toFloat()
+                    }
+                    .graphicsLayer { rotationZ = wiggle.value }
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
                         val n = taps.tap()
                         if (n >= 4) haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
@@ -132,7 +140,7 @@ fun HomeScreen(onToggle: () -> Unit, scroll: ScrollState) {
                         if (n >= 7) { taps.reset(); egg = true }
                     },
             )
-            if (egg) ShieldChomp(onClose = { egg = false })
+            if (egg) ShieldManGame(from = logoAt, onClose = { egg = false })
             Spacer(Modifier.width(10.dp))
             Box(Modifier.weight(1f).clipToBounds()) { Wordmark() }
             Spacer(Modifier.width(8.dp))
