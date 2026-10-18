@@ -30,7 +30,12 @@ class Enemy(val kind: EnemyKind, val home: Pair<Int, Int>, val index: Int) {
     /** Seconds before it comes back after being eaten (0 = in play). */
     var away = 0f
     var leftHouse = false
+    /** The real blocked domain it stands for ("" = a generic one). */
+    var label = ""
 }
+
+/** Points floating up where something was eaten. */
+class Popup(val x: Float, val y: Float, val points: Int, val label: String)
 
 class ChompGame(seed: Long = System.nanoTime()) {
     enum class State { READY, PLAY, DYING, CLEAR, OVER }
@@ -63,8 +68,13 @@ class ChompGame(seed: Long = System.nanoTime()) {
     val events = ArrayDeque<Event>()
     /** Last bite (time since): drives the chomp on screen. */
     var sinceBite = 9f; private set
-    /** Where points last appeared, for the floating "+200". */
-    var popup: Triple<Float, Float, Int>? = null; private set
+    /** Where points last appeared, for the floating "+200 doubleclick.net". */
+    var popup: Popup? = null; private set
+    /** Names given to the enemies (the screen sets this to real blocked domains). */
+    var labeler: (EnemyKind) -> String = { "" }
+        set(v) { field = v; for (e in enemies) e.label = v(e.kind) }
+    /** What you ate this game, newest last. */
+    val eatenNames = mutableListOf<String>()
     var popupTime = 9f; private set
 
     init {
@@ -101,7 +111,7 @@ class ChompGame(seed: Long = System.nanoTime()) {
     }
 
     fun restart() {
-        score = 0; lives = 3; level = 1; eatenAds = 0; eatenMalware = 0
+        score = 0; lives = 3; level = 1; eatenAds = 0; eatenMalware = 0; eatenNames.clear()
         refill(); resetPositions(); setState(State.READY)
     }
 
@@ -279,7 +289,9 @@ class ChompGame(seed: Long = System.nanoTime()) {
 
     private fun bite(e: Enemy, pts: Int) {
         sinceBite = 0f
-        popup = Triple(e.m.x, e.m.y, pts); popupTime = 0f
+        popup = Popup(e.m.x, e.m.y, pts, e.label); popupTime = 0f
+        if (e.label.isNotEmpty()) eatenNames += e.label
+        e.label = labeler(e.kind)
         e.m.tx = e.home.first; e.m.ty = e.home.second; e.m.dir = Dir.NONE; e.m.f = 0f
         e.leftHouse = false
     }

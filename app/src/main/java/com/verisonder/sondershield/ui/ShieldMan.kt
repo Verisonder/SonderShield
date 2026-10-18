@@ -144,7 +144,18 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
     val ctx = LocalContext.current
     val prefs = remember { Prefs(ctx) }
     val haptic = LocalHapticFeedback.current
-    val game = remember { ChompGame() }
+    val game = remember {
+        ChompGame().also { g ->
+            // Name the enemies after things SonderShield really blocked on this phone.
+            val (ads, malware) = blockedNames()
+            val rnd = java.util.Random()
+            g.labeler = { kind ->
+                val pool = if (kind == EnemyKind.AD) ads else malware
+                val onScreen = g.enemies.map { it.label }.toSet()
+                (pool.filter { it !in onScreen }.ifEmpty { pool }).let { if (it.isEmpty()) "" else it[rnd.nextInt(it.size)] }
+            }
+        }
+    }
     var best by remember { mutableStateOf(prefs.sp.getInt("egg.best", 0)) }
     var frame by remember { mutableLongStateOf(0L) }
     var clock by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
@@ -191,6 +202,10 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
     val measurer = rememberTextMeasurer()
     val adLabel = remember(measurer) { measurer.measure("AD", TextStyle(color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, fontFamily = Display)) }
     val density = LocalDensity.current
+    // Text drawn on the maze, measured once per string.
+    val texts = remember { HashMap<String, androidx.compose.ui.text.TextLayoutResult>() }
+    fun label(s: String, style: TextStyle) = texts.getOrPut(s + style.fontSize + style.color) { measurer.measure(s, style) }
+    val tagStyle = TextStyle(color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
 
     Dialog(onDismissRequest = { close() }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         BoxWithConstraints(
@@ -262,21 +277,49 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
                             if (e.away > 0f) continue
                             val p = at(e.m.x, e.m.y)
                             val bob = sin(clock * 8f + e.index) * tile * 0.06f
+                            val body = Offset(p.x, p.y + bob)
+                            // Its initial as a small icon on the body ("AD" / plain bug when there's no name).
+                            val initial = e.label.firstOrNull()?.uppercaseChar()?.toString()
                             when (e.kind) {
-                                EnemyKind.AD -> drawThreat(Kind.AD, Offset(p.x, p.y + bob), tile * 0.44f / 22.dp.toPx(), sin(clock * 5f + e.index) * 10f, accent, warn, adLabel)
-                                EnemyKind.MALWARE -> drawThreat(
-                                    Kind.MALWARE, Offset(p.x, p.y + bob), tile * 0.4f / 22.dp.toPx(), sin(clock * 9f) * 8f, accent, warn, adLabel,
-                                    bugColor = if (scared) (if (blink) Color.White else Color(0xFF6B7CFF)) else Color(0xFF4ADE80),
+                                EnemyKind.AD -> drawThreat(
+                                    Kind.AD, body, tile * 0.44f / 22.dp.toPx(), sin(clock * 5f + e.index) * 10f, accent, warn,
+                                    if (initial != null) label(initial, TextStyle(color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, fontFamily = Display)) else adLabel,
                                 )
+                                EnemyKind.MALWARE -> {
+                                    drawThreat(
+                                        Kind.MALWARE, body, tile * 0.4f / 22.dp.toPx(), sin(clock * 9f) * 8f, accent, warn, adLabel,
+                                        bugColor = if (scared) (if (blink) Color.White else Color(0xFF6B7CFF)) else Color(0xFF4ADE80),
+                                    )
+                                    if (initial != null) {
+                                        drawCircle(Color.Black.copy(alpha = 0.75f), tile * 0.2f, Offset(body.x, body.y + tile * 0.05f))
+                                        val l = label(initial, TextStyle(color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, fontFamily = Display))
+                                        drawText(l, topLeft = Offset(body.x - l.size.width / 2f, body.y + tile * 0.05f - l.size.height / 2f))
+                                    }
+                                }
+                            }
+                            // Its name on a little tag above it.
+                            if (e.label.isNotEmpty()) {
+                                val l = label(e.label.take(16), tagStyle)
+                                val pad = 3.dp.toPx()
+                                val tl = Offset(body.x - l.size.width / 2f - pad, body.y - tile * 0.95f - l.size.height)
+                                drawRoundRect(
+                                    (if (e.kind == EnemyKind.AD) warn else if (scared) Color(0xFF6B7CFF) else Color(0xFF16A34A)).copy(alpha = 0.85f),
+                                    tl, Size(l.size.width + 2 * pad, l.size.height.toFloat()), CornerRadius(l.size.height / 2f),
+                                )
+                                drawText(l, topLeft = Offset(tl.x + pad, tl.y))
                             }
                         }
                         // Points floating up.
-                        game.popup?.let { (px, py, pts) ->
-                            if (game.popupTime < 0.9f) {
-                                val q = game.popupTime / 0.9f
-                                val pos = at(px, py - q * 1.2f)
-                                val l = measurer.measure("+$pts", TextStyle(color = accent.copy(alpha = 1f - q), fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, fontFamily = Display))
-                                drawText(l, topLeft = Offset(pos.x - l.size.width / 2f, pos.y - l.size.height / 2f))
+                        game.popup?.let { pu ->
+                            if (game.popupTime < 1.1f) {
+                                val q = game.popupTime / 1.1f
+                                val pos = at(pu.x, pu.y - q * 1.2f)
+                                val l = label("+${pu.points}", TextStyle(color = accent, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, fontFamily = Display))
+                                drawText(l, topLeft = Offset(pos.x - l.size.width / 2f, pos.y - l.size.height / 2f), alpha = 1f - q)
+                                if (pu.label.isNotEmpty()) {
+                                    val n = label(pu.label.take(22), TextStyle(color = text, fontSize = 10.sp, fontWeight = FontWeight.Bold))
+                                    drawText(n, topLeft = Offset(pos.x - n.size.width / 2f, pos.y + l.size.height / 2f), alpha = 1f - q)
+                                }
                             }
                         }
                     }
@@ -352,6 +395,10 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
                 ) {
                     Text(msg.first, style = display(26), color = text)
                     Text(msg.second, color = dim, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+                    if (game.state == ChompGame.State.OVER && game.eatenNames.isNotEmpty()) {
+                        val names = game.eatenNames.distinct().takeLast(4).reversed().joinToString(", ")
+                        Text(tr("You ate $names", "Vous avez mangé $names", "Gefressen: $names"), color = faint, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                    }
                     if (game.state == ChompGame.State.OVER && game.score >= best && game.score > 0) {
                         Text(tr("New best!", "Nouveau record !", "Neuer Rekord!"), color = accent, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp))
                     }
@@ -359,4 +406,28 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * Real names for the enemies: domains SonderShield blocked on this phone, shortened to
+ * "doubleclick.net". Ads from recent blocks and the top-blocked list; malware from hits on
+ * the threat lists. Either can be empty (then the enemy has no name).
+ */
+private fun blockedNames(): Pair<List<String>, List<String>> {
+    val log = com.verisonder.sondershield.core.ShieldState.log.value
+    val threatLists = com.verisonder.sondershield.data.Stats.THREAT_LISTS
+    fun isThreat(r: String) = r.startsWith("list:") && r.removePrefix("list:") in threatLists
+    val malware = log.filter { it.verdict == 1 && isThreat(it.reason) }.map { shortDomain(it.domain) }.distinct()
+    val ads = (log.filter { it.verdict == 1 && !isThreat(it.reason) }.map { it.domain } +
+        com.verisonder.sondershield.core.ShieldState.stats.value.top.map { it.first })
+        .map { shortDomain(it) }.filter { it !in malware }.distinct().take(40)
+    return ads to malware.take(40)
+}
+
+/** "googleads.g.doubleclick.net" → "doubleclick.net" (keeps "bbc.co.uk"-style endings). */
+internal fun shortDomain(d: String): String {
+    val p = d.trimEnd('.').lowercase().split('.').filter { it.isNotEmpty() }
+    if (p.size <= 2) return p.joinToString(".")
+    val second = setOf("co", "com", "net", "org", "ac", "gov", "edu")
+    return if (p[p.size - 2] in second && p.last().length == 2) p.takeLast(3).joinToString(".") else p.takeLast(2).joinToString(".")
 }
