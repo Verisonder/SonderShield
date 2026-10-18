@@ -110,16 +110,13 @@ fun HomeScreen(onToggle: () -> Unit, scroll: ScrollState) {
     val snap = remember(screenPx, decay) { PageSnapFling(scroll, screenPx, decay) }
     Column(Modifier.fillMaxSize().verticalScroll(scroll, flingBehavior = snap)) {
     Column(Modifier.fillMaxWidth().height(screen)) {
-        // Top bar: mark + wordmark, DNS server.
+        // Top bar: mark + wordmark, protection profile.
         Row(Modifier.fillMaxWidth().padding(start = Gutter, end = Gutter, top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
             Logo(26.dp, lit = on)
             Spacer(Modifier.width(10.dp))
             Box(Modifier.weight(1f)) { Wordmark() }
-            val up = Upstreams.byId(prefs.upstreamId)?.name?.substringBefore(" (") ?: tr("Custom", "Perso", "Eigener")
-            Text(
-                up, color = Palette.text, fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.clip(CircleShape).border(1.5.dp, Palette.line, CircleShape).padding(horizontal = 12.dp, vertical = 6.dp),
-            )
+            // The profile in use; tap to switch or make your own.
+            ProfileChip()
         }
 
         // Hero: the headline rolls over when the state changes.

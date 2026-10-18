@@ -40,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -75,7 +76,7 @@ fun profileName(p: Profile?, lang: String): String = when {
     }
 }
 
-private fun profileAbout(p: Profile, lang: String): String = when (p.id) {
+internal fun profileAbout(p: Profile, lang: String): String = when (p.id) {
     "default" -> when (lang) { "fr" -> "Blocage équilibré : pubs et traqueurs courants"; "de" -> "Ausgewogen: übliche Werbung und Tracker"; else -> p.about }
     "strict" -> when (lang) { "fr" -> "Blocage poussé : pubs, traqueurs, statistiques, télémétrie"; "de" -> "Stark: Werbung, Tracker, Analyse, Telemetrie"; else -> p.about }
     "family" -> when (lang) { "fr" -> "Navigation sûre : pubs, contenu adulte, jeux d'argent"; "de" -> "Sicher surfen: Werbung, Erwachseneninhalte, Glücksspiel"; else -> p.about }
@@ -84,7 +85,7 @@ private fun profileAbout(p: Profile, lang: String): String = when (p.id) {
     else -> p.about
 }
 
-private fun profileIcon(key: String): ImageVector = when (key) {
+internal fun profileIcon(key: String): ImageVector = when (key) {
     "shield" -> Icons.pShield
     "strict" -> Icons.pStrict
     "family" -> Icons.pFamily
@@ -131,17 +132,9 @@ internal fun ProfilesPane(header: @Composable (String, String, @Composable RowSc
     var scheduling by remember { mutableStateOf<String?>(null) }
     val lang = lang()
 
-    // Push the change to the engine: fetch lists the new profile needs, then reload.
     fun changed() {
         rev++
-        scope.launch {
-            if (phase == Phase.ON) {
-                val store = ListStore(ctx)
-                withContext(Dispatchers.IO) { for (l in store.missingEnabled()) store.update(l) }
-                ShieldState.applyConfig()
-            }
-            ShieldState.listsVersion.value++
-        }
+        applyProfileChange(ctx, scope, phase)
     }
 
     val nowName = profileName(prefs.profileById(active.first), lang)
@@ -212,6 +205,18 @@ internal fun ProfilesPane(header: @Composable (String, String, @Composable RowSc
     }
 }
 
+/** Push a profile change to the engine: fetch lists the new profile needs, then reload. */
+internal fun applyProfileChange(ctx: android.content.Context, scope: kotlinx.coroutines.CoroutineScope, phase: Phase) {
+    scope.launch {
+        if (phase == Phase.ON) {
+            val store = ListStore(ctx)
+            withContext(Dispatchers.IO) { for (l in store.missingEnabled()) store.update(l) }
+            ShieldState.applyConfig()
+        }
+        ShieldState.listsVersion.value++
+    }
+}
+
 @Composable
 private fun SectionLabel(text: String) {
     Text(text, color = Palette.accentText, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp,
@@ -262,10 +267,11 @@ private fun RoundIcon(icon: ImageVector, description: String, lit: Boolean, onCl
 }
 
 @Composable
-private fun CheckDot(on: Boolean) {
+internal fun CheckDot(on: Boolean) {
     val bg by animateColorAsState(if (on) Palette.accent else androidx.compose.ui.graphics.Color.Transparent, label = "check")
+    val pop by androidx.compose.animation.core.animateFloatAsState(if (on) 1f else 0.86f, androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 600f), label = "checkPop")
     Box(
-        Modifier.size(26.dp).clip(CircleShape).background(bg).border(2.dp, if (on) Palette.accent else Palette.faint, CircleShape),
+        Modifier.size(26.dp).graphicsLayer { scaleX = pop; scaleY = pop }.clip(CircleShape).background(bg).border(2.dp, if (on) Palette.accent else Palette.faint, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         if (on) Icon(Icons.check, null, tint = Palette.onAccent, modifier = Modifier.size(16.dp))
@@ -294,7 +300,7 @@ private fun groupTitle(g: ListGroup, lang: String) = when (g) {
 
 /** New profile (editing == null) or change one of yours. */
 @Composable
-private fun ProfileEditor(prefs: Prefs, editing: Profile?, lang: String, onDone: () -> Unit, onCancel: () -> Unit) {
+internal fun ProfileEditor(prefs: Prefs, editing: Profile?, lang: String, onDone: () -> Unit, onCancel: () -> Unit) {
     var name by remember { mutableStateOf(editing?.name ?: "") }
     var icon by remember { mutableStateOf(editing?.icon ?: "star") }
     var on by remember { mutableStateOf(editing?.lists ?: prefs.activeLists()) }
