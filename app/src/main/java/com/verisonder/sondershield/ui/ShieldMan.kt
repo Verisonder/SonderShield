@@ -99,7 +99,9 @@ private object ManParts {
  */
 private fun DrawScope.shieldMan(center: Offset, size: Float, open: Float, left: Boolean, teeth: Float, top: Color, bottom: Color, scale: Float = 1f, spin: Float = 0f) {
     val box = size / 100f
-    val gap = 12f * open // in shield units, along the cut's normal
+    // The mouth opens on a hinge at the back: the upper jaw tilts up, the lower drops a little.
+    val upper = -24f * open
+    val lower = 6f * open
     withTransform({
         translate(center.x, center.y)
         rotate(spin, Offset.Zero)
@@ -108,17 +110,17 @@ private fun DrawScope.shieldMan(center: Offset, size: Float, open: Float, left: 
         scale(box, box, Offset.Zero)
     }) {
         // Upper jaw.
-        withTransform({ translate(-gap * 0.5f, -gap) }) {
-            clipPath(ManParts.top) { drawPath(ManParts.shield, top) }
-            if (teeth > 0f) clipPath(ManParts.shield) {
-                teethRow(Offset(0f, 80f), Offset(46f, 60f), Offset(100f, 30f), down = true, count = 5, color = Color.White.copy(alpha = teeth))
+        withTransform({ rotate(upper, Offset(10f, 78f)) }) {
+            clipPath(ManParts.shield) {
+                clipPath(ManParts.top) { drawPath(ManParts.shield, top) }
+                if (teeth > 0f) teethRow(Offset(0f, 80f), Offset(46f, 60f), Offset(100f, 30f), down = true, count = 5, color = Color.White.copy(alpha = teeth))
             }
         }
         // Lower jaw.
-        withTransform({ translate(gap * 0.5f, gap) }) {
-            clipPath(ManParts.bottom) { drawPath(ManParts.shield, bottom) }
-            if (teeth > 0f) clipPath(ManParts.shield) {
-                teethRow(Offset(0f, 88f), Offset(52f, 70f), Offset(100f, 45f), down = false, count = 4, color = Color.White.copy(alpha = teeth))
+        withTransform({ rotate(lower, Offset(10f, 86f)) }) {
+            clipPath(ManParts.shield) {
+                clipPath(ManParts.bottom) { drawPath(ManParts.shield, bottom) }
+                if (teeth > 0f) teethRow(Offset(0f, 88f), Offset(52f, 70f), Offset(100f, 45f), down = false, count = 4, color = Color.White.copy(alpha = teeth))
             }
         }
     }
@@ -131,17 +133,19 @@ private fun DrawScope.shieldMan(center: Offset, size: Float, open: Float, left: 
  */
 private fun DrawScope.teethRow(p0: Offset, c: Offset, p1: Offset, down: Boolean, count: Int, color: Color) {
     val n = count
-    // Upper: 0.18 … 0.82; lower: the midpoints between them.
-    val step = 0.64f / 4f
-    val first = if (n == 5) 0.18f else 0.18f + step / 2f
+    // Upper: 0.24 … 0.76 (in from the shield's sides); lower: the midpoints between them.
+    val step = 0.13f
+    val first = if (n == 5) 0.24f else 0.24f + step / 2f
     for (k in 0 until n) {
         val a = first + k * step
         val (p, _) = ManParts.quad(a, p0, c, p1)
         val (pl, _) = ManParts.quad(a - 0.04f, p0, c, p1)
         val (pr, _) = ManParts.quad(a + 0.04f, p0, c, p1)
         // Fangs point straight down (upper jaw) or up (lower), whatever the slope of the cut.
-        val tip = Offset(p.x, p.y + if (down) 10f else -10f)
-        val path = Path().apply { moveTo(pl.x, pl.y); lineTo(tip.x, tip.y); lineTo(pr.x, pr.y); close() }
+        val s = if (down) 1f else -1f
+        val tip = Offset(p.x, p.y + 10f * s)
+        // The base starts a little inside the jaw, so no seam shows where tooth meets jaw.
+        val path = Path().apply { moveTo(pl.x, pl.y - 3f * s); lineTo(tip.x, tip.y); lineTo(pr.x, pr.y - 3f * s); close() }
         drawPath(path, color)
     }
 }
