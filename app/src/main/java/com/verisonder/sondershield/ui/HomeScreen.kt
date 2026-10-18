@@ -143,14 +143,14 @@ fun HomeScreen(onToggle: () -> Unit, scroll: ScrollState) {
                     modifier = Modifier.padding(top = 8.dp, bottom = 6.dp),
                 )
             }
+            // One short line under the headline.
             Text(
-                if (on) tr(
-                    "Every app asks SonderShield first. ${if (domains > 0) domains.grouped() else "Thousands of"} ad and tracker domains get nothing back.",
-                    "Chaque appli passe d'abord par SonderShield. ${if (domains > 0) domains.grouped() else "Des milliers de"} domaines de pubs et de traqueurs ne reçoivent rien.",
-                    "Jede App fragt zuerst SonderShield. ${if (domains > 0) domains.grouped() else "Tausende"} Werbe- und Tracker-Domains bekommen keine Antwort.",
-                )
-                else tr("Tap the shield to block ads and trackers in every app on this phone.", "Touchez le bouclier pour bloquer pubs et traqueurs dans toutes les applis de ce téléphone.", "Tippe auf das Schild, um Werbung und Tracker in jeder App auf diesem Handy zu blockieren."),
-                color = Palette.dim, fontSize = 15.sp, lineHeight = 21.sp, maxLines = 2,
+                if (on) {
+                    if (domains > 0) tr("${domains.grouped()} ad and tracker domains blocked", "${domains.grouped()} domaines de pubs et traqueurs bloqués", "${domains.grouped()} Werbe- und Tracker-Domains blockiert")
+                    else tr("Blocking ads and trackers in every app", "Pubs et traqueurs bloqués dans toutes les applis", "Werbung und Tracker in jeder App blockiert")
+                } else tr("Tap the shield to block ads in every app", "Touchez le bouclier pour bloquer les pubs", "Tippe aufs Schild, um Werbung zu blockieren"),
+                color = Palette.faint, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
         }
 
