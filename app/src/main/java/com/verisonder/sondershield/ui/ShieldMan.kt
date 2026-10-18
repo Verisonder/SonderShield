@@ -5,6 +5,7 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -157,6 +159,8 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
         }
     }
     var best by remember { mutableStateOf(prefs.sp.getInt("egg.best", 0)) }
+    // Name tags over the enemies; remembered between games.
+    var showNames by remember { mutableStateOf(prefs.sp.getBoolean("egg.names", true)) }
     var frame by remember { mutableLongStateOf(0L) }
     var clock by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     val intro = remember { Animatable(0f) }
@@ -298,7 +302,7 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
                                 }
                             }
                             // Its name on a little tag above it.
-                            if (e.label.isNotEmpty()) {
+                            if (showNames && e.label.isNotEmpty()) {
                                 val l = label(e.label.take(16), tagStyle)
                                 val pad = 3.dp.toPx()
                                 val tl = Offset(body.x - l.size.width / 2f - pad, body.y - tile * 0.95f - l.size.height)
@@ -316,7 +320,7 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
                                 val pos = at(pu.x, pu.y - q * 1.2f)
                                 val l = label("+${pu.points}", TextStyle(color = accent, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, fontFamily = Display))
                                 drawText(l, topLeft = Offset(pos.x - l.size.width / 2f, pos.y - l.size.height / 2f), alpha = 1f - q)
-                                if (pu.label.isNotEmpty()) {
+                                if (showNames && pu.label.isNotEmpty()) {
                                     val n = label(pu.label.take(22), TextStyle(color = text, fontSize = 10.sp, fontWeight = FontWeight.Bold))
                                     drawText(n, topLeft = Offset(pos.x - n.size.width / 2f, pos.y + l.size.height / 2f), alpha = 1f - q)
                                 }
@@ -376,6 +380,25 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
                 repeat(game.lives.coerceAtLeast(0)) { Logo(18.dp, lit = true) }
                 Spacer(Modifier.width(10.dp))
                 Text("${game.eatenAds} " + tr("ads", "pubs", "Werbung") + " · ${game.eatenMalware} malware", color = faint, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(6.dp))
+                // Show / hide the names over the enemies.
+                val src = remember { MutableInteractionSource() }
+                Row(
+                    Modifier.height(30.dp).pressScale(src).clip(CircleShape)
+                        .background(if (showNames) accent else Color.Transparent)
+                        .border(1.5.dp, if (showNames) accent else Palette.line, CircleShape)
+                        .clickable(interactionSource = src, indication = null) {
+                            showNames = !showNames
+                            prefs.sp.edit().putBoolean("egg.names", showNames).apply()
+                        }
+                        .padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        if (showNames) tr("Names on", "Noms affichés", "Namen an") else tr("Names off", "Noms masqués", "Namen aus"),
+                        color = if (showNames) Palette.onAccent else dim, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                    )
+                }
             }
 
             // Messages over the maze.
