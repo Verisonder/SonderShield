@@ -619,39 +619,41 @@ function drawConns() {
 }
 
 // ---- Filter ----
-let filterView = 'lists', listSearch = '', logSearch = '', logFilter = 0, listsCache = [];
-const GROUPS = [['ads', 'AD BLOCKING'], ['privacy', 'PRIVACY'], ['security', 'SECURITY'], ['regional', 'REGIONAL'], ['custom', 'CUSTOM']];
+let filterView = 'profiles', listSearch = '', logSearch = '', logFilter = 0, listsCache = [];
+const GROUPS = [['ads', 'AD BLOCKING'], ['privacy', 'PRIVACY'], ['security', 'SECURITY'], ['family', 'FAMILY SAFETY'], ['regional', 'REGIONAL'], ['custom', 'CUSTOM']];
 
 async function renderFilter() {
   const p = $('#page-filter');
   if (!p.dataset.init) {
     p.innerHTML = `<div class="kicker">FILTER</div><h1>Filter</h1>
-      <div class="subtabs"><button class="chip active" id="fv-lists">Lists</button><button class="chip" id="fv-log">Log</button></div>
+      <div class="subtabs"><button class="chip active" id="fv-profiles">Profiles</button><button class="chip" id="fv-lists">Lists</button><button class="chip" id="fv-log">Log</button></div>
       <div id="filter-body"></div>`;
     p.dataset.init = '1';
-    $('#fv-lists').onclick = () => { filterView = 'lists'; switchFilter(); };
+    $('#fv-profiles').onclick = async () => { filterView = 'profiles'; await loadProfiles(); switchFilter(); };
+    $('#fv-lists').onclick = async () => { filterView = 'lists'; await loadProfiles(); switchFilter(); };
     $('#fv-log').onclick = () => { filterView = 'log'; switchFilter(); };
   }
+  if (filterView !== 'log') await loadProfiles();
   switchFilter();
-  if (filterView === 'lists') { listsCache = await api('lists'); renderLists(); }
 }
 function switchFilter() {
+  $('#fv-profiles').classList.toggle('active', filterView === 'profiles');
   $('#fv-lists').classList.toggle('active', filterView === 'lists');
   $('#fv-log').classList.toggle('active', filterView === 'log');
   $('#filter-body').innerHTML = '';
-  if (filterView === 'lists') renderLists(); else renderLog();
+  if (filterView === 'profiles') renderProfiles(); else if (filterView === 'lists') renderLists(); else renderLog();
 }
 
 function renderLists() {
   const body = $('#filter-body');
-  const on = cfg.lists || [];
+  const on = listsCache.filter(l => l.on).map(l => l.id);
   const q = listSearch.toLowerCase();
   const shown = listsCache.filter(l => !q || l.name.toLowerCase().includes(q) || l.url.toLowerCase().includes(q) || (l.about || '').toLowerCase().includes(q));
   let h = `<div class="row" style="gap:10px;margin-bottom:6px">
       <input class="field grow" id="lsearch" placeholder="Search lists" value="${escapeAttr(listSearch)}">
       <button class="pill" id="updateall">Update all</button>
       <button class="pill" id="addlist">Add</button>
-    </div>`;
+    </div>${listsNote()}`;
   for (const [g, label] of GROUPS) {
     const ls = shown.filter(l => (l.custom ? 'custom' : l.group) === g);
     if (!ls.length) continue;
@@ -683,16 +685,23 @@ function renderLists() {
   body.querySelectorAll('.sw[data-id]').forEach(s => s.onclick = () => toggleList(s.dataset.id));
   body.querySelectorAll('.rm[data-id]').forEach(b => b.onclick = () => removeList(b.dataset.id));
 }
+// ownPicks: switching a list by hand leaves the profile; start from the lists in use now.
+function ownPicks() {
+  const on = listsCache.filter(l => l.on).map(l => l.id);
+  cfg.profile = '';
+  return new Set(on);
+}
 async function toggleList(id) {
-  const on = new Set(cfg.lists || []);
+  const on = ownPicks();
   on.has(id) ? on.delete(id) : on.add(id);
   cfg.lists = [...on];
   await postConfig(cfg);
-  listsCache = await api('lists'); renderLists();
+  await loadProfiles(); renderLists();
 }
 async function removeList(id) {
   cfg.custom = (cfg.custom || []).filter(c => customId(c.url) !== id);
   cfg.lists = (cfg.lists || []).filter(x => x !== id);
+  cfg.profiles = (cfg.profiles || []).map(p => Object.assign({}, p, { lists: (p.lists || []).filter(x => x !== id) }));
   await postConfig(cfg);
   listsCache = await api('lists'); renderLists();
 }
@@ -705,8 +714,167 @@ async function addListDialog() {
   if (!v) return;
   const [name, url] = v;
   cfg.custom = (cfg.custom || []).concat([{ name, url }]);
-  cfg.lists = (cfg.lists || []).concat([customId(url)]);
+  const on = ownPicks(); on.add(customId(url));
+  cfg.lists = [...on];
   await postConfig(cfg); listsCache = await api('lists'); renderLists();
+}
+
+// ---- Profiles ----
+// Ready-made sets of lists for people who don't know which to pick, plus your own, and
+// schedules that switch profile at set times (Family in the evening, say).
+let profData = { profiles: [], chosen: '', now: '', scheduled: false, schedules: [] };
+async function loadProfiles() {
+  [profData, listsCache] = await Promise.all([api('profiles'), api('lists')]);
+}
+const P_ICONS = {
+  shield: '<path d="M12 3.5l7.5 2.8v5.4c0 4.6-3.1 7.9-7.5 9.3-4.4-1.4-7.5-4.7-7.5-9.3V6.3z"/><path d="M8.8 12.2l2.3 2.3 4.2-4.6"/>',
+  strict: '<path d="M12 3.5l7.5 2.8v5.4c0 4.6-3.1 7.9-7.5 9.3-4.4-1.4-7.5-4.7-7.5-9.3V6.3z"/><path d="M12 3.5v17.5" /><path d="M12 6.5l5 1.9v3.3c0 3.3-2 5.6-5 6.8z" fill="currentColor" stroke="none"/>',
+  family: '<circle cx="7" cy="6.5" r="2"/><circle cx="17" cy="6.5" r="2"/><circle cx="12" cy="10" r="1.6"/><path d="M4.5 20v-6.5a2.5 2.5 0 0 1 5 0V20"/><path d="M14.5 20v-6.5a2.5 2.5 0 0 1 5 0V20"/><path d="M10.4 20v-4a1.6 1.6 0 0 1 3.2 0v4"/>',
+  game: '<path d="M7 8h10a4 4 0 0 1 4 4v2.5a2.5 2.5 0 0 1-4.6 1.4L15 14H9l-1.4 1.9A2.5 2.5 0 0 1 3 14.5V12a4 4 0 0 1 4-4z"/><path d="M8 10.5v3M6.5 12h3"/><circle cx="15.5" cy="11" r=".6" fill="currentColor"/><circle cx="17.5" cy="13" r=".6" fill="currentColor"/>',
+  lock: '<path d="M12 3.5l7.5 2.8v5.4c0 4.6-3.1 7.9-7.5 9.3-4.4-1.4-7.5-4.7-7.5-9.3V6.3z" fill="currentColor" fill-opacity=".25"/><rect x="9" y="10.5" width="6" height="5" rx="1"/><path d="M10.2 10.5V9a1.8 1.8 0 0 1 3.6 0v1.5"/>',
+  star: '<path d="M12 4l2.4 5 5.4.6-4 3.7 1.1 5.3L12 16l-4.9 2.6 1.1-5.3-4-3.7 5.4-.6z"/>',
+  moon: '<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/>',
+  work: '<rect x="3.5" y="7.5" width="17" height="12" rx="2"/><path d="M9 7.5V5.5h6v2"/><path d="M3.5 12.5h17"/>',
+  own: '<path d="M4 7h10"/><path d="M4 17h6"/><path d="M18 4v6"/><path d="M15 7h6"/><path d="M14 17h6"/>',
+};
+const picon = (k, big) => `<div class="picon ${big ? 'big' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${P_ICONS[k] || P_ICONS.shield}</svg></div>`;
+const CLOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>';
+const DAYS = [[1, 'Mon'], [2, 'Tue'], [3, 'Wed'], [4, 'Thu'], [5, 'Fri'], [6, 'Sat'], [0, 'Sun']];
+const hm = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+const toMin = v => { const [h, m] = (v || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+function daysText(mask) {
+  if (mask === 127) return 'Every day';
+  if (mask === 62) return 'Weekdays';
+  if (mask === 65) return 'Weekends';
+  return DAYS.filter(([b]) => mask & (1 << b)).map(([, n]) => n).join(', ') || 'No days';
+}
+const profName = id => (profData.profiles.find(p => p.id === id) || {}).name || 'Your own picks';
+const schedsOf = id => (cfg.schedules || []).filter(s => s.profile === id);
+
+function listsNote() {
+  if (!profData.now) return '';
+  const name = esc(profName(profData.now));
+  return `<div class="card note"><div class="csub">${profData.scheduled
+    ? `A schedule has <b>${name}</b> on right now, so its lists are in use. Lists you switch here apply when the schedule ends.`
+    : `These are the lists of the <b>${name}</b> profile. Switching one here changes to your own picks.`}</div></div>`;
+}
+
+function renderProfiles() {
+  const body = $('#filter-body');
+  const d = profData;
+  const row = p => {
+    const n = schedsOf(p.id).filter(s => s.on).length;
+    const chosen = d.chosen === p.id;
+    const now = d.now === p.id;
+    return `<div class="prow ${chosen ? 'sel' : ''}" data-pid="${escapeAttr(p.id)}">
+      ${picon(p.icon)}
+      <div class="grow"><div class="row" style="gap:8px"><span class="ctitle">${esc(p.name)}</span>${now && d.scheduled ? '<span class="tag on">On by schedule</span>' : ''}</div>
+        ${p.about ? `<div class="csub">${esc(p.about)}</div>` : ''}
+        <div class="cfaint">${p.lists.length} list${p.lists.length === 1 ? '' : 's'}${n ? ' · ' + n + ' schedule' + (n > 1 ? 's' : '') : ''}</div></div>
+      ${p.custom ? `<button class="iconbtn" data-edit="${escapeAttr(p.id)}" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></button>` : ''}
+      <button class="iconbtn ${n ? 'has' : ''}" data-sched="${escapeAttr(p.id)}" title="Schedule">${CLOCK}</button>
+      <div class="pcheck"></div>
+    </div>`;
+  };
+  const built = d.profiles.filter(p => !p.custom), mine = d.profiles.filter(p => p.custom);
+  let h = '';
+  if (d.scheduled) h += `<div class="card note"><div class="csub">A schedule has <b>${esc(profName(d.now))}</b> on right now. When it ends, <b>${esc(profName(d.chosen))}</b> comes back.</div></div>`;
+  h += `<div class="seclabel"><span class="t">PROFILES</span><span class="n">Pick one, or make your own</span></div><div class="plist">${built.map(row).join('')}</div>`;
+  h += `<div class="seclabel"><span class="t">YOURS</span><button class="pill" id="newprof">+ New profile</button></div><div class="plist">`;
+  h += mine.map(row).join('');
+  h += `<div class="prow ${d.chosen === '' ? 'sel' : ''}" data-pid="">${picon('own')}<div class="grow"><div class="ctitle">Your own picks</div>
+      <div class="csub">Exactly the lists you switch on in Lists.</div></div><div class="pcheck"></div></div></div>`;
+  h += `<div class="cfaint" style="margin-top:14px">A profile only decides which block lists are on. Your rules, firewall and DNS settings stay as they are.</div>`;
+  body.innerHTML = h;
+  body.querySelectorAll('.prow[data-pid]').forEach(r => r.onclick = async ev => {
+    if (ev.target.closest('.iconbtn')) return;
+    cfg.profile = r.dataset.pid;
+    await postConfig(cfg);
+    await loadProfiles(); renderProfiles();
+  });
+  body.querySelectorAll('[data-sched]').forEach(b => b.onclick = () => openSchedules(b.dataset.sched));
+  body.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openProfileEditor(d.profiles.find(p => p.id === b.dataset.edit)));
+  $('#newprof').onclick = () => openProfileEditor(null);
+}
+
+function openProfileEditor(p) {
+  const isNew = !p;
+  const on = new Set(isNew ? listsCache.filter(l => l.on).map(l => l.id) : p.lists);
+  let icon = isNew ? 'star' : (p.icon || 'star');
+  const bg = el('div', 'modal-bg');
+  const lists = () => GROUPS.map(([g, label]) => {
+    const ls = listsCache.filter(l => (l.custom ? 'custom' : l.group) === g);
+    if (!ls.length) return '';
+    return `<div class="mlabel">${label}</div>` + ls.map(l => `<label class="lrow"><input type="checkbox" data-l="${escapeAttr(l.id)}" ${on.has(l.id) ? 'checked' : ''}><span class="grow"><span class="ctitle">${esc(l.name)}</span><span class="csub">${esc(l.about || '')}</span></span></label>`).join('');
+  }).join('');
+  bg.innerHTML = `<div class="modal wide" role="dialog"><h3>${isNew ? 'New profile' : 'Edit profile'}</h3>
+    <input class="field" id="pname" placeholder="Name, e.g. Work" value="${escapeAttr(isNew ? '' : p.name)}">
+    <div class="mlabel">ICON</div><div class="iconpick">${['star', 'moon', 'work', 'game', 'family', 'shield', 'strict', 'lock'].map(k => `<button class="ipk ${k === icon ? 'sel' : ''}" data-i="${k}">${picon(k)}</button>`).join('')}</div>
+    <div class="mlists">${lists()}</div>
+    <div class="err"></div>
+    <div class="actions">${isNew ? '' : '<button class="pill danger" data-a="del" style="margin-right:auto">Delete</button>'}<button class="pill" data-a="no">Cancel</button><button class="pill filled" data-a="yes">Save</button></div></div>`;
+  document.body.appendChild(bg);
+  bg.querySelectorAll('.ipk').forEach(b => b.onclick = () => { icon = b.dataset.i; bg.querySelectorAll('.ipk').forEach(x => x.classList.toggle('sel', x === b)); });
+  bg.querySelectorAll('input[data-l]').forEach(c => c.onchange = () => c.checked ? on.add(c.dataset.l) : on.delete(c.dataset.l));
+  const close = () => bg.remove();
+  bg.querySelector('[data-a=no]').onclick = close;
+  bg.onclick = e => { if (e.target === bg) close(); };
+  bg.querySelector('[data-a=yes]').onclick = async () => {
+    const name = $('#pname', bg).value.trim();
+    const err = !name ? 'Give the profile a name.' : !on.size ? 'Switch on at least one list.' : '';
+    if (err) { bg.querySelector('.err').textContent = err; return; }
+    const id = isNew ? 'p-' + Date.now().toString(36) : p.id;
+    const np = { id, name, about: '', icon, lists: [...on] };
+    const rest = (cfg.profiles || []).filter(x => x.id !== id);
+    cfg.profiles = isNew ? rest.concat([np]) : (cfg.profiles || []).map(x => x.id === id ? np : x);
+    if (isNew) cfg.profile = id;
+    await postConfig(cfg); close();
+    await loadProfiles(); renderProfiles();
+  };
+  const del = bg.querySelector('[data-a=del]');
+  if (del) del.onclick = async () => {
+    close();
+    const ok = await ask({ title: 'Delete ' + p.name + '?', text: 'Its schedules go too. If it was in use, SonderShield goes back to Default.', ok: 'Delete', danger: true });
+    if (!ok) return;
+    cfg.profiles = (cfg.profiles || []).filter(x => x.id !== p.id);
+    cfg.schedules = (cfg.schedules || []).filter(s => s.profile !== p.id);
+    if (cfg.profile === p.id) cfg.profile = 'default';
+    await postConfig(cfg);
+    await loadProfiles(); renderProfiles();
+  };
+}
+
+function openSchedules(pid) {
+  const bg = el('div', 'modal-bg');
+  let days = 62, start = '21:00', end = '07:00';
+  const draw = () => {
+    const ss = schedsOf(pid);
+    bg.innerHTML = `<div class="modal wide" role="dialog"><h3>Schedule ${esc(profName(pid))}</h3>
+      <p>During these times ${esc(profName(pid))} is used, whatever profile you picked. Outside them your pick comes back.</p>
+      ${ss.length ? ss.map(s => `<div class="srow"><div class="grow"><div class="ctitle">${hm(s.start)} – ${hm(s.end)}${s.end <= s.start ? ' <span class="cfaint">(next day)</span>' : ''}</div><div class="csub">${daysText(s.days)}</div></div>
+        <button class="pill" data-rm="${escapeAttr(s.id)}" style="padding:8px 12px">Remove</button>
+        <div class="sw ${s.on ? 'on' : ''}" data-sw="${escapeAttr(s.id)}"><div class="knob"></div></div></div>`).join('') : '<div class="cfaint" style="margin:14px 0">No schedule yet.</div>'}
+      <div class="mlabel">ADD A TIME</div>
+      <div class="dayrow">${DAYS.map(([b, n]) => `<button class="chip ${days & (1 << b) ? 'active' : ''}" data-d="${b}">${n}</button>`).join('')}</div>
+      <div class="row" style="gap:10px;margin-top:10px"><span class="csub">From</span><input type="time" class="field tfield" id="st" value="${start}"><span class="csub">to</span><input type="time" class="field tfield" id="en" value="${end}"><button class="pill filled" id="addsch">Add</button></div>
+      <div class="err"></div>
+      <div class="actions"><button class="pill" data-a="close">Done</button></div></div>`;
+    bg.querySelector('[data-a=close]').onclick = done;
+    bg.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { start = $('#st', bg).value; end = $('#en', bg).value; days ^= 1 << +b.dataset.d; draw(); });
+    bg.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => save((cfg.schedules || []).filter(s => s.id !== b.dataset.rm)));
+    bg.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => save((cfg.schedules || []).map(s => s.id === b.dataset.sw ? Object.assign({}, s, { on: !s.on }) : s)));
+    $('#addsch', bg).onclick = () => {
+      start = $('#st', bg).value; end = $('#en', bg).value;
+      const err = !days ? 'Pick at least one day.' : !start || !end ? 'Set both times.' : start === end ? 'Start and end must differ.' : '';
+      if (err) { bg.querySelector('.err').textContent = err; return; }
+      save((cfg.schedules || []).concat([{ id: 's-' + Date.now().toString(36), profile: pid, days, start: toMin(start), end: toMin(end), on: true }]));
+    };
+  };
+  const save = async list => { cfg.schedules = list; await postConfig(cfg); draw(); };
+  const done = async () => { bg.remove(); await loadProfiles(); renderProfiles(); };
+  bg.onclick = e => { if (e.target === bg) done(); };
+  draw();
+  document.body.appendChild(bg);
 }
 
 function renderLog() {

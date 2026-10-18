@@ -49,24 +49,30 @@ import com.verisonder.sondershield.data.Prefs
 import com.verisonder.sondershield.service.UpdateWorker
 import kotlinx.coroutines.launch
 
-/** The Filter tab: block lists (grouped, searchable) and the live log. */
+/** The Filter tab: profiles, block lists (grouped, searchable) and the live log. */
 @Composable
 fun FilterScreen() {
-    var view by rememberSaveable { mutableIntStateOf(0) } // 0 lists, 1 log
+    var view by rememberSaveable { mutableIntStateOf(0) } // 0 profiles, 1 lists, 2 log
     val header: @Composable (String, String, @Composable RowScope.() -> Unit) -> Unit = { kicker, sub, action ->
         ScreenHeader(tr("Filter", "Filtre", "Filter"), kicker = kicker, sub = sub, action = action)
         ChipRow(Modifier.padding(top = 4.dp)) {
-            Chip(tr("Lists", "Listes", "Listen"), view == 0) { view = 0 }
-            Chip(tr("Log", "Journal", "Protokoll"), view == 1) { view = 1 }
+            Chip(tr("Profiles", "Profils", "Profile"), view == 0) { view = 0 }
+            Chip(tr("Lists", "Listes", "Listen"), view == 1) { view = 1 }
+            Chip(tr("Log", "Journal", "Protokoll"), view == 2) { view = 2 }
         }
     }
-    if (view == 0) ListsPane(header) else LogScreen(header)
+    when (view) {
+        0 -> ProfilesPane(header)
+        1 -> ListsPane(header)
+        else -> LogScreen(header)
+    }
 }
 
 private fun groupName(g: ListGroup, lang: String) = when (g) {
     ListGroup.ADS -> when (lang) { "fr" -> "BLOCAGE DES PUBS"; "de" -> "WERBEBLOCKER"; else -> "AD BLOCKING" }
     ListGroup.PRIVACY -> when (lang) { "fr" -> "VIE PRIVÉE"; "de" -> "PRIVATSPHÄRE"; else -> "PRIVACY" }
     ListGroup.SECURITY -> when (lang) { "fr" -> "SÉCURITÉ"; "de" -> "SICHERHEIT"; else -> "SECURITY" }
+    ListGroup.FAMILY -> when (lang) { "fr" -> "PROTECTION FAMILLE"; "de" -> "FAMILIENSCHUTZ"; else -> "FAMILY SAFETY" }
     ListGroup.REGIONAL -> when (lang) { "fr" -> "RÉGIONAL"; "de" -> "REGIONAL"; else -> "REGIONAL" }
     ListGroup.CUSTOM -> when (lang) { "fr" -> "PERSONNALISÉES"; "de" -> "EIGENE"; else -> "CUSTOM" }
 }
@@ -80,7 +86,10 @@ private fun ListsPane(header: @Composable (String, String, @Composable RowScope.
     val phase by ShieldState.phase.collectAsState()
     val listsVersion by ShieldState.listsVersion.collectAsState()
     val domains by ShieldState.domains.collectAsState()
-    var enabled by remember(listsVersion) { mutableStateOf(prefs.enabledLists) }
+    // The lists in use now (a profile's, or your own picks). Switching one here makes them
+    // your own picks.
+    var enabled by remember(listsVersion) { mutableStateOf(prefs.activeLists()) }
+    var active by remember(listsVersion) { mutableStateOf(prefs.activeProfile()) }
     var lists by remember(listsVersion) { mutableStateOf(prefs.allLists()) }
     var updating by remember { mutableStateOf(false) }
     var tick by remember { mutableIntStateOf(0) }
@@ -91,6 +100,8 @@ private fun ListsPane(header: @Composable (String, String, @Composable RowScope.
 
     fun changed(download: List<BlockList> = emptyList()) {
         prefs.enabledLists = enabled
+        prefs.profileId = com.verisonder.sondershield.core.Profiles.OWN
+        active = prefs.activeProfile()
         scope.launch {
             if (download.isNotEmpty()) {
                 updating = true
@@ -143,6 +154,23 @@ private fun ListsPane(header: @Composable (String, String, @Composable RowScope.
                         }
                     }
                     Text(tr("On Wi-Fi only, when the battery isn't low.", "En Wi-Fi uniquement, quand la batterie n'est pas faible.", "Nur im WLAN, wenn der Akku nicht schwach ist."), color = Palette.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                    if (active.first != com.verisonder.sondershield.core.Profiles.OWN) {
+                        val name = profileName(prefs.profileById(active.first), lang)
+                        Block(Modifier.padding(top = 14.dp)) {
+                            Text(
+                                if (active.second) tr(
+                                    "A schedule has $name on right now, so its lists are in use. Lists you switch here apply when it ends.",
+                                    "Une plage horaire active $name, ses listes sont utilisées. Vos changements ici s'appliqueront à la fin.",
+                                    "Ein Zeitplan hat gerade $name aktiv, also gelten dessen Listen. Änderungen hier gelten danach.",
+                                ) else tr(
+                                    "These are the lists of the $name profile. Switching one here changes to your own picks.",
+                                    "Ce sont les listes du profil $name. En changer une ici passe à vos choix.",
+                                    "Das sind die Listen des Profils $name. Änderst du hier eine, gilt deine eigene Auswahl.",
+                                ),
+                                color = Palette.dim, fontSize = 13.sp, lineHeight = 18.sp,
+                            )
+                        }
+                    }
                 }
             }
             for (g in ListGroup.entries) {
@@ -165,6 +193,7 @@ private fun ListsPane(header: @Composable (String, String, @Composable RowScope.
                         },
                         onRemove = {
                             prefs.customLists = prefs.customLists.filter { it.id != l.id }
+                            prefs.customProfiles = prefs.customProfiles.map { it.copy(lists = it.lists - l.id) }
                             store.delete(l.id)
                             enabled = enabled - l.id
                             lists = prefs.allLists()

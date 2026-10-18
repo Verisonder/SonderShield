@@ -18,6 +18,9 @@ object Backup {
         val o = JSONObject().apply {
             put("format", FORMAT); put("version", 1)
             put("lists", JSONArray(p.enabledLists.toList()))
+            put("profile", p.profileId)
+            put("profiles", JSONArray(p.customProfiles.map { it.toJson() }))
+            put("schedules", JSONArray(p.schedules.map { it.toJson() }))
             put("customLists", JSONArray(p.customLists.map { JSONObject().put("name", it.name).put("url", it.url) }))
             put("upstream", p.upstreamId); put("customUpstream", p.customUpstream)
             put("blockRules", p.blockRules); put("allowRules", p.allowRules)
@@ -42,6 +45,10 @@ object Backup {
                 .map { com.verisonder.sondershield.core.BlockList("", it.optString("name"), it.optString("url"), it.optString("url")) }
         }
         o.optJSONArray("lists")?.let { a -> p.enabledLists = (0 until a.length()).map { a.getString(it) }.toSet() }
+        o.optJSONArray("profiles")?.let { p.customProfiles = com.verisonder.sondershield.core.Profiles.parseProfiles(it.toString()) }
+        o.optJSONArray("schedules")?.let { p.schedules = com.verisonder.sondershield.core.Profiles.parseSchedules(it.toString()) }
+        // A backup from before profiles holds own picks only.
+        if (o.has("profile")) p.profileId = o.getString("profile") else if (o.has("lists")) p.profileId = com.verisonder.sondershield.core.Profiles.OWN
         if (o.has("upstream")) p.upstreamId = o.getString("upstream")
         if (o.has("customUpstream")) p.customUpstream = o.getString("customUpstream")
         if (o.has("blockRules")) p.blockRules = o.getString("blockRules")

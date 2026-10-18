@@ -22,9 +22,12 @@ type Config struct {
 	Firewall       []string     `json:"firewall"`  // legacy: blocked program paths (migrated to AppRules)
 	AppRules       []AppRule    `json:"appRules"`  // per-app firewall mode
 	UpdateHours    int          `json:"updateHours"`
-	Theme          string       `json:"theme"`  // default, light, system
-	Accent         uint32       `json:"accent"` // ARGB
-	Lang           string       `json:"lang"`   // "" follows Windows, else en / fr / de
+	Theme          string       `json:"theme"`     // default, light, system
+	Accent         uint32       `json:"accent"`    // ARGB
+	Lang           string       `json:"lang"`      // "" follows Windows, else en / fr / de
+	Profile        string       `json:"profile"`   // chosen profile id; "" = your own list picks
+	Profiles       []Profile    `json:"profiles"`  // profiles you made
+	Schedules      []Schedule   `json:"schedules"` // switch profile at set times
 	Autostart      bool         `json:"autostart"`
 	Onboarded      bool         `json:"onboarded"`
 }
@@ -46,6 +49,7 @@ func defaultConfig(lang, country string) Config {
 	return Config{
 		Lists:       defaultLists(lang, country),
 		Upstream:    defaultUpstream,
+		Profile:     "default",
 		UpdateHours: 24,
 		Theme:       "default",
 		Accent:      0xFF3B82FF,
@@ -97,6 +101,16 @@ func (s *store) load(name string, v any) error {
 		return err
 	}
 	return json.Unmarshal(b, v)
+}
+
+// hasKey reports whether the saved JSON object has this top-level key.
+func (s *store) hasKey(name, key string) bool {
+	var m map[string]json.RawMessage
+	if s.load(name, &m) != nil {
+		return false
+	}
+	_, ok := m[key]
+	return ok
 }
 
 // save writes a temp file then renames it, so a crash never leaves half a file.

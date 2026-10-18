@@ -4,12 +4,24 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.verisonder.sondershield.core.BlockList
 import com.verisonder.sondershield.core.Catalog
+import com.verisonder.sondershield.core.Profile
+import com.verisonder.sondershield.core.Profiles
+import com.verisonder.sondershield.core.Schedule
 import com.verisonder.sondershield.core.Upstreams
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 /** Everything the user sets, in one SharedPreferences file. */
 class Prefs(context: Context) {
     val sp: SharedPreferences = context.applicationContext.getSharedPreferences("shield", Context.MODE_PRIVATE)
+
+    init {
+        // Profiles arrived in 2.5.0: a new install starts on Default; an existing one keeps
+        // the lists its owner picked.
+        if (!sp.contains("profile")) {
+            sp.edit().putString("profile", if (sp.getBoolean("onboarded", false)) Profiles.OWN else Profiles.DEFAULT).apply()
+        }
+    }
 
     /** The user's wish: protection on. Survives reboots and app updates. */
     var wantOn: Boolean
@@ -22,10 +34,59 @@ class Prefs(context: Context) {
 
     /** First run: the defaults plus regional lists for the phone's languages. */
     private fun firstRunLists(): Set<String> {
+        val (langs, country) = phoneLocale()
+        return Catalog.defaultsFor(langs, country)
+    }
+
+    private fun phoneLocale(): Pair<List<String>, String> {
         val locales = android.content.res.Resources.getSystem().configuration.locales
         val langs = (0 until locales.size()).map { locales[it].language }
         val country = if (locales.size() > 0) locales[0].country else ""
-        return Catalog.defaultsFor(langs, country)
+        return langs to country
+    }
+
+    /** The profile you chose; [Profiles.OWN] ("") means your own list picks. */
+    var profileId: String
+        get() = sp.getString("profile", Profiles.DEFAULT) ?: Profiles.DEFAULT
+        set(v) = sp.edit().putString("profile", v).apply()
+
+    /** Profiles you made. */
+    var customProfiles: List<Profile>
+        get() = Profiles.parseProfiles(sp.getString("profiles", "[]") ?: "[]")
+        set(v) = sp.edit().putString("profiles", Profiles.profilesJson(v)).apply()
+
+    var schedules: List<Schedule>
+        get() = Profiles.parseSchedules(sp.getString("schedules", "[]") ?: "[]")
+        set(v) = sp.edit().putString("schedules", Profiles.schedulesJson(v)).apply()
+
+    fun allProfiles(): List<Profile> = Profiles.builtin + customProfiles
+
+    fun profileById(id: String): Profile? = allProfiles().firstOrNull { it.id == id }
+
+    /** The profile in use at [t]: a running schedule wins, else your choice. Second = by schedule. */
+    fun activeProfile(t: LocalDateTime = LocalDateTime.now()): Pair<String, Boolean> {
+        val all = allProfiles().map { it.id }.toSet()
+        schedules.firstOrNull { it.covers(t) && it.profile in all }?.let { return it.profile to true }
+        val id = profileId
+        return (if (id in all) id else Profiles.OWN) to false
+    }
+
+    /** The lists a profile turns on here (with the regional lists for the phone's languages). */
+    fun profileLists(p: Profile): Set<String> {
+        var s = p.lists
+        if (p.regional) {
+            val (langs, country) = phoneLocale()
+            s = s + Catalog.regionalFor(langs, country)
+        }
+        if (httpsOn) s = s + Catalog.pageListIds
+        return s
+    }
+
+    /** The list ids in use now: the active profile's, or your own picks. */
+    fun activeLists(t: LocalDateTime = LocalDateTime.now()): Set<String> {
+        val id = activeProfile(t).first
+        val p = profileById(id) ?: return enabledLists
+        return if (id == Profiles.OWN) enabledLists else profileLists(p)
     }
 
     var onboarded: Boolean

@@ -42,6 +42,9 @@ type App struct {
 	startedAt int64
 	lastQuery int64  // ms of the most recent DNS query seen (for the "is it working" check)
 	mode      string // "local" (port 53 here) or "adapter" (SonderShield network adapter)
+	lang      string // Windows language and country, for the regional lists of a profile
+	country   string
+	applied   string // profile in use when lists were last pushed to the engine ("" = own picks)
 
 	logMu  sync.Mutex
 	log    []logEntry
@@ -67,8 +70,12 @@ func newApp(plat platform) *App {
 		tl:    &timeline{},
 	}
 	lang, country := systemLocale()
+	a.lang, a.country = lang, country
 	a.cfg = defaultConfig(lang, country)
-	st.load("config.json", &a.cfg)
+	if st.load("config.json", &a.cfg) == nil && !st.hasKey("config.json", "profile") {
+		// Settings from before profiles: keep the lists this person picked.
+		a.cfg.Profile = ""
+	}
 	if a.cfg.Lists == nil {
 		a.cfg.Lists = defaultLists(lang, country)
 	}
@@ -211,8 +218,9 @@ func (a *App) setConfig(c Config) {
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 			defer cancel()
+			on := a.listsNow(c)
 			for _, l := range c.allLists() {
-				if contains(c.Lists, l.ID) && !a.lists.has(l.ID) {
+				if contains(on, l.ID) && !a.lists.has(l.ID) {
 					a.lists.update(ctx, l, false)
 				}
 			}
@@ -228,15 +236,48 @@ func (a *App) applyConfig() {
 	if err := a.eng.SetUpstream(c.upstreamSpec()); err != nil {
 		a.eng.SetUpstream(upstreamByID(defaultUpstream).Spec)
 	}
+	a.mu.Lock()
+	a.applied, _ = c.activeProfile(time.Now())
+	a.mu.Unlock()
+	on := a.listsNow(c)
 	var paths string
 	for _, l := range c.allLists() {
-		if contains(c.Lists, l.ID) && a.lists.has(l.ID) {
+		if contains(on, l.ID) && a.lists.has(l.ID) {
 			paths += a.lists.file(l.ID) + "\n"
 		}
 	}
 	a.eng.SetLists(paths)
 	a.plat.setAppRules(c.AppRules)
 	a.plat.setNetworkBlocks(c.NetBlocks)
+}
+
+// listsNow is the list ids in use right now: the active profile's, or your own picks.
+func (a *App) listsNow(c Config) []string {
+	return c.activeLists(time.Now(), a.lang, a.country)
+}
+
+// checkSchedule reloads the lists when a schedule has just started or ended. It returns
+// true if the profile in use changed.
+func (a *App) checkSchedule(ctx context.Context) bool {
+	c := a.config()
+	id, _ := c.activeProfile(time.Now())
+	a.mu.Lock()
+	same := id == a.applied
+	a.mu.Unlock()
+	if same {
+		return false
+	}
+	on := a.listsNow(c)
+	for _, l := range c.allLists() {
+		if contains(on, l.ID) && !a.lists.has(l.ID) {
+			a.lists.update(ctx, l, false)
+		}
+		if ctx.Err() != nil {
+			return false
+		}
+	}
+	a.applyConfig()
+	return true
 }
 
 func (a *App) running() bool {

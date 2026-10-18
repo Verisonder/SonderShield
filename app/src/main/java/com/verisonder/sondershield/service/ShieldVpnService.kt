@@ -87,6 +87,7 @@ class ShieldVpnService : VpnService() {
     @Volatile private var rootRules = false
     private var counterJob: Job? = null
     private var alwaysJob: Job? = null
+    private var profileJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -218,6 +219,7 @@ class ShieldVpnService : VpnService() {
         refreshTile()
         watchCounters()
         watchAlwaysOn()
+        watchProfile()
 
         // First start, or a list was just switched on: fetch what's missing, then reload.
         val store = ListStore(this)
@@ -234,6 +236,7 @@ class ShieldVpnService : VpnService() {
     private fun teardown() {
         counterJob?.cancel()
         alwaysJob?.cancel()
+        profileJob?.cancel()
         ShieldState.alwaysOn.value = false
         if (rootRules) {
             Root.clear()
@@ -258,6 +261,7 @@ class ShieldVpnService : VpnService() {
     override fun onDestroy() {
         counterJob?.cancel()
         alwaysJob?.cancel()
+        profileJob?.cancel()
         ShieldState.alwaysOn.value = false
         if (rootRules) {
             Root.clear()
@@ -334,6 +338,23 @@ class ShieldVpnService : VpnService() {
                     refreshTile()
                 }
                 kotlinx.coroutines.delay(4000)
+            }
+        }
+    }
+
+    /** Switches lists when a profile schedule starts or ends. */
+    private fun watchProfile() {
+        profileJob?.cancel()
+        profileJob = ShieldState.scope.launch(Dispatchers.IO) {
+            while (true) {
+                kotlinx.coroutines.delay(20_000)
+                val now = Prefs(this@ShieldVpnService).activeProfile().first
+                if (now != ShieldState.appliedProfile) {
+                    val store = ListStore(this@ShieldVpnService)
+                    for (l in store.missingEnabled()) store.update(l)
+                    ShieldState.applyConfig()
+                    ShieldState.listsVersion.value++
+                }
             }
         }
     }

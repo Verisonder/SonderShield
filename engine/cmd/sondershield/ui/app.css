@@ -403,3 +403,38 @@ svg.cchart { height: 150px; }
 svg.chart .lw { fill: none; stroke: var(--warn); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linecap: round; }
 .diagnote { font-size: 13px; line-height: 1.55; color: var(--dim); border-left: 3px solid var(--warn); padding: 4px 0 4px 12px; margin: 0 0 12px; }
 .diagnote b { color: var(--text); }
+
+/* ---- Profiles ---- */
+.plist { display: flex; flex-direction: column; gap: 8px; }
+.prow { display: flex; align-items: center; gap: 14px; background: var(--panel); border-radius: 18px; padding: 14px 16px; cursor: pointer; transition: background .15s; }
+.prow:hover { background: var(--card); }
+.prow .grow { flex: 1; min-width: 0; }
+.picon { width: 46px; height: 46px; border-radius: 50%; background: var(--card); color: var(--text); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.picon svg { width: 24px; height: 24px; }
+.prow.sel .picon { background: var(--accent); color: var(--on-accent); }
+.pcheck { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--faint); flex-shrink: 0; }
+.prow.sel .pcheck { border-color: var(--accent); background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E") center/16px no-repeat; }
+.iconbtn { width: 36px; height: 36px; border-radius: 50%; border: none; background: transparent; color: var(--faint); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.iconbtn:hover { background: var(--card); color: var(--text); }
+.iconbtn.has { color: var(--accent); }
+.iconbtn svg { width: 22px; height: 22px; }
+.tag.on { background: var(--accent); color: var(--on-accent); }
+.card.note { border-left: 3px solid var(--accent); }
+.card.note b { color: var(--text); }
+.modal.wide { width: min(560px, calc(100vw - 48px)); max-height: calc(100vh - 48px); overflow-y: auto; }
+.mlabel { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: 1.5px; margin: 18px 0 8px; }
+.iconpick { display: flex; flex-wrap: wrap; gap: 8px; }
+.ipk { border: 2px solid transparent; background: none; border-radius: 50%; padding: 0; cursor: pointer; }
+.ipk .picon { width: 40px; height: 40px; }
+.ipk.sel { border-color: var(--accent); }
+.mlists { max-height: 300px; overflow-y: auto; padding-right: 4px; }
+.lrow { display: flex; gap: 12px; align-items: flex-start; padding: 8px 4px; cursor: pointer; border-radius: 10px; }
+.lrow:hover { background: var(--card); }
+.lrow input { margin-top: 3px; accent-color: var(--accent); width: 16px; height: 16px; flex-shrink: 0; }
+.lrow .ctitle { display: block; font-size: 14px; }
+.lrow .csub { display: block; }
+.srow { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: 14px; padding: 12px 14px; margin-top: 10px; }
+.srow .grow { flex: 1; }
+.dayrow { display: flex; flex-wrap: wrap; gap: 6px; }
+.dayrow .chip { padding: 7px 12px; }
+.tfield { width: 120px; margin-top: 0 !important; }

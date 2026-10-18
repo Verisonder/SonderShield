@@ -103,9 +103,10 @@ func (a *App) background(ctx context.Context) {
 	// First, fetch any enabled list we don't have yet, then reload.
 	go func() {
 		c := a.config()
+		on := a.listsNow(c)
 		changed := false
 		for _, l := range c.allLists() {
-			if contains(c.Lists, l.ID) && !a.lists.has(l.ID) {
+			if contains(on, l.ID) && !a.lists.has(l.ID) {
 				if ok, _ := a.lists.update(ctx, l, false); ok {
 					changed = true
 				}
@@ -137,6 +138,7 @@ func (a *App) background(ctx context.Context) {
 			cs := a.connections()
 			a.hist.record(cs)
 			a.tl.add(len(cs), a.eng.Blocked())
+			a.checkSchedule(ctx)
 		case <-update.C:
 			c := a.config()
 			if c.UpdateHours > 0 && time.Since(lastUpdate) >= time.Duration(c.UpdateHours)*time.Hour {
@@ -156,9 +158,10 @@ func (a *App) saveStats() {
 // updateAll refreshes every enabled list. Returns how many changed.
 func (a *App) updateAll(ctx context.Context, force bool) int {
 	c := a.config()
+	on := a.listsNow(c)
 	n := 0
 	for _, l := range c.allLists() {
-		if !contains(c.Lists, l.ID) {
+		if !contains(on, l.ID) {
 			continue
 		}
 		if ok, _ := a.lists.update(ctx, l, force); ok {

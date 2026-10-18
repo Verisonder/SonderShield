@@ -51,6 +51,9 @@ object ShieldState {
     val log = MutableStateFlow<List<LogEntry>>(emptyList())
     /** Bumped when list files or their metadata change, so the lists screen re-reads. */
     val listsVersion = MutableStateFlow(0)
+
+    /** Profile whose lists were last pushed to the engine (see Prefs.activeProfile). */
+    @Volatile var appliedProfile: String? = null
     /** Theme id from Settings; the activity recolours when it changes. */
     val theme = MutableStateFlow("default")
     /** Accent colour (ARGB) from Settings. */
@@ -144,6 +147,7 @@ object ShieldState {
                 engine.setWireGuard("")
                 problem.value = com.verisonder.sondershield.ui.trc(app, "WireGuard config is invalid: ${e.message}. Going out directly.", "Configuration WireGuard invalide : ${e.message}. Connexion directe.", "WireGuard-Konfiguration ungültig: ${e.message}. Direkte Verbindung.")
             }
+            appliedProfile = prefs.activeProfile().first
             try {
                 engine.setLists(ListStore(app).enabledPaths())
             } catch (_: Exception) {

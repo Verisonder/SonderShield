@@ -93,6 +93,8 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, a.config())
 	case "lists":
 		writeJSON(w, s.lists())
+	case "profiles":
+		writeJSON(w, s.profiles())
 	case "lists/update":
 		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 		defer cancel()
@@ -186,20 +188,22 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 }
 
 type stateView struct {
-	On        bool      `json:"on"`
-	Active    bool      `json:"active"`
-	Problem   string    `json:"problem"`
-	Domains   int       `json:"domains"`
-	StartedAt int64     `json:"startedAt"`
-	Stats     statsView `json:"stats"`
-	Today     [2]int64  `json:"today"`
-	Config    Config    `json:"config"`
-	Mode      string    `json:"mode"`
-	Kill      bool      `json:"kill"`
-	DataIn    uint64    `json:"dataIn"`
-	DataOut   uint64    `json:"dataOut"`
-	Conns     int       `json:"conns"`
-	Apps      int       `json:"apps"`
+	On         bool      `json:"on"`
+	Active     bool      `json:"active"`
+	Problem    string    `json:"problem"`
+	Domains    int       `json:"domains"`
+	StartedAt  int64     `json:"startedAt"`
+	Stats      statsView `json:"stats"`
+	Today      [2]int64  `json:"today"`
+	Config     Config    `json:"config"`
+	Mode       string    `json:"mode"`
+	Kill       bool      `json:"kill"`
+	DataIn     uint64    `json:"dataIn"`
+	DataOut    uint64    `json:"dataOut"`
+	Conns      int       `json:"conns"`
+	Apps       int       `json:"apps"`
+	ProfileNow string    `json:"profileNow"` // profile in use now ("" = own picks)
+	Scheduled  bool      `json:"scheduled"`  // ...because a schedule is running
 }
 
 func (s *server) state() stateView {
@@ -214,6 +218,7 @@ func (s *server) state() stateView {
 		StartedAt: started, Stats: sv, Today: sv.Today, Config: cfg, Mode: mode,
 		Kill: a.plat.killSwitchOn(),
 	}
+	out.ProfileNow, out.Scheduled = cfg.activeProfile(time.Now())
 	if on {
 		a.data.sample(a.plat.rawNetCounters())
 		din, dout := a.data.totals()
@@ -233,10 +238,30 @@ func (s *server) lists() []listView {
 	a := s.a
 	c := a.config()
 	var out []listView
+	on := a.listsNow(c)
 	for _, l := range c.allLists() {
-		out = append(out, listView{listDef: l, On: contains(c.Lists, l.ID), Meta: a.lists.get(l.ID)})
+		out = append(out, listView{listDef: l, On: contains(on, l.ID), Meta: a.lists.get(l.ID)})
 	}
 	return out
+}
+
+type profileView struct {
+	Profile
+	Lists  []string `json:"lists"`  // with the regional lists added
+	Active bool     `json:"active"` // in use now
+}
+
+// profiles lists every profile with the lists it turns on here, and which is in use.
+func (s *server) profiles() map[string]any {
+	a := s.a
+	c := a.config()
+	now, sched := c.activeProfile(time.Now())
+	var out []profileView
+	for _, p := range c.allProfiles() {
+		pc := Config{Profile: p.ID, Profiles: c.Profiles}
+		out = append(out, profileView{Profile: p, Lists: pc.activeLists(time.Now(), a.lang, a.country), Active: p.ID == now})
+	}
+	return map[string]any{"profiles": out, "chosen": c.Profile, "now": now, "scheduled": sched, "schedules": c.Schedules}
 }
 
 func (s *server) logSince(after int64) []logEntry {

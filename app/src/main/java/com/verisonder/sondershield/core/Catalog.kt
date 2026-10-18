@@ -15,7 +15,7 @@ data class BlockList(
 }
 
 /** How the Filter tab groups the lists. */
-enum class ListGroup { ADS, PRIVACY, SECURITY, REGIONAL, CUSTOM }
+enum class ListGroup { ADS, PRIVACY, SECURITY, FAMILY, REGIONAL, CUSTOM }
 
 object Catalog {
     val lists = listOf(
@@ -95,6 +95,17 @@ object Catalog {
             "https://ublockorigin.github.io/uAssets/filters/filters.min.txt",
             "Fixes for anti-adblock walls and stubborn ads (scriptlets). For HTTPS filtering.",
         ),
+        // Family safety: used by the Family profiles.
+        BlockList(
+            "hagezi-nsfw", "HaGeZi NSFW",
+            "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/nsfw.txt",
+            "Adult and porn sites.", group = ListGroup.FAMILY,
+        ),
+        BlockList(
+            "hagezi-gambling", "HaGeZi Gambling",
+            "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/gambling.medium.txt",
+            "Betting, casino and gambling sites.", group = ListGroup.FAMILY,
+        ),
         // Regional: ad networks of one language area. On by default for the phone's languages.
         BlockList(
             "liste-fr", "Liste FR",
@@ -142,7 +153,14 @@ object Catalog {
     fun defaultsFor(langs: Collection<String>, country: String): Set<String> {
         val want = langs.toMutableSet()
         if (country.uppercase() in setOf("MA", "DZ", "TN")) want += setOf("fr", "ar")
-        return defaultIds + lists.filter { l -> l.langs.any { it in want } }.map { it.id }
+        return defaultIds + regionalFor(langs, country)
+    }
+
+    /** The regional lists for these languages (in the Maghreb, French and Arabic too). */
+    fun regionalFor(langs: Collection<String>, country: String): Set<String> {
+        val want = langs.toMutableSet()
+        if (country.uppercase() in setOf("MA", "DZ", "TN")) want += setOf("fr", "ar")
+        return lists.filter { l -> l.langs.any { it in want } }.map { it.id }.toSet()
     }
 }
 

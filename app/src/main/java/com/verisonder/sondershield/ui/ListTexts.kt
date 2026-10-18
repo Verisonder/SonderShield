@@ -32,6 +32,8 @@ private fun aboutFr(id: String, en: String): String = when (id) {
     "adguard-social" -> "Boutons j'aime et partager, widgets et contenus intégrés des réseaux sociaux."
     "rpilist-malware" -> "Liste communautaire de domaines qui diffusent des malwares."
     "phishing-army" -> "Sites de phishing qui volent mots de passe et cartes (PhishTank et autres)."
+    "hagezi-nsfw" -> "Sites pour adultes et pornographiques."
+    "hagezi-gambling" -> "Paris, casinos et jeux d'argent."
     "abpvn" -> "Régies pub vietnamiennes."
     else -> en
 }
@@ -59,6 +61,8 @@ private fun aboutDe(id: String, en: String): String = when (id) {
     "adguard-social" -> "Like- und Teilen-Knöpfe, Social-Widgets und Einbettungen."
     "rpilist-malware" -> "Community-Liste von Domains, die Malware verbreiten."
     "phishing-army" -> "Phishing-Seiten, die Passwörter und Karten stehlen (PhishTank und andere)."
+    "hagezi-nsfw" -> "Erotik- und Pornoseiten."
+    "hagezi-gambling" -> "Wett-, Casino- und Glücksspielseiten."
     "abpvn" -> "Vietnamesische Werbenetzwerke."
     else -> en
 }

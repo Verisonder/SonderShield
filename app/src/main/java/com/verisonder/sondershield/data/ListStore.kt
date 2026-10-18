@@ -16,13 +16,15 @@ class ListStore(context: Context) {
     fun file(id: String) = File(dir, "$id.txt")
 
     /** Files of the enabled lists that have been downloaded, one path per line. */
-    fun enabledPaths(): String =
-        prefs.allLists().filter { it.id in prefs.enabledLists }
+    fun enabledPaths(): String = prefs.activeLists().let { on ->
+        prefs.allLists().filter { it.id in on }
             .map { file(it.id) }.filter { it.isFile && it.length() > 0 }
             .joinToString("\n") { it.absolutePath }
+    }
 
-    fun missingEnabled(): List<BlockList> =
-        prefs.allLists().filter { it.id in prefs.enabledLists && !file(it.id).isFile }
+    fun missingEnabled(): List<BlockList> = prefs.activeLists().let { on ->
+        prefs.allLists().filter { it.id in on && !file(it.id).isFile }
+    }
 
     /**
      * Downloads one list unless the server says it hasn't changed.
@@ -80,7 +82,8 @@ class ListStore(context: Context) {
     /** Updates every enabled list. Returns true when any file changed. */
     suspend fun updateEnabled(force: Boolean = false): Boolean {
         var changed = false
-        for (l in prefs.allLists().filter { it.id in prefs.enabledLists }) {
+        val on = prefs.activeLists()
+        for (l in prefs.allLists().filter { it.id in on }) {
             if (update(l, force)) changed = true
         }
         return changed

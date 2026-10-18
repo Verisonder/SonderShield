@@ -8,7 +8,7 @@ type listDef struct {
 	Name      string   `json:"name"`
 	URL       string   `json:"url"`
 	About     string   `json:"about"`
-	Group     string   `json:"group"` // ads, privacy, security, regional, custom
+	Group     string   `json:"group"` // ads, privacy, security, family, regional, custom
 	DefaultOn bool     `json:"defaultOn"`
 	Langs     []string `json:"langs,omitempty"`
 	Custom    bool     `json:"custom"`
@@ -28,6 +28,8 @@ var catalog = []listDef{
 	{ID: "hagezi-tif", Name: "HaGeZi Threat Intelligence", URL: "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/tif.txt", About: "Phishing, scams and malware. Large.", Group: "security"},
 	{ID: "rpilist-malware", Name: "Malware Domain List", URL: "https://raw.githubusercontent.com/RPiList/specials/master/Blocklisten/malware", About: "Community list of domains spreading malware.", Group: "security"},
 	{ID: "phishing-army", Name: "Phishing Army", URL: "https://phishing.army/download/phishing_army_blocklist_extended.txt", About: "Phishing sites that steal passwords and cards (PhishTank and others).", Group: "security"},
+	{ID: "hagezi-nsfw", Name: "HaGeZi NSFW", URL: "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/nsfw.txt", About: "Adult and porn sites.", Group: "family"},
+	{ID: "hagezi-gambling", Name: "HaGeZi Gambling", URL: "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/gambling.medium.txt", About: "Betting, casino and gambling sites.", Group: "family"},
 	{ID: "liste-fr", Name: "Liste FR", URL: "https://raw.githubusercontent.com/easylist/listefr/master/liste_fr.txt", About: "French ad networks and trackers.", Group: "regional", Langs: []string{"fr"}},
 	{ID: "liste-ar", Name: "Liste AR", URL: "https://raw.githubusercontent.com/easylist/listear/master/Liste_AR.txt", About: "Arabic-language ad networks. Small.", Group: "regional", Langs: []string{"ar"}},
 	{ID: "easylist-de", Name: "EasyList Germany", URL: "https://easylist.to/easylistgermany/easylistgermany.txt", About: "German ad networks and trackers.", Group: "regional", Langs: []string{"de"}},
