@@ -419,8 +419,10 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
                     }
                 }
             }
+            // Right under the maze, not at the screen's edge.
+            val underMaze = with(density) { (oy + mazeH).toDp() } + 18.dp
             Row(
-                Modifier.align(Alignment.BottomCenter).padding(bottom = bottomBar + 18.dp).graphicsLayer { alpha = hud },
+                Modifier.align(Alignment.TopCenter).padding(top = underMaze).graphicsLayer { alpha = hud },
                 horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
             ) {
                 @Suppress("UNUSED_EXPRESSION") frame
