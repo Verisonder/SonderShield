@@ -140,6 +140,7 @@ private fun ProfileSheet(navBar: androidx.compose.ui.unit.Dp, onClose: () -> Uni
     var creating by remember { mutableStateOf(false) }
     var closing by remember { mutableStateOf(false) }
     var menuFor by remember { mutableStateOf<String?>(null) }
+    var scheduling by remember { mutableStateOf<String?>(null) }
     val lang = lang()
 
     val shown = remember { Animatable(0f) }
@@ -205,14 +206,15 @@ private fun ProfileSheet(navBar: androidx.compose.ui.unit.Dp, onClose: () -> Uni
                                 p, prefs.profileLists(p).size, lang, p.id == chosen, active.second && active.first == p.id, i,
                                 onPick = { menuFor = null; pick(p.id) },
                                 menuOpen = menuFor == p.id,
-                                onLongPress = if (p.custom) ({ menuFor = if (menuFor == p.id) null else p.id }) else null,
-                                onEdit = { menuFor = null; editing = p },
-                                onDelete = {
+                                onLongPress = { menuFor = if (menuFor == p.id) null else p.id },
+                                onSchedule = { menuFor = null; scheduling = p.id },
+                                onEdit = if (p.custom) ({ menuFor = null; editing = p }) else null,
+                                onDelete = if (!p.custom) null else ({
                                     menuFor = null
                                     deleteProfile(prefs, p.id)
                                     rev++
                                     applyProfileChange(ctx, scope, phase)
-                                },
+                                }),
                             )
                         }
                         SheetRow(
@@ -229,6 +231,10 @@ private fun ProfileSheet(navBar: androidx.compose.ui.unit.Dp, onClose: () -> Uni
         }
     }
 
+    scheduling?.let { pid ->
+        ScheduleDialog(prefs, pid, profileName(prefs.profileById(pid), lang), lang,
+            onChange = { rev++; applyProfileChange(ctx, scope, phase) }, onClose = { scheduling = null })
+    }
     if (creating || editing != null) {
         ProfileEditor(prefs, editing, lang,
             onDone = {
@@ -244,7 +250,8 @@ private fun ProfileSheet(navBar: androidx.compose.ui.unit.Dp, onClose: () -> Uni
 private fun SheetRow(
     p: Profile, count: Int, lang: String, chosen: Boolean, bySchedule: Boolean, order: Int,
     onPick: () -> Unit, about: String? = null,
-    menuOpen: Boolean = false, onLongPress: (() -> Unit)? = null, onEdit: () -> Unit = {}, onDelete: () -> Unit = {},
+    menuOpen: Boolean = false, onLongPress: (() -> Unit)? = null,
+    onSchedule: (() -> Unit)? = null, onEdit: (() -> Unit)? = null, onDelete: (() -> Unit)? = null,
 ) {
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     val bg by animateColorAsState(if (chosen) Palette.accent else Palette.card2, tween(260), label = "rowBg")
@@ -280,7 +287,7 @@ private fun SheetRow(
         Spacer(Modifier.width(6.dp))
         SheetCheck(chosen)
     }
-    if (onLongPress != null) RowActions(menuOpen, onEdit, onDelete, Modifier.padding(start = 56.dp, top = 10.dp), onDark = chosen)
+    if (onLongPress != null) RowActions(menuOpen, onSchedule, onEdit, onDelete, Modifier.padding(start = 56.dp, top = 10.dp), onDark = chosen)
     }
 }
 
