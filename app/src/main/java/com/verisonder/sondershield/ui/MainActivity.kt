@@ -99,10 +99,16 @@ class MainActivity : ComponentActivity() {
 
     private val notifPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    /** Bumped when something (like long-pressing the Quick Settings tile) should land on Home. */
+    private val goHome = kotlinx.coroutines.flow.MutableStateFlow(0)
+
+    private fun wantsHome(i: Intent?) = i?.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES"
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ShieldState.init(this)
         if (intent?.getBooleanExtra(EXTRA_TURN_ON, false) == true) turnOn()
+        if (wantsHome(intent)) goHome.value++
 
         setContent {
             val themeId by ShieldState.theme.collectAsState()
@@ -132,6 +138,14 @@ class MainActivity : ComponentActivity() {
                 val homeScroll = rememberScrollState()
                 val uiScope = rememberCoroutineScope()
                 BackHandler(enabled = tab != Tab.Home) { tab = Tab.Home }
+                // Long-press on the tile: back to Home, at the top.
+                val home by goHome.collectAsState()
+                LaunchedEffect(home) {
+                    if (home > 0) {
+                        tab = Tab.Home
+                        homeScroll.scrollTo(0)
+                    }
+                }
                 Scaffold(
                     containerColor = Palette.bg,
                     bottomBar = {
@@ -174,6 +188,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.getBooleanExtra(EXTRA_TURN_ON, false)) turnOn()
+        if (wantsHome(intent)) goHome.value++
     }
 
     private fun toggle() {
