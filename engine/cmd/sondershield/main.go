@@ -25,10 +25,17 @@ func main() {
 	}
 	// If another copy is already running, just open its window and exit.
 	if url, ok := existingInstance(); ok {
+		if hasFlag("--startup") || hasFlag("--tray") {
+			return // started with Windows but already running: stay quiet
+		}
 		// Ask the running copy to bring its window forward; fall back to a browser.
 		if !showExisting(url) {
 			openWindow(url)
 		}
+		return
+	}
+	// Started by the Run entry at sign-in: hand over to the task that has full rights.
+	if hasFlag("--startup") && startupLaunch() {
 		return
 	}
 	// Blocking DNS on port 53 and changing network settings need administrator rights.
@@ -38,6 +45,9 @@ func main() {
 
 	cleanupOldUpdate()
 	plat := newPlatform()
+	if exe, err := os.Executable(); err == nil {
+		plat.fixAutostart(exe)
+	}
 	a := newApp(plat)
 	// A crash or power cut while protection was on can leave Windows pointed at us.
 	if plat.pendingRestore() && !a.config().On {
@@ -60,7 +70,7 @@ func main() {
 
 	// The window (and on Windows the tray icon). Started by "start with Windows" (--tray),
 	// it stays hidden in the tray. Returns when the user quits.
-	runFrontend(a, srv, hasFlag("--tray"))
+	runFrontend(a, srv, hasFlag("--tray") || hasFlag("--startup"))
 	time.Sleep(200 * time.Millisecond)
 }
 

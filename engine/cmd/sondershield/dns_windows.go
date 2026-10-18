@@ -218,25 +218,3 @@ func (p *windowsPlatform) startTunDNS(e *shield.Engine) (string, string, error) 
 	run("netsh", "interface", "ipv4", "set", "dnsservers", "name="+idx, "source=static", "address="+tunDNS4, "register=none", "validate=no")
 	return tunDNS4, tunDNS6, nil
 }
-
-// Start with Windows: a scheduled task that runs at sign-in with full rights, so there's
-// no UAC prompt each time (a plain Run key can't start an elevated program).
-func (p *windowsPlatform) setAutostart(on bool, exe string) error {
-	// Clean up the Run key the first Windows version used.
-	if k, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Run`, registry.SET_VALUE); err == nil {
-		k.DeleteValue("SonderShield")
-		k.Close()
-	}
-	if !on {
-		run("schtasks", "/delete", "/tn", "SonderShield", "/f")
-		return nil
-	}
-	_, err := run("schtasks", "/create", "/tn", "SonderShield", "/tr", `"`+exe+`" --tray`,
-		"/sc", "onlogon", "/rl", "highest", "/f")
-	return err
-}
-
-func (p *windowsPlatform) autostartOn() bool {
-	_, err := run("schtasks", "/query", "/tn", "SonderShield")
-	return err == nil
-}

@@ -32,6 +32,8 @@ type platform interface {
 	// autostart turns "start with the computer" on or off for the current user.
 	setAutostart(on bool, exe string) error
 	autostartOn() bool
+	// fixAutostart repairs or upgrades the autostart setup at launch.
+	fixAutostart(exe string)
 	// listPrograms: programs the user can pick for the firewall (running apps with a path).
 	listPrograms() []Program
 	// listConnections: the computer's current outbound TCP connections, with the owning app.

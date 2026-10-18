@@ -23,6 +23,7 @@ func (p *otherPlatform) clearFirewall() error                      { return nil 
 func (p *otherPlatform) outsideInterfaces() (int, int)             { return 0, 0 }
 func (p *otherPlatform) setAutostart(on bool, exe string) error    { return nil }
 func (p *otherPlatform) autostartOn() bool                         { return false }
+func (p *otherPlatform) fixAutostart(exe string)                   {}
 func (p *otherPlatform) listPrograms() []Program                   { return nil }
 func (p *otherPlatform) listConnections() []Conn                   { return nil }
 func (p *otherPlatform) setKillSwitch(on bool) error               { return nil }
