@@ -22,12 +22,14 @@ type Config struct {
 	Firewall       []string     `json:"firewall"`  // legacy: blocked program paths (migrated to AppRules)
 	AppRules       []AppRule    `json:"appRules"`  // per-app firewall mode
 	UpdateHours    int          `json:"updateHours"`
-	Theme          string       `json:"theme"`     // default, light, system
-	Accent         uint32       `json:"accent"`    // ARGB
-	Lang           string       `json:"lang"`      // "" follows Windows, else en / fr / de
-	Profile        string       `json:"profile"`   // chosen profile id; "" = your own list picks
-	Profiles       []Profile    `json:"profiles"`  // profiles you made
-	Schedules      []Schedule   `json:"schedules"` // switch profile at set times
+	Theme          string       `json:"theme"`      // default, light, system
+	Accent         uint32       `json:"accent"`     // ARGB
+	Lang           string       `json:"lang"`       // "" follows Windows, else en / fr / de
+	Profile        string       `json:"profile"`    // chosen profile id; "" = your own list picks
+	Profiles       []Profile    `json:"profiles"`   // profiles you made
+	Schedules      []Schedule   `json:"schedules"`  // switch profile at set times
+	EggBest        int          `json:"eggBest"`    // Shield-Man best score
+	EggNoNames     bool         `json:"eggNoNames"` // Shield-Man: hide the enemies' names
 	Autostart      bool         `json:"autostart"`
 	Onboarded      bool         `json:"onboarded"`
 }

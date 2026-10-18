@@ -13,9 +13,21 @@ async function api(path, opts = {}) {
 }
 const postConfig = c => api('config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) });
 
-let state = null, cfg = null, lastLogSeq = 0, logs = [], tab = 'home', homeKey = '';
+let profSeen = null, state = null, cfg = null, lastLogSeq = 0, logs = [], tab = 'home', homeKey = '';
 
 // ---- shell ----
+// The mark by the name hides Shield-Man: click it 7 times.
+SM.secret(document.querySelector('.brand svg'), eggCtx);
+function eggCtx() {
+  return {
+    logs, top: (state && state.stats && state.stats.top) || [], best: cfg.eggBest || 0, names: !cfg.eggNoNames,
+    save: ({ best, names }) => {
+      if (best != null && best > (cfg.eggBest || 0)) cfg.eggBest = best;
+      if (names != null) cfg.eggNoNames = !names;
+      postConfig(cfg);
+    },
+  };
+}
 document.querySelectorAll('nav .tab[data-tab]').forEach(b => b.onclick = () => setTab(b.dataset.tab));
 $('#quitbtn').onclick = async () => {
   const r = await ask({ title: 'Quit SonderShield?', text: 'Protection stops and Windows goes back to its usual DNS. Closing the window instead keeps SonderShield running in the tray.', ok: 'Quit', danger: true });
@@ -60,11 +72,13 @@ async function poll() {
   try {
     state = await api('state');
     cfg = state.config;
+    // Profile names for the Home chip: load once, and again when the profile in use changes.
+    if (profSeen !== state.profileNow + '|' + (cfg.profiles || []).length) { profSeen = state.profileNow + '|' + (cfg.profiles || []).length; loadProfiles().then(() => { if (tab === 'home') { homeKey = ''; renderHome(); } }).catch(() => {}); }
     applyTheme();
     renderStatus();
     // Only Home follows live numbers; other pages redraw when you change something there
     // (redrawing them every second closed menus and lost your place).
-    const key = JSON.stringify([state.on, state.active, state.problem, state.domains, state.today, state.stats.blocked, state.stats.threats, state.dataIn, state.dataOut, state.conns, state.apps, cfg.theme, cfg.accent]);
+    const key = JSON.stringify([state.on, state.active, state.problem, state.domains, state.today, state.stats.blocked, state.stats.threats, state.dataIn, state.dataOut, state.conns, state.apps, cfg.theme, cfg.accent, state.profileNow, state.scheduled, profData.profiles.length]);
     if (tab === 'home' && !busy && key !== homeKey) { homeKey = key; renderHome(); }
     const newLogs = await api('log?after=' + lastLogSeq);
     if (newLogs && newLogs.length) {
@@ -144,7 +158,7 @@ function renderHome() {
     : 'Turn on to block ads and trackers for every app on this PC.';
   const warn = !busy && on && !state.active, problem = !busy && state.problem ? state.problem : '';
   const p = $('#page-home');
-  const shape = JSON.stringify([phase, warn, problem, sub, state.kill]);
+  const shape = JSON.stringify([phase, warn, problem, sub, state.kill, state.profileNow, state.scheduled, profData.profiles.length]);
   if (shape !== homeShape || justOn || !p.firstChild) {
     const fresh = !p.firstChild || homeShape === '';
     const snap = justOn; justOn = false;
@@ -152,6 +166,7 @@ function renderHome() {
     homeShape = shape; lastHead = head;
     if (fresh) shown = {};
     p.innerHTML = `
+    ${profileChipHTML()}
     <div class="shieldwrap">
       <div class="shieldstage">
         <div class="ring ${snap ? 'go' : ''}"></div>
@@ -216,6 +231,7 @@ function renderHome() {
     chartKey = ''; topKey = '';
     watchReveal(p, fresh);
     $('#shield').onclick = toggleProtection;
+    const pc = $('#profchip'); if (pc) pc.onclick = openProfileSheet;
     drawSwoosh();
     const db = $('#diagbtn'); if (db) db.onclick = showDiag;
   }
@@ -759,41 +775,81 @@ function listsNote() {
     : `These are the lists of the <b>${name}</b> profile. Switching one here changes to your own picks.`}</div></div>`;
 }
 
+// Schedule, and for your own profiles Edit / Delete: right-click a profile (or press and hold).
+// The pills open under the row with a little stagger; Delete asks "Sure?" first.
+const EDIT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';
+const TRASH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg>';
+function actionsHTML(p) {
+  if (p.id === '') return '';
+  return `<div class="pacts"><div class="pacts-in">
+    <button class="apill" data-act="sched">${CLOCK}<span>Schedule</span></button>
+    ${p.custom ? `<button class="apill" data-act="edit">${EDIT_ICON}<span>Edit</span></button>
+    <button class="apill danger" data-act="del">${TRASH_ICON}<span>Delete</span></button>` : ''}
+  </div></div>`;
+}
+// Wires right-click / press-and-hold and the pills for every .pwrap inside root.
+function wireActions(root, onDone) {
+  const close = except => root.querySelectorAll('.pwrap.menu').forEach(w => { if (w !== except) { w.classList.remove('menu'); const d = w.querySelector('[data-act=del] span'); if (d) d.textContent = 'Delete'; } });
+  root.querySelectorAll('.pwrap').forEach(w => {
+    const pid = w.dataset.pid;
+    if (pid === '') return;
+    const toggle = () => { close(w); w.classList.toggle('menu'); };
+    w.addEventListener('contextmenu', e => { e.preventDefault(); toggle(); });
+    let hold = 0;
+    w.querySelector('.prow').addEventListener('pointerdown', () => { hold = setTimeout(() => { hold = -1; toggle(); }, 500); });
+    w.querySelector('.prow').addEventListener('pointerup', () => { if (hold > 0) clearTimeout(hold); });
+    w.querySelector('.prow').addEventListener('pointerleave', () => { if (hold > 0) clearTimeout(hold); });
+    w.querySelector('.prow').addEventListener('click', e => { if (hold === -1) { e.stopImmediatePropagation(); hold = 0; } }, true);
+    w.querySelectorAll('.apill').forEach(b => b.onclick = async e => {
+      e.stopPropagation();
+      const p = profData.profiles.find(x => x.id === pid);
+      if (b.dataset.act === 'sched') { close(); openSchedules(pid); }
+      else if (b.dataset.act === 'edit') { close(); openProfileEditor(p); }
+      else if (b.dataset.act === 'del') {
+        const span = b.querySelector('span');
+        if (span.textContent !== 'Sure?') { span.textContent = 'Sure?'; return; }
+        cfg.profiles = (cfg.profiles || []).filter(x => x.id !== pid);
+        cfg.schedules = (cfg.schedules || []).filter(x => x.profile !== pid);
+        if (cfg.profile === pid) cfg.profile = 'default';
+        await postConfig(cfg); await loadProfiles(); onDone();
+      }
+    });
+  });
+}
+
 function renderProfiles() {
   const body = $('#filter-body');
+  if (!body || filterView !== 'profiles' || tab !== 'filter') return;
   const d = profData;
   const row = p => {
     const n = schedsOf(p.id).filter(s => s.on).length;
     const chosen = d.chosen === p.id;
     const now = d.now === p.id;
-    return `<div class="prow ${chosen ? 'sel' : ''}" data-pid="${escapeAttr(p.id)}">
+    return `<div class="pwrap" data-pid="${escapeAttr(p.id)}"><div class="prow ${chosen ? 'sel' : ''}">
       ${picon(p.icon)}
       <div class="grow"><div class="row" style="gap:8px"><span class="ctitle">${esc(p.name)}</span>${now && d.scheduled ? '<span class="tag on">On by schedule</span>' : ''}</div>
         ${p.about ? `<div class="csub">${esc(p.about)}</div>` : ''}
         <div class="cfaint">${p.lists.length} list${p.lists.length === 1 ? '' : 's'}${n ? ' · ' + n + ' schedule' + (n > 1 ? 's' : '') : ''}</div></div>
-      ${p.custom ? `<button class="iconbtn" data-edit="${escapeAttr(p.id)}" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></button>` : ''}
-      <button class="iconbtn ${n ? 'has' : ''}" data-sched="${escapeAttr(p.id)}" title="Schedule">${CLOCK}</button>
+      ${n ? `<span class="hasclock" title="Has a schedule">${CLOCK}</span>` : ''}
       <div class="pcheck"></div>
-    </div>`;
+    </div>${actionsHTML(p)}</div>`;
   };
   const built = d.profiles.filter(p => !p.custom), mine = d.profiles.filter(p => p.custom);
   let h = '';
   if (d.scheduled) h += `<div class="card note"><div class="csub">A schedule has <b>${esc(profName(d.now))}</b> on right now. When it ends, <b>${esc(profName(d.chosen))}</b> comes back.</div></div>`;
-  h += `<div class="seclabel"><span class="t">PROFILES</span><span class="n">Pick one, or make your own</span></div><div class="plist">${built.map(row).join('')}</div>`;
+  h += `<div class="seclabel"><span class="t">PROFILES</span><span class="n">Right-click a profile to schedule it</span></div><div class="plist">${built.map(row).join('')}</div>`;
   h += `<div class="seclabel"><span class="t">YOURS</span><button class="pill" id="newprof">+ New profile</button></div><div class="plist">`;
   h += mine.map(row).join('');
-  h += `<div class="prow ${d.chosen === '' ? 'sel' : ''}" data-pid="">${picon('own')}<div class="grow"><div class="ctitle">Your own picks</div>
-      <div class="csub">Exactly the lists you switch on in Lists.</div></div><div class="pcheck"></div></div></div>`;
+  h += `<div class="pwrap" data-pid=""><div class="prow ${d.chosen === '' ? 'sel' : ''}">${picon('own')}<div class="grow"><div class="ctitle">Your own picks</div>
+      <div class="csub">Exactly the lists you switch on in Lists.</div></div><div class="pcheck"></div></div></div></div>`;
   h += `<div class="cfaint" style="margin-top:14px">A profile only decides which block lists are on. Your rules, firewall and DNS settings stay as they are.</div>`;
   body.innerHTML = h;
-  body.querySelectorAll('.prow[data-pid]').forEach(r => r.onclick = async ev => {
-    if (ev.target.closest('.iconbtn')) return;
-    cfg.profile = r.dataset.pid;
+  body.querySelectorAll('.pwrap').forEach(w => w.querySelector('.prow').addEventListener('click', async () => {
+    cfg.profile = w.dataset.pid;
     await postConfig(cfg);
     await loadProfiles(); renderProfiles();
-  });
-  body.querySelectorAll('[data-sched]').forEach(b => b.onclick = () => openSchedules(b.dataset.sched));
-  body.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openProfileEditor(d.profiles.find(p => p.id === b.dataset.edit)));
+  }));
+  wireActions(body, renderProfiles);
   $('#newprof').onclick = () => openProfileEditor(null);
 }
 
@@ -1126,10 +1182,11 @@ async function renderSettings() {
       <div id="updateaction" class="hidden" style="margin-top:12px"></div>
     </div>
     <div class="seclabel"><span class="t">08 ABOUT</span></div>
-    <div class="card"><div class="ctitle">SonderShield for Windows</div>
+    <div class="card"><div class="aboutbrand"><span id="aboutmark">${shieldMark(34)}</span><div><div class="wordmark big">Sonder<span class="s2">Shield</span></div><div class="cfaint">Version ${esc(cat.version)} for Windows</div></div></div>
       <div class="csub" style="margin-top:6px">By Verisonder. Free and open source under Apache 2.0. Everything stays on this PC: no account, no analytics.</div>
       <div class="csub" style="margin-top:8px">Blocks ads, trackers and malware by DNS, and can cut off any app's internet.${state.on ? (state.mode === 'adapter' ? ' Filtering through the SonderShield network adapter.' : ' Filtering on this PC (port 53).') : ''}</div>
       <div style="margin-top:12px"><button class="pill" id="diagbtn2">Run DNS diagnostic</button> <button class="pill" id="src">Source code</button></div></div>`;
+  SM.secret($('#aboutmark'), eggCtx);
   p.querySelectorAll('.pick[data-up]').forEach(r => r.onclick = () => {
     cfg.upstream = r.dataset.up; save();
     p.querySelectorAll('.pick[data-up]').forEach(x => x.classList.toggle('sel', x === r));
@@ -1192,3 +1249,58 @@ function customId(url) { let h = 2166136261; for (let i = 0; i < url.length; i++
 
 poll();
 setInterval(poll, 1000);
+
+// ---- Home: the profile chip and its sheet ----
+function shieldMark(px) {
+  return `<svg viewBox="0 0 100 110" width="${px}" height="${Math.round(px * 1.1)}"><clipPath id="mk${px}"><path d="M50 4L92 18V52C92 78 74 97 50 106C26 97 8 78 8 52V18Z"/></clipPath>
+    <g clip-path="url(#mk${px})"><path d="M0 0H100V30Q46 60 0 80Z" fill="var(--accent)"/><path d="M0 88Q52 70 100 45V110H0Z" fill="var(--text)"/></g></svg>`;
+}
+function profileChipHTML() {
+  const id = state.profileNow || '';
+  const p = profData.profiles.find(x => x.id === id);
+  const name = id === '' ? 'Own picks' : p ? p.name : 'Default';
+  return `<button class="profchip" id="profchip" title="Protection profile">${picon(p ? p.icon : 'own')}<span>${esc(name)}</span>${state.scheduled ? `<i class="cclock">${CLOCK}</i>` : ''}<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>`;
+}
+// Slides up under a swoosh: pick a profile, or make your own (starts from the lists in use).
+async function openProfileSheet() {
+  await loadProfiles();
+  const bg = el('div', 'modal-bg sheetbg');
+  const chip = $('#profchip'); if (chip) chip.classList.add('open');
+  const draw = (animate) => {
+    const d = profData;
+    const row = (p, i) => `<div class="pwrap ${animate ? 'rise' : ''}" style="--i:${i}" data-pid="${escapeAttr(p.id)}"><div class="prow srow ${d.chosen === p.id ? 'sel' : ''}">
+      ${picon(p.icon)}<div class="grow"><div class="row" style="gap:6px"><span class="ctitle">${esc(p.name)}</span>${d.now === p.id && d.scheduled ? `<i class="cclock">${CLOCK}</i>` : ''}</div>
+      ${p.about ? `<div class="csub">${esc(p.about)}</div>` : ''}<div class="cfaint">${p.lists.length} lists</div></div><div class="pcheck"></div></div>${actionsHTML(p)}</div>`;
+    const all = d.profiles.concat([{ id: '', name: 'Your own picks', icon: 'own', about: 'Exactly the lists you switch on in Filter › Lists.', lists: cfg.lists || [] }]);
+    bg.querySelector('.slist').innerHTML = all.map(row).join('');
+    bg.querySelectorAll('.slist .pwrap').forEach(w => w.querySelector('.prow').addEventListener('click', async () => {
+      const id = w.dataset.pid;
+      if (id === profData.chosen) { close(); return; }
+      cfg.profile = id; await postConfig(cfg); await loadProfiles();
+      draw(false); poll();
+      setTimeout(close, 420); // let the check pop first
+    }));
+    wireActions(bg, () => draw(false));
+  };
+  bg.innerHTML = `<div class="psheet">
+    <svg class="swoosh sheetswoosh" height="46" viewBox="0 0 560 46" preserveAspectRatio="none">
+      <path class="blade lit sweep" d="M16 46Q202 4 554 12Q560 12 560 16Q560 20 554 20Q241 16 16 46Z"/>
+      <path d="M16 46Q233 20 544 28Q560 28 560 44L560 47L16 47Z" fill="var(--panel)"/></svg>
+    <div class="sheetbody">
+      <div class="kicker">PROTECTION PROFILE</div><h2 class="sheeth">How much to block</h2>
+      <div class="csub">Only changes which block lists are on. Right-click a profile to schedule it.</div>
+      <div class="slist"></div>
+      <div style="text-align:center;margin-top:14px"><button class="pill filled" id="mkown">+ Make your own</button></div>
+    </div></div>`;
+  document.body.appendChild(bg);
+  draw(true);
+  const close = () => {
+    if (bg.classList.contains('closing')) return;
+    bg.classList.add('closing'); if (chip) chip.classList.remove('open');
+    setTimeout(() => bg.remove(), 240);
+  };
+  bg.onclick = e => { if (e.target === bg) close(); };
+  const key = e => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', key); } };
+  document.addEventListener('keydown', key);
+  $('#mkown', bg).onclick = () => { close(); openProfileEditor(null); };
+}
