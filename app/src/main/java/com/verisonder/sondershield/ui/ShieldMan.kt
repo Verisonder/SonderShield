@@ -110,26 +110,37 @@ private fun DrawScope.shieldMan(center: Offset, size: Float, open: Float, left: 
         // Upper jaw.
         withTransform({ translate(-gap * 0.5f, -gap) }) {
             clipPath(ManParts.top) { drawPath(ManParts.shield, top) }
-            if (teeth > 0f) teethRow(Offset(0f, 80f), Offset(46f, 60f), Offset(100f, 30f), down = true, color = Color.White.copy(alpha = teeth))
+            if (teeth > 0f) clipPath(ManParts.shield) {
+                teethRow(Offset(0f, 80f), Offset(46f, 60f), Offset(100f, 30f), down = true, count = 5, color = Color.White.copy(alpha = teeth))
+            }
         }
         // Lower jaw.
         withTransform({ translate(gap * 0.5f, gap) }) {
             clipPath(ManParts.bottom) { drawPath(ManParts.shield, bottom) }
-            if (teeth > 0f) teethRow(Offset(0f, 88f), Offset(52f, 70f), Offset(100f, 45f), down = false, color = Color.White.copy(alpha = teeth))
+            if (teeth > 0f) clipPath(ManParts.shield) {
+                teethRow(Offset(0f, 88f), Offset(52f, 70f), Offset(100f, 45f), down = false, count = 4, color = Color.White.copy(alpha = teeth))
+            }
         }
     }
 }
 
-/** Five sharp triangles along a cut edge, inside the shield's width. */
-private fun DrawScope.teethRow(p0: Offset, c: Offset, p1: Offset, down: Boolean, color: Color) {
-    val n = 5
+/**
+ * Sharp triangles along a cut edge, pointing into the gap. The upper jaw has five and the
+ * lower four, set between them, so they interlock when the mouth shuts; short enough to stay
+ * inside the gap. Drawn clipped to the shield so none stick out at the sides.
+ */
+private fun DrawScope.teethRow(p0: Offset, c: Offset, p1: Offset, down: Boolean, count: Int, color: Color) {
+    val n = count
+    // Upper: 0.18 … 0.82; lower: the midpoints between them.
+    val step = 0.64f / 4f
+    val first = if (n == 5) 0.18f else 0.18f + step / 2f
     for (k in 0 until n) {
-        val a = 0.2f + k * (0.6f / (n - 1))
-        val (p, nrm) = ManParts.quad(a, p0, c, p1)
-        val (pl, _) = ManParts.quad(a - 0.055f, p0, c, p1)
-        val (pr, _) = ManParts.quad(a + 0.055f, p0, c, p1)
-        val s = if (down) 1f else -1f
-        val tip = Offset(p.x + nrm.x * 11f * s, p.y + nrm.y * 11f * s)
+        val a = first + k * step
+        val (p, _) = ManParts.quad(a, p0, c, p1)
+        val (pl, _) = ManParts.quad(a - 0.04f, p0, c, p1)
+        val (pr, _) = ManParts.quad(a + 0.04f, p0, c, p1)
+        // Fangs point straight down (upper jaw) or up (lower), whatever the slope of the cut.
+        val tip = Offset(p.x, p.y + if (down) 10f else -10f)
         val path = Path().apply { moveTo(pl.x, pl.y); lineTo(tip.x, tip.y); lineTo(pr.x, pr.y); close() }
         drawPath(path, color)
     }
