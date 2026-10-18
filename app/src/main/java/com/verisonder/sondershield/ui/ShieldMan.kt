@@ -20,7 +20,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
@@ -143,6 +144,10 @@ private val Pop = CubicBezierEasing(0.2f, 0.9f, 0.3f, 1.15f)
  */
 @Composable
 fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
+    // The game window gets no system-bar sizes of its own; read them here (from Home's window).
+    val dens = LocalDensity.current
+    val topBar = with(dens) { androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(dens).toDp() }
+    val bottomBar = with(dens) { androidx.compose.foundation.layout.WindowInsets.navigationBars.getBottom(dens).toDp() }
     val ctx = LocalContext.current
     val prefs = remember { Prefs(ctx) }
     val haptic = LocalHapticFeedback.current
@@ -209,7 +214,7 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
     // Text drawn on the maze, measured once per string.
     val texts = remember { HashMap<String, androidx.compose.ui.text.TextLayoutResult>() }
     fun label(s: String, style: TextStyle) = texts.getOrPut(s + style.fontSize + style.color) { measurer.measure(s, style) }
-    val tagStyle = TextStyle(color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+    val tagStyle = TextStyle(color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = Body, fontStyle = androidx.compose.ui.text.font.FontStyle.Normal)
 
     Dialog(onDismissRequest = { close() }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         BoxWithConstraints(
@@ -230,11 +235,13 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
             val wPx = with(density) { maxWidth.toPx() }
             val hPx = with(density) { maxHeight.toPx() }
             // Maze size: full width less margins, leaving room for the HUD above and below.
-            val tile = min((wPx - with(density) { 24.dp.toPx() }) / game.w, (hPx - with(density) { 230.dp.toPx() }) / game.h)
+            val topPx = with(density) { (topBar + 110.dp).toPx() } // status bar + score
+            val bottomPx = with(density) { (bottomBar + 64.dp).toPx() } // gesture bar + lives row
+            val tile = min((wPx - with(density) { 24.dp.toPx() }) / game.w, (hPx - topPx - bottomPx) / game.h)
             val mazeW = tile * game.w
             val mazeH = tile * game.h
             val ox = (wPx - mazeW) / 2f
-            val oy = (hPx - mazeH) / 2f + with(density) { 16.dp.toPx() }
+            val oy = topPx + (hPx - topPx - bottomPx - mazeH) / 2f
             val manSize = tile * 1.6f
             val i = intro.value
 
@@ -301,14 +308,23 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
                                     }
                                 }
                             }
-                            // Its name on a little tag above it.
-                            if (showNames && e.label.isNotEmpty()) {
+                        }
+                        // Name tags on top of everything, only once out of the house, and never
+                        // two on top of each other (the later one waits until there's room).
+                        if (showNames) {
+                            val placed = mutableListOf<androidx.compose.ui.geometry.Rect>()
+                            for (e in game.enemies) {
+                                if (e.away > 0f || !e.leftHouse || e.label.isEmpty()) continue
+                                val p = at(e.m.x, e.m.y)
                                 val l = label(e.label.take(16), tagStyle)
-                                val pad = 3.dp.toPx()
-                                val tl = Offset(body.x - l.size.width / 2f - pad, body.y - tile * 0.95f - l.size.height)
+                                val pad = 4.dp.toPx()
+                                val tl = Offset(p.x - l.size.width / 2f - pad, p.y - tile * 0.95f - l.size.height)
+                                val rect = androidx.compose.ui.geometry.Rect(tl, Size(l.size.width + 2 * pad, l.size.height.toFloat()))
+                                if (placed.any { it.overlaps(rect) }) continue
+                                placed += rect
                                 drawRoundRect(
-                                    (if (e.kind == EnemyKind.AD) warn else if (scared) Color(0xFF6B7CFF) else Color(0xFF16A34A)).copy(alpha = 0.85f),
-                                    tl, Size(l.size.width + 2 * pad, l.size.height.toFloat()), CornerRadius(l.size.height / 2f),
+                                    (if (e.kind == EnemyKind.AD) warn else if (scared) Color(0xFF6B7CFF) else Color(0xFF16A34A)).copy(alpha = 0.9f),
+                                    tl, rect.size, CornerRadius(l.size.height / 2f),
                                 )
                                 drawText(l, topLeft = Offset(tl.x + pad, tl.y))
                             }
@@ -321,7 +337,7 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
                                 val l = label("+${pu.points}", TextStyle(color = accent, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, fontFamily = Display))
                                 drawText(l, topLeft = Offset(pos.x - l.size.width / 2f, pos.y - l.size.height / 2f), alpha = 1f - q)
                                 if (showNames && pu.label.isNotEmpty()) {
-                                    val n = label(pu.label.take(22), TextStyle(color = text, fontSize = 10.sp, fontWeight = FontWeight.Bold))
+                                    val n = label(pu.label.take(22), TextStyle(color = text, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Body))
                                     drawText(n, topLeft = Offset(pos.x - n.size.width / 2f, pos.y + l.size.height / 2f), alpha = 1f - q)
                                 }
                             }
@@ -352,7 +368,7 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
 
             // HUD.
             val hud = ((i - 0.8f) / 0.2f).coerceIn(0f, 1f)
-            Column(Modifier.fillMaxWidth().systemBarsPadding().padding(horizontal = Gutter, vertical = 10.dp).graphicsLayer { alpha = hud }) {
+            Column(Modifier.fillMaxWidth().padding(top = topBar).padding(horizontal = Gutter, vertical = 10.dp).graphicsLayer { alpha = hud }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Kicker(tr("Shield-Man", "Shield-Man", "Shield-Man"), Modifier.weight(1f))
                     Box(
@@ -373,7 +389,7 @@ fun ShieldManGame(from: Pair<Offset, Float>?, onClose: () -> Unit) {
                 }
             }
             Row(
-                Modifier.align(Alignment.BottomCenter).systemBarsPadding().padding(bottom = 22.dp).graphicsLayer { alpha = hud },
+                Modifier.align(Alignment.BottomCenter).padding(bottom = bottomBar + 16.dp).graphicsLayer { alpha = hud },
                 horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
             ) {
                 @Suppress("UNUSED_EXPRESSION") frame
