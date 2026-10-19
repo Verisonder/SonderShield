@@ -175,11 +175,6 @@ func runFrontend(a *App, srv *server, hidden bool) {
 
 	srv.onQuit = func() { w.Dispatch(u.quit) }
 	srv.onShow = func() { w.Dispatch(u.show) }
-	onNewVersion = func(v string) {
-		w.Dispatch(func() {
-			u.balloon("SonderShield "+v+" is available", "Open SonderShield › Settings › Updates to install it.")
-		})
-	}
 	go u.watch()
 
 	w.Navigate(srv.url())

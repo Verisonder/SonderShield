@@ -154,7 +154,7 @@ class MainActivity : ComponentActivity() {
                         homeScroll.scrollTo(0)
                     }
                 }
-                // "Update" on Home or the update notification: Settings, scrolled to Updates.
+                // Opened for an update: Settings, scrolled to Updates.
                 val openUpdate by AppUpdate.openRequest.collectAsState()
                 LaunchedEffect(openUpdate) {
                     if (openUpdate > 0) tab = Tab.Settings
@@ -180,7 +180,7 @@ class MainActivity : ComponentActivity() {
                             label = "tabs",
                         ) { t ->
                             when (t) {
-                                Tab.Home -> HomeScreen(onToggle = ::toggle, scroll = homeScroll, onUpdate = { AppUpdate.openRequest.value++ })
+                                Tab.Home -> HomeScreen(onToggle = ::toggle, scroll = homeScroll)
                                 Tab.Filter -> FilterScreen()
                                 Tab.Data -> DataScreen()
                                 Tab.Apps -> AppsScreen()

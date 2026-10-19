@@ -88,7 +88,7 @@ async function poll() {
     $('nav .tab[data-tab="settings"]').classList.toggle('hasdot', !!state.newVersion);
     // Only Home follows live numbers; other pages redraw when you change something there
     // (redrawing them every second closed menus and lost your place).
-    const key = JSON.stringify([state.on, state.active, state.problem, state.domains, state.today, state.stats.blocked, state.stats.threats, state.dataIn, state.dataOut, state.conns, state.apps, cfg.theme, cfg.accent, state.profileNow, state.scheduled, profData.profiles.length, state.newVersion]);
+    const key = JSON.stringify([state.on, state.active, state.problem, state.domains, state.today, state.stats.blocked, state.stats.threats, state.dataIn, state.dataOut, state.conns, state.apps, cfg.theme, cfg.accent, state.profileNow, state.scheduled, profData.profiles.length]);
     if (tab === 'home' && !busy && key !== homeKey) { homeKey = key; renderHome(); }
     const newLogs = await api('log?after=' + lastLogSeq);
     if (newLogs && newLogs.length) {
@@ -187,7 +187,6 @@ function renderHome() {
     <div class="headline ${roll ? 'roll' : ''}">${head}</div>
     <div class="headsub">${sub}</div>
     ${state.kill ? `<div class="banner danger" style="margin-top:22px">All internet is blocked by the panic switch. Turn it off in Firewall to restore.</div>` : ''}
-    ${state.newVersion ? `<div class="banner update" style="margin-top:22px">SonderShield ${esc(state.newVersion)} is available. <button class="linkbtn" id="updbtn">Update</button></div>` : ''}
     ${warn ? `<div class="banner" style="margin-top:22px">${PC(true)} isn't sending its lookups to SonderShield yet. <button class="linkbtn" id="diagbtn">See why</button></div>` : ''}
     ${problem ? `<div class="banner" style="margin-top:22px">${esc(problem)}</div>` : ''}
     <div class="homebody ${fresh ? 'enter' : ''}">
@@ -245,7 +244,6 @@ function renderHome() {
     const pc = $('#profchip'); if (pc) pc.onclick = openProfileSheet;
     drawSwoosh();
     const db = $('#diagbtn'); if (db) db.onclick = showDiag;
-    const ub = $('#updbtn'); if (ub) ub.onclick = openUpdates;
   }
   const n = k => p.querySelector(`.num[data-k="${k}"]`);
   countTo(n('t'), total);
@@ -1260,12 +1258,6 @@ async function doUpdate() {
 }
 const save = () => postConfig(cfg);
 
-// From the Home notice: Settings, scrolled to Updates.
-async function openUpdates() {
-  setTab('settings');
-  for (let i = 0; i < 20 && !$('#updatecard'); i++) await new Promise(r => setTimeout(r, 50));
-  const c = $('#updatecard'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
 
 // ---- helpers ----
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }

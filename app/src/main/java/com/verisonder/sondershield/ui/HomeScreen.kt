@@ -80,14 +80,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verisonder.sondershield.core.Phase
-import com.verisonder.sondershield.core.AppUpdate
 import com.verisonder.sondershield.core.ShieldState
 import com.verisonder.sondershield.core.Upstreams
 import com.verisonder.sondershield.data.Prefs
 import kotlinx.coroutines.delay
 
 @Composable
-fun HomeScreen(onToggle: () -> Unit, scroll: ScrollState, onUpdate: () -> Unit = {}) {
+fun HomeScreen(onToggle: () -> Unit, scroll: ScrollState) {
     val ctx = LocalContext.current
     val prefs = remember { Prefs(ctx) }
     val phase by ShieldState.phase.collectAsState()
@@ -186,19 +185,6 @@ fun HomeScreen(onToggle: () -> Unit, scroll: ScrollState, onUpdate: () -> Unit =
 
             problem?.let { p ->
                 Notice(p, tr("Tap to dismiss", "Touchez pour fermer", "Tippen zum Schließen")) { ShieldState.problem.value = null }
-            }
-            AppUpdate.available.collectAsState().value?.let { u ->
-                Spacer(Modifier.height(12.dp))
-                Block(color = Palette.accent, onClick = onUpdate) {
-                    Text(
-                        tr("SonderShield ${u.version} is out.", "SonderShield ${u.version} est disponible.", "SonderShield ${u.version} ist da."),
-                        style = display(17), color = Palette.onAccent,
-                    )
-                    Text(
-                        tr("UPDATE", "METTRE À JOUR", "AKTUALISIEREN"), color = Palette.onAccent, fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
             }
             if (strictDns != null && on) {
                 Notice(

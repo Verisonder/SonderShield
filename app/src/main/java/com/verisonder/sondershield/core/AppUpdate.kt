@@ -1,18 +1,10 @@
 package com.verisonder.sondershield.core
 
-import android.Manifest
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -22,8 +14,6 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.verisonder.sondershield.BuildConfig
-import com.verisonder.sondershield.R
-import com.verisonder.sondershield.ui.MainActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
@@ -36,9 +26,9 @@ import java.util.concurrent.TimeUnit
 /**
  * App updates from the GitHub releases (the same signed APK the release page has).
  * SonderShield checks by itself — when the app opens (at most every few hours) and once a
- * day in the background — and says so when a new version is out: a banner on Home, a dot on
- * Settings, and one notification per new version. Installing is one tap (Android asks to
- * confirm, as for any app update).
+ * day in the background — and a new version shows as a dot on the Settings tab, with the
+ * Update button in Settings › Updates. Installing is one tap (Android asks to confirm, as
+ * for any app update).
  */
 object AppUpdate {
 
@@ -47,15 +37,13 @@ object AppUpdate {
     /** The newer version, when there is one (null = up to date or not checked yet). */
     val available = MutableStateFlow<Info?>(null)
 
-    /** Bumped to open Settings › Updates (from the Home notice or the notification). */
+    /** Bumped to open Settings › Updates. */
     val openRequest = MutableStateFlow(0)
 
     /** Download progress 0..1 while an update downloads, else null. */
     val progress = MutableStateFlow<Float?>(null)
 
     private const val API = "https://api.github.com/repos/Verisonder/SonderShield/releases/latest"
-    private const val CHANNEL = "updates"
-    private const val NOTE_ID = 7301
     private const val PREFS = "app_update"
     private const val AUTO_EVERY_MS = 6 * 3_600_000L
 
@@ -105,7 +93,6 @@ object AppUpdate {
                 .putString("version", info?.version).putString("notes", info?.notes)
                 .putString("url", info?.apkUrl).putLong("size", info?.size ?: 0L).apply()
             available.value = info
-            if (info != null) notifyOnce(ctx, info)
             info
         } finally {
             c.disconnect()
@@ -171,38 +158,6 @@ object AppUpdate {
             Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
         )
-    }
-
-    /** One notification per new version, so it never nags. */
-    private fun notifyOnce(ctx: Context, info: Info) {
-        val sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (sp.getString("notified", null) == info.version) return
-        if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) return
-        val nm = ctx.getSystemService(NotificationManager::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm.getNotificationChannel(CHANNEL) == null) {
-            nm.createNotificationChannel(NotificationChannel(CHANNEL, "Updates", NotificationManager.IMPORTANCE_DEFAULT))
-        }
-        val open = PendingIntent.getActivity(
-            ctx, 0,
-            Intent(ctx, MainActivity::class.java).putExtra(MainActivity.EXTRA_OPEN_UPDATE, true)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-        val (title, text) = when (java.util.Locale.getDefault().language) {
-            "fr" -> "SonderShield ${info.version} est disponible" to "Touchez pour mettre à jour."
-            "de" -> "SonderShield ${info.version} ist verfügbar" to "Tippen zum Aktualisieren."
-            else -> "SonderShield ${info.version} is available" to "Tap to update."
-        }
-        runCatching {
-            NotificationManagerCompat.from(ctx).notify(
-                NOTE_ID,
-                NotificationCompat.Builder(ctx, CHANNEL).setSmallIcon(R.drawable.ic_stat_shield)
-                    .setContentTitle(title).setContentText(text).setContentIntent(open).setAutoCancel(true).build(),
-            )
-        }
-        sp.edit().putString("notified", info.version).apply()
     }
 
     /** a > b, comparing dotted numbers ("2.6.0" > "2.5.1"). */

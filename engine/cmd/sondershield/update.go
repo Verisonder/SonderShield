@@ -184,12 +184,8 @@ func cleanupOldUpdate() {
 	}
 }
 
-// onNewVersion shows a system notice about a new version (the Windows tray balloon);
-// nil where there is none. Called once per new version.
-var onNewVersion func(v string)
-
 // watchUpdates checks for a new version by itself — shortly after start, then twice a day —
-// so the window can say so without the user pressing "Check for updates".
+// so the Settings tab can show a dot without the user pressing "Check for updates".
 func (a *App) watchUpdates() {
 	time.Sleep(20 * time.Second)
 	for {
@@ -203,21 +199,9 @@ func (a *App) watchUpdates() {
 	}
 }
 
-// noteUpdate keeps the latest check result and, the first time a version shows up, tells
-// the user through the system (once per version, remembered across restarts).
+// noteUpdate keeps the latest check result; the window shows a dot on Settings from it.
 func (a *App) noteUpdate(info updateInfo) {
 	a.mu.Lock()
 	a.update = info
-	tell := info.Available && a.cfg.UpdateNotified != info.Latest
-	if tell {
-		a.cfg.UpdateNotified = info.Latest
-	}
-	cfg := a.cfg
 	a.mu.Unlock()
-	if tell {
-		a.st.save("config.json", &cfg)
-		if onNewVersion != nil {
-			onNewVersion(info.Latest)
-		}
-	}
 }

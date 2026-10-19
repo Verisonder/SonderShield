@@ -209,7 +209,6 @@ func (a *App) diag() dnsDiag {
 // setConfig replaces settings, saves them, and re-applies to a running engine.
 func (a *App) setConfig(c Config) {
 	a.mu.Lock()
-	c.UpdateNotified = a.cfg.UpdateNotified // kept by the backend, not the window
 	a.cfg = c
 	on := a.on
 	a.mu.Unlock()
