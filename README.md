@@ -23,9 +23,9 @@
 
 ## What it does
 
-SonderShield runs a local VPN on your phone. Every app's DNS lookups go through it: names on your block lists get nothing back, the rest go on to the DNS server you pick, encrypted by default. Nothing is sent to any SonderShield server, because there isn't one.
+SonderShield runs a local VPN on your phone, or a small background service on your Windows or Linux computer. Every app's DNS lookups go through it: names on your block lists get nothing back, the rest go on to the DNS server you pick, encrypted by default. Nothing is sent to any SonderShield server, because there isn't one.
 
-Turn on **HTTPS filtering** and it goes further in your browsers: ad spaces and anti-adblock walls are removed from the page itself.
+On the phone, turn on **HTTPS filtering** and it goes further in your browsers: ad spaces and anti-adblock walls are removed from the page itself.
 
 ## Features
 
@@ -40,9 +40,13 @@ Turn on **HTTPS filtering** and it goes further in your browsers: ad spaces and 
 | **Root mode** | On rooted phones, blocks without a VPN so another VPN can run alongside. |
 | **Live log** | Every lookup, with the app that asked. Search, filter, and block or allow from a tap. |
 | **Per-app control** | Let an app that breaks skip SonderShield, or cut an app off the internet entirely (firewall). |
+| **Profiles** | Default, Strict, Family, Gaming or your own set of lists, switched by hand or on a schedule. |
+| **Data monitor** | Mobile and Wi-Fi use today and this week, your data plan with what's left per day, and how much each app used. |
 | **Always there** | Quick Settings tile, home screen widget, start on boot, always-on VPN. |
 | **Yours to shape** | Pure black, light, system or Material You theme, any accent colour. English, French and German. |
 | **Portable** | Export and import your settings; export the log as CSV. |
+| **Updates built in** | Checks by itself; a dot on Settings shows a new version, installed in one tap. |
+| **Windows and Linux** | The same blocking for the whole computer, plus Force DNS (stops apps and browsers using their own DNS), a panic switch, address and port blocks, and a live view of every connection with its app. Windows adds per-app firewall rules. |
 
 ## Install
 
