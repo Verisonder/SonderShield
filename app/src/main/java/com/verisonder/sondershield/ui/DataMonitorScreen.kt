@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +26,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -42,7 +44,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,15 +72,20 @@ private val WifiGreen = Color(0xFF22C55E)
 /** The "Data" tab: a data monitor, with the block/allow Rules kept on a second sub-tab. */
 @Composable
 fun DataScreen() {
-    var view by rememberSaveable { mutableIntStateOf(0) } // 0 usage, 1 rules
+    var view by rememberSaveable { mutableIntStateOf(0) } // 0 usage, 1 apps, 2 rules
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(tr("Data", "Données", "Daten"), kicker = tr("On this phone", "Sur ce téléphone", "Auf diesem Handy"))
         ChipRow(Modifier.padding(bottom = 2.dp)) {
             Chip(tr("Usage", "Conso", "Verbrauch"), view == 0) { view = 0 }
-            Chip(tr("Rules", "Règles", "Regeln"), view == 1) { view = 1 }
+            Chip(tr("Apps", "Applis", "Apps"), view == 1) { view = 1 }
+            Chip(tr("Rules", "Règles", "Regeln"), view == 2) { view = 2 }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (view == 0) DataMonitorScreen() else RulesScreen(showHeader = false)
+            when (view) {
+                0 -> DataMonitorScreen()
+                1 -> AppUsageScreen()
+                else -> RulesScreen(showHeader = false)
+            }
         }
     }
 }
@@ -118,38 +127,7 @@ fun DataMonitorScreen() {
     }
 
     if (!access) {
-        LazyColumn(Modifier.fillMaxSize()) {
-            item {
-                val seen = remember { mutableStateOf(false) }
-                Column(Modifier.padding(horizontal = Gutter).padding(top = 14.dp)) {
-                    Kicker(tr("Usage access", "Accès à l'utilisation", "Nutzungszugriff"), Modifier.onSeen(seen).reveal(seen.value))
-                    Spacer(Modifier.height(12.dp))
-                    Column(
-                        Modifier.fillMaxWidth().reveal(seen.value, 1).clip(blockShape).background(Palette.accent)
-                            .padding(horizontal = 18.dp, vertical = 18.dp),
-                    ) {
-                        Text(tr("One switch to go.", "Plus qu'un réglage.", "Noch ein Schalter."), style = display(22), color = Palette.onAccent)
-                        Text(
-                            tr(
-                                "SonderShield reads this phone's own data counters. Allow Usage access once — nothing leaves the phone.",
-                                "SonderShield lit les compteurs de données de ce téléphone. Autorisez l'accès à l'utilisation une fois — rien ne quitte le téléphone.",
-                                "SonderShield liest die Datenzähler dieses Handys. Erlaube einmal den Nutzungszugriff — nichts verlässt das Handy.",
-                            ),
-                            color = Palette.onAccent, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 6.dp, bottom = 14.dp),
-                        )
-                        val src = remember { MutableInteractionSource() }
-                        Box(
-                            Modifier.height(44.dp).pressScale(src).clip(CircleShape).background(Palette.onAccent)
-                                .clickable(interactionSource = src, indication = null) { DataUsage.openAccessSettings(ctx) }
-                                .padding(horizontal = 20.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(tr("Allow access", "Autoriser", "Erlauben"), color = Palette.accent, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        }
-                    }
-                }
-            }
-        }
+        UsageAccessGate()
         return
     }
 
@@ -213,6 +191,44 @@ fun DataMonitorScreen() {
     }
 }
 
+/** Shown until Usage access is granted: one block with the button to the system switch. */
+@Composable
+internal fun UsageAccessGate() {
+    val ctx = LocalContext.current
+    LazyColumn(Modifier.fillMaxSize()) {
+        item {
+            val seen = remember { mutableStateOf(false) }
+            Column(Modifier.padding(horizontal = Gutter).padding(top = 14.dp)) {
+                Kicker(tr("Usage access", "Accès à l'utilisation", "Nutzungszugriff"), Modifier.onSeen(seen).reveal(seen.value))
+                Spacer(Modifier.height(12.dp))
+                Column(
+                    Modifier.fillMaxWidth().reveal(seen.value, 1).clip(blockShape).background(Palette.accent)
+                        .padding(horizontal = 18.dp, vertical = 18.dp),
+                ) {
+                    Text(tr("One switch to go.", "Plus qu'un réglage.", "Noch ein Schalter."), style = display(22), color = Palette.onAccent)
+                    Text(
+                        tr(
+                            "SonderShield reads this phone's own data counters. Allow Usage access once — nothing leaves the phone.",
+                            "SonderShield lit les compteurs de données de ce téléphone. Autorisez l'accès à l'utilisation une fois — rien ne quitte le téléphone.",
+                            "SonderShield liest die Datenzähler dieses Handys. Erlaube einmal den Nutzungszugriff — nichts verlässt das Handy.",
+                        ),
+                        color = Palette.onAccent, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 6.dp, bottom = 14.dp),
+                    )
+                    val src = remember { MutableInteractionSource() }
+                    Box(
+                        Modifier.height(44.dp).pressScale(src).clip(CircleShape).background(Palette.onAccent)
+                            .clickable(interactionSource = src, indication = null) { DataUsage.openAccessSettings(ctx) }
+                            .padding(horizontal = 20.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(tr("Allow access", "Autoriser", "Erlauben"), color = Palette.accent, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
 /** One of the two Today tiles, styled like Home's stat tiles: accent number that counts up. */
 @Composable
 private fun UsageCard(icon: ImageVector, tint: Color, label: String, u: DataUsage.Usage?, seen: Boolean, ready: Boolean, order: Int, modifier: Modifier) {
@@ -225,19 +241,35 @@ private fun UsageCard(icon: ImageVector, tint: Color, label: String, u: DataUsag
         Box(Modifier.size(30.dp).clip(CircleShape).background(tint.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
             Icon(icon, null, tint = tint, modifier = Modifier.size(17.dp))
         }
-        Text(fmtBytes(total), style = display(22), color = Palette.accentText, maxLines = 1, modifier = Modifier.padding(top = 10.dp))
+        FitText(fmtBytes(total), fmtBytes(u?.total ?: 0L), display(22), Palette.accentText, Modifier.padding(top = 10.dp))
         Text(label, color = Palette.dim, fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(top = 2.dp))
         Spacer(Modifier.height(12.dp))
         Row {
-            Column(Modifier.weight(1f)) {
-                Text(fmtBytes(tx), color = Palette.text, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Column(Modifier.weight(1f).padding(end = 6.dp)) {
+                FitText(fmtBytes(tx), fmtBytes(u?.tx ?: 0L), TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold), Palette.text)
                 Text(tr("sent", "envoyé", "gesendet"), color = Palette.faint, fontSize = 11.sp)
             }
             Column(Modifier.weight(1f)) {
-                Text(fmtBytes(rx), color = Palette.text, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                FitText(fmtBytes(rx), fmtBytes(u?.rx ?: 0L), TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold), Palette.text)
                 Text(tr("received", "reçu", "empfangen"), color = Palette.faint, fontSize = 11.sp)
             }
         }
+    }
+}
+
+/**
+ * One line of text that shrinks to fit its width instead of being cut off. Sized from [widest]
+ * (the final value) so a number counting up doesn't change size on every frame.
+ */
+@Composable
+internal fun FitText(text: String, widest: String, style: TextStyle, color: Color, modifier: Modifier = Modifier) {
+    val measurer = rememberTextMeasurer()
+    val full = LocalTextStyle.current.merge(style)
+    BoxWithConstraints(modifier) {
+        val maxPx = constraints.maxWidth
+        val natural = remember(widest, full) { measurer.measure(widest, full, maxLines = 1, softWrap = false).size.width }
+        val scale = if (natural > maxPx && natural > 0) maxPx.toFloat() / natural * 0.98f else 1f
+        Text(text, style = full.copy(fontSize = full.fontSize * scale), color = color, maxLines = 1, softWrap = false)
     }
 }
 
@@ -424,7 +456,7 @@ private fun DateRow(label: String, value: Long, onPick: (Long) -> Unit) {
 
 /** Two-way switch (MB | GB), in the same pill style as the app's chips. */
 @Composable
-private fun Segmented(options: List<String>, selected: Int, onPick: (Int) -> Unit) {
+internal fun Segmented(options: List<String>, selected: Int, onPick: (Int) -> Unit) {
     Row(Modifier.height(48.dp).clip(CircleShape).background(Palette.panel).padding(4.dp)) {
         options.forEachIndexed { i, o ->
             val on = i == selected
@@ -518,7 +550,7 @@ private suspend fun computeRest(ctx: Context, prefs: Prefs, tm: DataUsage.Usage,
 }
 
 /** The plan's current counting window [start, end) in millis. */
-private fun planPeriod(prefs: Prefs, now: Long): Pair<Long, Long> = when (prefs.planMode) {
+internal fun planPeriod(prefs: Prefs, now: Long): Pair<Long, Long> = when (prefs.planMode) {
     "daily" -> DataUsage.startOfToday() to DataUsage.midnight(-1)
     "custom" -> prefs.planStartMillis to endOfDay(prefs.planEndMillis)
     else -> {
@@ -547,7 +579,7 @@ private fun endOfDay(ms: Long): Long {
     return c.timeInMillis
 }
 
-private fun fmtBytes(b: Long): String {
+internal fun fmtBytes(b: Long): String {
     val gb = 1_000_000_000.0
     val mb = 1_000_000.0
     val kb = 1_000.0

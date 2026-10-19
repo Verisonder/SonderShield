@@ -1,6 +1,7 @@
 package com.verisonder.sondershield.data
 
 import android.app.AppOpsManager
+import android.app.usage.NetworkStats
 import android.app.usage.NetworkStatsManager
 import android.content.Context
 import android.content.Intent
@@ -13,7 +14,8 @@ import java.util.Calendar
 /**
  * Reads this phone's own data counters through Android's NetworkStatsManager: device-wide
  * totals, split into mobile and Wi-Fi, sent and received. Needs the one-time "Usage access"
- * permission (granted in Settings, not a runtime prompt). No per-app tracking here.
+ * permission (granted in Settings, not a runtime prompt). Per-app totals come from the same
+ * counters, keyed by app uid.
  */
 object DataUsage {
 
@@ -51,6 +53,36 @@ object DataUsage {
             Usage(0, 0)
         }
     }
+
+    /** Bytes per app uid between [start] and [end] on one network type. Empty if it can't be read. */
+    private fun perUid(ctx: Context, type: Int, start: Long, end: Long): Map<Int, Usage> {
+        val out = HashMap<Int, LongArray>()
+        try {
+            val nsm = ctx.getSystemService(Context.NETWORK_STATS_SERVICE) as NetworkStatsManager
+            val st = nsm.querySummary(type, null, start, end)
+            val b = NetworkStats.Bucket()
+            try {
+                while (st.hasNextBucket()) {
+                    st.getNextBucket(b)
+                    val a = out.getOrPut(b.uid) { LongArray(2) }
+                    a[0] += b.rxBytes
+                    a[1] += b.txBytes
+                }
+            } finally {
+                st.close()
+            }
+        } catch (_: Throwable) {
+        }
+        return out.mapValues { Usage(it.value[0], it.value[1]) }
+    }
+
+    @Suppress("DEPRECATION")
+    fun mobileByUid(ctx: Context, start: Long, end: Long): Map<Int, Usage> =
+        perUid(ctx, ConnectivityManager.TYPE_MOBILE, start, end)
+
+    @Suppress("DEPRECATION")
+    fun wifiByUid(ctx: Context, start: Long, end: Long): Map<Int, Usage> =
+        perUid(ctx, ConnectivityManager.TYPE_WIFI, start, end)
 
     @Suppress("DEPRECATION")
     fun mobile(ctx: Context, start: Long, end: Long): Usage =
