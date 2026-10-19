@@ -38,7 +38,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Icon
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -55,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -230,12 +230,14 @@ private fun BottomBar(current: Tab, onPick: (Tab) -> Unit) {
                 val weight by animateFloatAsState(if (on) 1.8f else 1f, spring(dampingRatio = 0.7f, stiffness = 500f), label = "w")
                 val pill by animateColorAsState(if (on) Palette.accent else Color.Transparent, tween(220), label = "pill")
                 val tint by animateColorAsState(if (on) Palette.onAccent else Palette.faint, tween(220), label = "tint")
+                // Each tap on a tab plays its icon's move (see TabIcons.kt).
+                var plays by remember { mutableIntStateOf(0) }
                 val press = remember { MutableInteractionSource() }
                 val pressed by press.collectIsPressedAsState()
                 val scale by animateFloatAsState(if (pressed) 0.9f else 1f, spring(dampingRatio = 0.5f, stiffness = 900f), label = "s")
                 Box(
                     Modifier.weight(weight).fillMaxHeight()
-                        .clickable(interactionSource = press, indication = null) { onPick(t) }
+                        .clickable(interactionSource = press, indication = null) { plays++; onPick(t) }
                         .semantics { role = Role.Tab; selected = on; contentDescription = name },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -244,7 +246,7 @@ private fun BottomBar(current: Tab, onPick: (Tab) -> Unit) {
                             .padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(t.icon(), null, tint = tint, modifier = Modifier.size(21.dp))
+                        TabIcon(t, tint, plays, 21.dp)
                         AnimatedVisibility(
                             visible = on,
                             enter = expandHorizontally(spring(dampingRatio = 0.8f, stiffness = 600f)) + fadeIn(tween(200, 60)),
@@ -260,12 +262,4 @@ private fun BottomBar(current: Tab, onPick: (Tab) -> Unit) {
             }
         }
     }
-}
-
-private fun Tab.icon() = when (this) {
-    Tab.Home -> Icons.home
-    Tab.Filter -> Icons.filter
-    Tab.Data -> Icons.data
-    Tab.Apps -> Icons.apps
-    Tab.Settings -> Icons.settings
 }
