@@ -1,9 +1,12 @@
 name: Checks
 
+# Text-only changes (README, release notes, other docs) don't need a full build.
 on:
   push:
     branches: [main, 'test/**']
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE', 'NOTICE']
   pull_request:
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE', 'NOTICE']
 
 permissions:
   contents: write
