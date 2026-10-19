@@ -580,3 +580,11 @@ nav button.tab svg { stroke-linecap: round; stroke-linejoin: round; overflow: vi
 .play .i-arrow { animation: arrowNudge .5s cubic-bezier(.34,1.8,.64,1) both; }
 @keyframes arrowNudge { 40% { transform: translateX(3px); } }
 @media (prefers-reduced-motion: reduce) { nav button.tab.play * { animation: none !important; } }
+
+/* A newer version is out: dot on the Settings tab, accent notice on Home. */
+nav button.tab { position: relative; }
+nav button.tab.hasdot::after { content: ''; position: absolute; left: 31px; top: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg); animation: dotIn .4s cubic-bezier(.34,1.8,.64,1) both; }
+nav button.tab.hasdot.active::after { background: var(--on-accent); box-shadow: 0 0 0 2px var(--accent); }
+@keyframes dotIn { from { transform: scale(0); } to { transform: scale(1); } }
+.banner.update { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.banner.update .linkbtn { color: var(--on-accent); }

@@ -67,6 +67,7 @@ func main() {
 	defer removeInstance(instanceDir(plat))
 
 	go srv.serve()
+	go a.watchUpdates()
 
 	// Resume if protection was on when we last quit.
 	if a.config().On {

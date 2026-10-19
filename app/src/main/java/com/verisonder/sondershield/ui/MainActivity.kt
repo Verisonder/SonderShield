@@ -76,6 +76,10 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.verisonder.sondershield.core.ShieldState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.offset
+import androidx.lifecycle.lifecycleScope
+import com.verisonder.sondershield.core.AppUpdate
 import com.verisonder.sondershield.service.ShieldVpnService
 
 enum class Tab(val label: String, val fr: String, val de: String) {
@@ -87,6 +91,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_TURN_ON = "turn_on"
+        const val EXTRA_OPEN_UPDATE = "open_update"
     }
 
     private val vpnConsent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -109,6 +114,9 @@ class MainActivity : ComponentActivity() {
         ShieldState.init(this)
         if (intent?.getBooleanExtra(EXTRA_TURN_ON, false) == true) turnOn()
         if (wantsHome(intent)) goHome.value++
+        if (intent?.getBooleanExtra(EXTRA_OPEN_UPDATE, false) == true) AppUpdate.openRequest.value++
+        AppUpdate.restore(this)
+        AppUpdate.schedule(this)
 
         setContent {
             val themeId by ShieldState.theme.collectAsState()
@@ -146,6 +154,11 @@ class MainActivity : ComponentActivity() {
                         homeScroll.scrollTo(0)
                     }
                 }
+                // "Update" on Home or the update notification: Settings, scrolled to Updates.
+                val openUpdate by AppUpdate.openRequest.collectAsState()
+                LaunchedEffect(openUpdate) {
+                    if (openUpdate > 0) tab = Tab.Settings
+                }
                 Scaffold(
                     containerColor = Palette.bg,
                     bottomBar = {
@@ -167,7 +180,7 @@ class MainActivity : ComponentActivity() {
                             label = "tabs",
                         ) { t ->
                             when (t) {
-                                Tab.Home -> HomeScreen(onToggle = ::toggle, scroll = homeScroll)
+                                Tab.Home -> HomeScreen(onToggle = ::toggle, scroll = homeScroll, onUpdate = { AppUpdate.openRequest.value++ })
                                 Tab.Filter -> FilterScreen()
                                 Tab.Data -> DataScreen()
                                 Tab.Apps -> AppsScreen()
@@ -183,12 +196,15 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         ShieldState.resumed.value++
+        // Tells about a new version by itself (at most every few hours).
+        lifecycleScope.launch { AppUpdate.autoCheck(this@MainActivity) }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.getBooleanExtra(EXTRA_TURN_ON, false)) turnOn()
         if (wantsHome(intent)) goHome.value++
+        if (intent.getBooleanExtra(EXTRA_OPEN_UPDATE, false)) AppUpdate.openRequest.value++
     }
 
     private fun toggle() {
@@ -217,6 +233,7 @@ class MainActivity : ComponentActivity() {
  */
 @Composable
 private fun BottomBar(current: Tab, onPick: (Tab) -> Unit) {
+    val hasUpdate = AppUpdate.available.collectAsState().value != null
     Column(Modifier.fillMaxWidth().background(Palette.bg)) {
         HorizontalDivider(color = Palette.line, thickness = 1.dp)
         Row(
@@ -246,7 +263,16 @@ private fun BottomBar(current: Tab, onPick: (Tab) -> Unit) {
                             .padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        TabIcon(t, tint, plays, 21.dp)
+                        Box {
+                            TabIcon(t, tint, plays, 21.dp)
+                            // A new version is out: a dot on Settings.
+                            if (t == Tab.Settings && hasUpdate) {
+                                Box(
+                                    Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-2).dp).size(8.dp)
+                                        .clip(CircleShape).background(if (on) Palette.onAccent else Palette.accent),
+                                )
+                            }
+                        }
                         AnimatedVisibility(
                             visible = on,
                             enter = expandHorizontally(spring(dampingRatio = 0.8f, stiffness = 600f)) + fadeIn(tween(200, 60)),

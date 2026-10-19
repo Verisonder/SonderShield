@@ -32,6 +32,7 @@ type Config struct {
 	EggNoNames     bool         `json:"eggNoNames"` // Shield-Man: hide the enemies' names
 	Autostart      bool         `json:"autostart"`
 	Onboarded      bool         `json:"onboarded"`
+	UpdateNotified string       `json:"updateNotified,omitempty"` // last version the "new version" notice was shown for
 }
 
 // AppRule is how one app is firewalled: Mode is "block" (no internet), "in" (block

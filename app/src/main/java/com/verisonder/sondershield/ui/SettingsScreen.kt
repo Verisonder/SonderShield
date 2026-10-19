@@ -71,6 +71,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verisonder.sondershield.BuildConfig
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.LaunchedEffect
+import com.verisonder.sondershield.core.AppUpdate
 import com.verisonder.sondershield.core.BlockList
 import com.verisonder.sondershield.core.Phase
 import com.verisonder.sondershield.core.ShieldState
@@ -119,7 +122,17 @@ private fun SettingsContent(onReload: () -> Unit) {
         if (phase == Phase.ON) scope.launch { ShieldState.applyConfig() }
     }
 
-    Column(Modifier.verticalScroll(rememberScrollState())) {
+    val scroll = rememberScrollState()
+    // Opened from the update notice or notification: go straight down to Updates.
+    val openUpdate by AppUpdate.openRequest.collectAsState()
+    LaunchedEffect(openUpdate) {
+        if (openUpdate > 0) {
+            delay(350)
+            scroll.animateScrollTo(scroll.maxValue)
+            AppUpdate.openRequest.value = 0 // handled: don't jump again next visit
+        }
+    }
+    Column(Modifier.verticalScroll(scroll)) {
         ScreenHeader(tr("Settings", "Réglages", "Einstellungen"))
 
         // 01 DNS server
@@ -392,8 +405,13 @@ private fun SettingsContent(onReload: () -> Unit) {
             }
         }
 
-        // 08 About
-        Section(8, tr("About", "À propos", "Über")) {
+        // 08 Updates
+        Section(8, tr("Updates", "Mises à jour", "Updates")) {
+            UpdateSection()
+        }
+
+        // 09 About
+        Section(9, tr("About", "À propos", "Über")) {
             Block {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     SecretLogo(30.dp, lit = true)

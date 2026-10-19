@@ -44,7 +44,8 @@ type App struct {
 	mode      string // "local" (port 53 here) or "adapter" (SonderShield network adapter)
 	lang      string // Windows language and country, for the regional lists of a profile
 	country   string
-	applied   string // profile in use when lists were last pushed to the engine ("" = own picks)
+	applied   string     // profile in use when lists were last pushed to the engine ("" = own picks)
+	update    updateInfo // the last update check (Available = a newer version is out)
 
 	logMu  sync.Mutex
 	log    []logEntry
@@ -208,6 +209,7 @@ func (a *App) diag() dnsDiag {
 // setConfig replaces settings, saves them, and re-applies to a running engine.
 func (a *App) setConfig(c Config) {
 	a.mu.Lock()
+	c.UpdateNotified = a.cfg.UpdateNotified // kept by the backend, not the window
 	a.cfg = c
 	on := a.on
 	a.mu.Unlock()

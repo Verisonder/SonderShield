@@ -183,3 +183,41 @@ func cleanupOldUpdate() {
 		os.Remove(filepath.Dir(exe) + string(os.PathSeparator) + "SonderShield.exe.new")
 	}
 }
+
+// onNewVersion shows a system notice about a new version (the Windows tray balloon);
+// nil where there is none. Called once per new version.
+var onNewVersion func(v string)
+
+// watchUpdates checks for a new version by itself — shortly after start, then twice a day —
+// so the window can say so without the user pressing "Check for updates".
+func (a *App) watchUpdates() {
+	time.Sleep(20 * time.Second)
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		info, err := checkUpdate(ctx)
+		cancel()
+		if err == nil {
+			a.noteUpdate(info)
+		}
+		time.Sleep(12 * time.Hour)
+	}
+}
+
+// noteUpdate keeps the latest check result and, the first time a version shows up, tells
+// the user through the system (once per version, remembered across restarts).
+func (a *App) noteUpdate(info updateInfo) {
+	a.mu.Lock()
+	a.update = info
+	tell := info.Available && a.cfg.UpdateNotified != info.Latest
+	if tell {
+		a.cfg.UpdateNotified = info.Latest
+	}
+	cfg := a.cfg
+	a.mu.Unlock()
+	if tell {
+		a.st.save("config.json", &cfg)
+		if onNewVersion != nil {
+			onNewVersion(info.Latest)
+		}
+	}
+}

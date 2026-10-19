@@ -171,6 +171,7 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]any{"current": version, "error": err.Error()})
 			return
 		}
+		s.a.noteUpdate(info)
 		writeJSON(w, info)
 	case "update/apply":
 		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
@@ -211,6 +212,7 @@ type stateView struct {
 	ProfileNow string    `json:"profileNow"` // profile in use now ("" = own picks)
 	Scheduled  bool      `json:"scheduled"`  // ...because a schedule is running
 	OS         string    `json:"os"`         // "windows" or "linux": the window adapts its wording
+	NewVersion string    `json:"newVersion"` // set when a newer version is out (found by the automatic check)
 }
 
 func (s *server) state() stateView {
@@ -225,6 +227,11 @@ func (s *server) state() stateView {
 		StartedAt: started, Stats: sv, Today: sv.Today, Config: cfg, Mode: mode,
 		Kill: a.plat.killSwitchOn(), OS: runtime.GOOS,
 	}
+	a.mu.Lock()
+	if a.update.Available {
+		out.NewVersion = a.update.Latest
+	}
+	a.mu.Unlock()
 	out.ProfileNow, out.Scheduled = cfg.activeProfile(time.Now())
 	if on {
 		a.data.sample(a.plat.rawNetCounters())
