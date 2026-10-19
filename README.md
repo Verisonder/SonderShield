@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <b>Ad, tracker and malware blocker for Android and Windows.</b><br>
+  <b>Ad, tracker and malware blocker for Android, Windows and Linux.</b><br>
   No root needed, no account, no analytics. Everything stays on your phone.
 </p>
 
@@ -52,6 +52,8 @@ Turn on **HTTPS filtering** and it goes further in your browsers: ad spaces and 
 2. Follow the first-run steps: allow the VPN, keep it running in the background.
 3. Tap the shield.
 
+**Linux:** download `SonderShield-Linux-x.y.z-x86_64.AppImage` from the latest release, make it executable (`chmod +x`) and open it. The first time, it asks for your password once to install its small background service, then adds itself to your app launcher. Works on Fedora, Ubuntu, Arch and others with systemd and nftables; the window uses WebKitGTK when installed (else a Chromium-family browser window). On desktops with no password prompt running (e.g. a bare Hyprland), run `sudo ./SonderShield-Linux-*.AppImage --install` once. Remove it with `./SonderShield-Linux-*.AppImage --uninstall`.
+
 **Private DNS:** if Android's Private DNS is set to a specific provider, lookups go straight there and skip SonderShield. The app warns you; set it to Automatic or Off.
 
 **HTTPS filtering:** Settings › HTTPS filtering. Save the certificate, install it from Android's settings (the app shows where), and pick your browsers. Firefox needs one extra switch, shown in the app.
@@ -63,10 +65,12 @@ engine/   Go: DNS and packet handling, list parsing, rules, cache, DoH,
           gVisor netstack full tunnel, WireGuard, HTTPS filtering
 app/      Android app: Kotlin and Jetpack Compose
 tools/    build_engine.sh: engine -> app/libs/engine.aar (gomobile)
-engine/cmd/sondershield/  the Windows app (Go + embedded web UI)
+engine/cmd/sondershield/  the Windows and Linux app (Go + embedded web UI)
+linux/    the Linux window (WebKitGTK) and AppImage files;
+          tools/build_appimage.sh builds the AppImage
 ```
 
-The engine is plain Go with its own tests, bound to Android with gomobile and reused directly by the Windows app (`engine/cmd/sondershield`).
+The engine is plain Go with its own tests, bound to Android with gomobile and reused directly by the Windows and Linux app (`engine/cmd/sondershield`). On Linux it runs as a systemd service and sends every app's DNS to itself with an nftables redirect (nothing in resolved or NetworkManager is changed).
 
 ### Building
 

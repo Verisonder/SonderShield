@@ -13,6 +13,11 @@ async function api(path, opts = {}) {
 }
 const postConfig = c => api('config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) });
 
+// Linux and Windows share this window; a few words differ.
+const isLinux = () => !!(state && state.os === 'linux');
+const PC = cap => isLinux() ? (cap ? 'This computer' : 'this computer') : 'Windows';
+const THISPC = () => isLinux() ? 'this computer' : 'this PC';
+
 let profSeen = null, state = null, cfg = null, lastLogSeq = 0, logs = [], tab = 'home', homeKey = '';
 
 // ---- shell ----
@@ -30,7 +35,7 @@ function eggCtx() {
 }
 document.querySelectorAll('nav .tab[data-tab]').forEach(b => b.onclick = () => setTab(b.dataset.tab));
 $('#quitbtn').onclick = async () => {
-  const r = await ask({ title: 'Quit SonderShield?', text: 'Protection stops and Windows goes back to its usual DNS. Closing the window instead keeps SonderShield running in the tray.', ok: 'Quit', danger: true });
+  const r = await ask({ title: 'Quit SonderShield?', text: isLinux() ? 'Protection stops and DNS goes back to normal. Closing the window instead keeps SonderShield protecting in the background.' : 'Protection stops and Windows goes back to its usual DNS. Closing the window instead keeps SonderShield running in the tray.', ok: 'Quit', danger: true });
   if (r) await api('quit', { method: 'POST' });
 };
 
@@ -152,10 +157,10 @@ function renderHome() {
   const total = state.today[0], blocked = state.today[1];
   const label = { off: 'PROTECTION OFF', on: 'PROTECTION ON', starting: 'STARTING…', stopping: 'TURNING OFF…' }[phase];
   const head = { off: 'Ads get through.', on: 'Ads stop here.', starting: 'Starting up…', stopping: 'Turning off…' }[phase];
-  const sub = phase === 'starting' ? 'Downloading lists and pointing Windows at SonderShield. This takes a few seconds.'
-    : phase === 'stopping' ? 'Putting Windows back to its usual DNS.'
+  const sub = phase === 'starting' ? 'Downloading lists and pointing ' + PC() + ' at SonderShield. This takes a few seconds.'
+    : phase === 'stopping' ? (isLinux() ? 'Putting DNS back to normal.' : 'Putting Windows back to its usual DNS.')
     : on ? (state.domains ? fmt(state.domains) + ' ad and tracker domains get nothing back.' : 'Loading block lists…')
-    : 'Turn on to block ads and trackers for every app on this PC.';
+    : 'Turn on to block ads and trackers for every app on ' + THISPC() + '.';
   const warn = !busy && on && !state.active, problem = !busy && state.problem ? state.problem : '';
   const p = $('#page-home');
   const shape = JSON.stringify([phase, warn, problem, sub, state.kill, state.profileNow, state.scheduled, profData.profiles.length]);
@@ -177,7 +182,7 @@ function renderHome() {
     <div class="headline ${roll ? 'roll' : ''}">${head}</div>
     <div class="headsub">${sub}</div>
     ${state.kill ? `<div class="banner danger" style="margin-top:22px">All internet is blocked by the panic switch. Turn it off in Firewall to restore.</div>` : ''}
-    ${warn ? `<div class="banner" style="margin-top:22px">Windows isn't sending its lookups to SonderShield yet. <button class="linkbtn" id="diagbtn">See why</button></div>` : ''}
+    ${warn ? `<div class="banner" style="margin-top:22px">${PC(true)} isn't sending its lookups to SonderShield yet. <button class="linkbtn" id="diagbtn">See why</button></div>` : ''}
     ${problem ? `<div class="banner" style="margin-top:22px">${esc(problem)}</div>` : ''}
     <div class="homebody ${fresh ? 'enter' : ''}">
       <svg class="swoosh" height="46">
@@ -411,26 +416,32 @@ async function showDiag() {
     </div>`).join('') || '<div class="cfaint">No active adapters found.</div>';
   let verdict, cls;
   if (!d.on) { verdict = 'Protection is off, so nothing is pointed at SonderShield yet.'; cls = ''; }
-  else if (d.receiving) { verdict = 'Windows is sending its DNS to SonderShield and lookups are arriving. All good.'; cls = 'good'; }
+  else if (d.receiving) { verdict = PC(true) + ' is sending its DNS to SonderShield and lookups are arriving. All good.'; cls = 'good'; }
+  else if (isLinux()) {
+    verdict = d.allGood
+      ? "Every app's DNS is redirected to SonderShield, but no queries are arriving. A VPN or another DNS program may be answering first, or apps may be using encrypted DNS — turn on Settings › Force DNS through SonderShield."
+      : "The DNS redirect isn't in place. Switch protection off and on. If it stays like this, check that nftables is installed (the nft command).";
+    cls = 'warn';
+  }
   else if (d.allGood) { verdict = 'Every adapter is pointed at SonderShield, but no queries are arriving. The most likely cause is Windows Encrypted DNS (DoH): open Settings → Network & internet → your connection → DNS server assignment, and set DNS over HTTPS to Off. Another DNS app could also be intercepting.'; cls = 'warn'; }
   else { verdict = "One or more adapters below aren't pointed at SonderShield (✕). SonderShield should set them automatically — switch protection off and on. If an adapter keeps showing ✕, that adapter type may not be caught yet; tell me which one."; cls = 'warn'; }
   // Lookups arrive but nothing is ever blocked: a browser is most likely doing its own
   // encrypted DNS, which skips SonderShield.
   if (d.on && d.seen > 40 && !(state.today && state.today[1]) && !cfg.lockDns) {
     const tip = 'Nothing has been blocked yet, which usually means your browser uses its own secure DNS and skips SonderShield. Turn on <b>Settings › Force DNS through SonderShield</b>, or switch off "secure DNS" in the browser\'s settings.';
-    if (d.receiving) { verdict = 'Windows is sending its lookups to SonderShield. ' + tip; cls = 'warn'; }
+    if (d.receiving) { verdict = PC(true) + ' is sending its lookups to SonderShield. ' + tip; cls = 'warn'; }
     else verdict += ' <br><br>' + tip;
   }
   const adapterNote = d.on && d.mode === 'adapter'
     ? `<div class="diagnote">${d.portOwner
-        ? `Port 53 on this PC is taken by <b>${esc(d.portOwner)}</b>, so SonderShield answers on its own network adapter instead, which some setups don't use reliably. Close ${esc(d.portOwner)} or turn off its DNS feature, then turn protection off and on.`
+        ? `Port 53 on ${THISPC()} is taken by <b>${esc(d.portOwner)}</b>, so SonderShield answers on its own network adapter instead, which some setups don't use reliably. Close ${esc(d.portOwner)} or turn off its DNS feature, then turn protection off and on.`
         : 'SonderShield is answering on its own network adapter because port 53 was busy when protection started. Turn protection off and on to try port 53 again.'}</div>`
     : '';
   bg.innerHTML = `<div class="modal diag" role="dialog">
     <h3>DNS diagnostic</h3>
     <div class="diagverdict ${cls}">${verdict}</div>
     ${adapterNote}
-    <div class="diagmeta">Mode: <b>${d.mode === 'adapter' ? 'SonderShield adapter' : d.mode === 'local' ? 'This PC (port 53)' : '—'}</b> · SonderShield answers on: <b>${(d.expected || []).join(', ') || '—'}</b> · Queries arriving: <b>${d.receiving ? 'yes' : 'no'}</b></div>
+    <div class="diagmeta">Mode: <b>${d.mode === 'adapter' ? 'SonderShield adapter' : d.mode === 'local' ? (isLinux() ? 'Every app redirected' : 'This PC (port 53)') : '—'}</b> · SonderShield answers on: <b>${(d.expected || []).join(', ') || '—'}</b> · Queries arriving: <b>${d.receiving ? 'yes' : 'no'}</b></div>
     <div class="diagadapters">${adRows}</div>
     <div class="actions"><button class="pill" data-a="close">Close</button><button class="pill filled" data-a="refresh">Refresh</button></div>
   </div>`;
@@ -594,7 +605,7 @@ function drawConns() {
         ${live ? kv('State', esc(i.state || '')) : kv('First seen', new Date(i.firstSeen).toLocaleString()) + kv('Last seen', new Date(i.lastSeen).toLocaleString()) + kv('Times seen', i.count)}
         ${kv('Status', i.blocked ? 'This app is blocked' : 'Allowed')}
         <div class="dacts">
-          ${i.path ? `<button class="pill" data-act="app" data-key="${escapeAttr(i.key)}">App rules…</button>` : ''}
+          ${i.path && !isLinux() ? `<button class="pill" data-act="app" data-key="${escapeAttr(i.key)}">App rules…</button>` : ''}
           <button class="pill danger" data-act="ip" data-key="${escapeAttr(i.key)}">Block this address</button>
           <button class="pill" data-act="copy" data-key="${escapeAttr(i.key)}">Copy address</button>
         </div></div>`;
@@ -990,27 +1001,28 @@ async function renderApps() {
   const p = $('#page-apps');
   const kill = state.kill;
   p.innerHTML = `<div class="kicker">FIREWALL</div><h1>Firewall</h1>
-    <div class="sub">Control what each app can reach — block it entirely, block only incoming connections, or keep it off the local network. Uses Windows Firewall.</div>
+    <div class="sub">${isLinux() ? 'Cut off the whole computer at once, or block addresses and ports for every app. Uses nftables.' : 'Control what each app can reach — block it entirely, block only incoming connections, or keep it off the local network. Uses Windows Firewall.'}</div>
     <div class="panic ${kill ? 'on' : ''}">
       <div class="panictext"><div class="panicttl">${kill ? 'All internet is blocked' : 'Block all internet'}</div>
-        <div class="panicsub">${kill ? 'Every app is cut off. SonderShield still works.' : 'Cut off every app on this PC at once. A panic switch.'}</div></div>
+        <div class="panicsub">${kill ? 'Every app is cut off. SonderShield still works.' : 'Cut off every app on ' + THISPC() + ' at once. A panic switch.'}</div></div>
       <button class="pill ${kill ? 'filled' : 'danger'}" id="killbtn">${kill ? 'Restore internet' : 'Block everything'}</button>
     </div>
     <div class="seclabel" style="margin-top:28px"><span class="t">BLOCK BY ADDRESS OR PORT</span></div>
     <div class="sub" style="margin-bottom:12px">Cut off outbound traffic to an IP address or range, or to a port, for every app. Applies while protection is on.</div>
     <div class="row" style="margin-bottom:12px"><button class="pill" id="addnet">Add a block</button></div>
     <div id="netlist"></div>
-    <div class="seclabel" style="margin-top:28px"><span class="t">APPS</span></div>
+    ${isLinux() ? '' : `<div class="seclabel" style="margin-top:28px"><span class="t">APPS</span></div>
     <div class="connbar"><input class="field" id="appsearch" placeholder="Search apps…" value="${escapeAttr(appSearch)}"><button class="pill" id="refreshprog">Refresh</button></div>
-    <div id="proglist"><div class="empty">Loading apps…</div></div>`;
+    <div id="proglist"><div class="empty">Loading apps…</div></div>`}`;
   $('#addnet').onclick = addNetBlock;
   drawNetBlocks();
   $('#killbtn').onclick = async () => {
     const on = !kill;
-    if (on) { const ok = await ask({ title: 'Block all internet?', text: 'Every app on this PC loses internet until you switch this back off. SonderShield itself keeps working.', ok: 'Block everything', danger: true }); if (!ok) return; }
+    if (on) { const ok = await ask({ title: 'Block all internet?', text: 'Every app on ' + THISPC() + ' loses internet until you switch this back off. SonderShield itself keeps working.', ok: 'Block everything', danger: true }); if (!ok) return; }
     await api('killswitch?on=' + (on ? '1' : '0'), { method: 'POST' });
     await poll(); renderApps();
   };
+  if (isLinux()) return; // no per-app firewall on Linux
   $('#appsearch').oninput = e => { appSearch = e.target.value; drawPrograms(); };
   const load = async () => {
     [programs, appHist] = await Promise.all([api('programs'), api('history').catch(() => [])]);
@@ -1169,7 +1181,7 @@ async function renderSettings() {
       ${[['default', 'Dark'], ['light', 'Light'], ['system', 'System']].map(([t, l]) => `<button class="chip ${cfg.theme === t ? 'active' : ''}" data-theme="${t}">${l}</button>`).join('')}
     </div><div class="accentrow">${ACCENTS.map(a => `<div class="swatch ${cfg.accent === a ? 'sel' : ''}" data-a="${a}" style="background:#${(a & 0xffffff).toString(16).padStart(6, '0')}"></div>`).join('')}</div></div>
     <div class="seclabel"><span class="t">05 STARTUP</span></div>
-    <div class="card"><div class="row"><div class="grow"><div class="ctitle">Start with Windows</div><div class="csub">Launch in the background when you sign in.</div></div>
+    <div class="card"><div class="row"><div class="grow"><div class="ctitle">${isLinux() ? 'Start with the computer' : 'Start with Windows'}</div><div class="csub">${isLinux() ? 'Protection starts when the computer does, before you sign in.' : 'Launch in the background when you sign in.'}</div></div>
       <div class="sw ${auto.on ? 'on' : ''}" id="autostart"><div class="knob"></div></div></div></div>
     <div class="seclabel"><span class="t">06 STATISTICS</span></div>
     <div class="card"><div class="row"><div class="grow"><div class="ctitle">Blocked in total</div><div class="csub">${fmt(state.stats.blocked)}</div></div>
@@ -1182,9 +1194,9 @@ async function renderSettings() {
       <div id="updateaction" class="hidden" style="margin-top:12px"></div>
     </div>
     <div class="seclabel"><span class="t">08 ABOUT</span></div>
-    <div class="card"><div class="aboutbrand"><span id="aboutmark">${shieldMark(34)}</span><div><div class="wordmark big">Sonder<span class="s2">Shield</span></div><div class="cfaint">Version ${esc(cat.version)} for Windows</div></div></div>
-      <div class="csub" style="margin-top:6px">By Verisonder. Free and open source under Apache 2.0. Everything stays on this PC: no account, no analytics.</div>
-      <div class="csub" style="margin-top:8px">Blocks ads, trackers and malware by DNS, and can cut off any app's internet.${state.on ? (state.mode === 'adapter' ? ' Filtering through the SonderShield network adapter.' : ' Filtering on this PC (port 53).') : ''}</div>
+    <div class="card"><div class="aboutbrand"><span id="aboutmark">${shieldMark(34)}</span><div><div class="wordmark big">Sonder<span class="s2">Shield</span></div><div class="cfaint">Version ${esc(cat.version)} for ${cat.os === 'linux' ? 'Linux' : 'Windows'}</div></div></div>
+      <div class="csub" style="margin-top:6px">By Verisonder. Free and open source under Apache 2.0. Everything stays on ${THISPC()}: no account, no analytics.</div>
+      <div class="csub" style="margin-top:8px">Blocks ads, trackers and malware by DNS, ${isLinux() ? 'and can cut off the internet or chosen addresses.' : "and can cut off any app's internet."}${state.on ? (isLinux() ? " Filtering every app's DNS (redirected to SonderShield)." : state.mode === 'adapter' ? ' Filtering through the SonderShield network adapter.' : ' Filtering on this PC (port 53).') : ''}</div>
       <div style="margin-top:12px"><button class="pill" id="diagbtn2">Run DNS diagnostic</button> <button class="pill" id="src">Source code</button></div></div>`;
   SM.secret($('#aboutmark'), eggCtx);
   p.querySelectorAll('.pick[data-up]').forEach(r => r.onclick = () => {
@@ -1229,7 +1241,7 @@ async function doUpdate() {
   msg.textContent = 'This will restart SonderShield.';
   try {
     await api('update/apply', { method: 'POST' });
-    msg.textContent = 'Updating… the window will reopen in a moment.';
+    msg.textContent = isLinux() ? 'Updating… the window reloads in a moment.' : 'Updating… the window will reopen in a moment.';
     // The backend relaunches; this window's server goes away. Try to reopen shortly.
   } catch (e) {
     b.disabled = false; b.textContent = 'Update now';

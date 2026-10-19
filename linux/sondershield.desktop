@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=SonderShield
+GenericName=Ad blocker
+Comment=Block ads, trackers and malware on this computer
+Exec=sondershield
+Icon=sondershield
+Terminal=false
+Categories=Network;Security;
+Keywords=adblock;dns;firewall;privacy;
+StartupWMClass=sondershield

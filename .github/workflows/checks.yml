@@ -40,6 +40,12 @@ jobs:
           curl -sfL -o wintun.zip https://www.wintun.net/builds/wintun-0.14.1.zip
           unzip -q -j wintun.zip wintun/bin/amd64/wintun.dll -d engine/cmd/sondershield/wintun
           cd engine && GOOS=windows GOARCH=amd64 go build ./...
+      - name: Linux window
+        shell: bash
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq libwebkit2gtk-4.1-dev > /dev/null
+          cc -O2 -Wall linux/window/sondershield-window.c -o /tmp/sondershield-window \
+            $(pkg-config --cflags --libs gtk+-3.0 webkit2gtk-4.1) 2>&1 | tee linux-window.log
       - name: Engine tests
         shell: bash
         run: |
@@ -59,7 +65,7 @@ jobs:
           # CI logs are not fetchable from outside, so the error is attached to a
           # pre-release called ci-failure in this repository, where the API can read it.
           touch out.txt
-          for f in engine.log engine-tests.txt build-output.txt; do
+          for f in engine.log linux-window.log engine-tests.txt build-output.txt; do
             [ -f "$f" ] && { echo "== $f"; tail -n 200 "$f"; } >> out.txt
           done
           gh release view ci-failure --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \

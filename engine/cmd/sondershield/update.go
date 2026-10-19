@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +18,9 @@ import (
 // version is the build's version, set at build time with -ldflags "-X main.version=1.0.2".
 // "dev" means a local build, which never reports an update as available.
 var version = "dev"
+
+// linuxAsset is the release file the Linux service updates itself from.
+const linuxAsset = "sondershield-linux-x86_64"
 
 const releasesAPI = "https://api.github.com/repos/Verisonder/SonderShield/releases/latest"
 
@@ -60,12 +64,19 @@ func checkUpdate(ctx context.Context) (updateInfo, error) {
 	info.Notes = r.Body
 	// Prefer the plain .exe; older releases only have the zip.
 	for _, a := range r.Assets {
+		if runtime.GOOS == "linux" {
+			// The service updates itself from the plain program (the AppImage's contents).
+			if a.Name == linuxAsset {
+				info.url = a.URL
+			}
+			continue
+		}
 		if strings.HasPrefix(a.Name, "SonderShield-Windows") && strings.HasSuffix(a.Name, ".zip") && info.url == "" {
 			info.url = a.URL
 		}
 	}
 	for _, a := range r.Assets {
-		if strings.HasPrefix(a.Name, "SonderShield-Windows") && strings.HasSuffix(a.Name, ".exe") {
+		if runtime.GOOS != "linux" && strings.HasPrefix(a.Name, "SonderShield-Windows") && strings.HasSuffix(a.Name, ".exe") {
 			info.url = a.URL
 		}
 	}
@@ -127,7 +138,7 @@ func applyUpdate(ctx context.Context, onBeforeExit func()) error {
 	tmpZip.Close()
 
 	newExe := exe + ".new"
-	if strings.HasSuffix(strings.ToLower(info.url), ".exe") {
+	if strings.HasSuffix(strings.ToLower(info.url), ".exe") || runtime.GOOS == "linux" {
 		if err := os.Rename(tmpZip.Name(), newExe); err != nil {
 			return err
 		}

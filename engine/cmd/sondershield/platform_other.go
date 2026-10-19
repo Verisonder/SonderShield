@@ -8,11 +8,10 @@ import (
 	shield "github.com/Verisonder/SonderShield/engine"
 )
 
-// A no-op platform so the program builds and its logic can be tested on Linux. The real
-// behaviour is in platform_windows.go and dns_windows.go.
+// A no-op platform: the tests use it on Linux (no root, nothing touched), and it is the
+// platform on systems with no real one. The real ones are platform_windows.go and
+// platform_linux.go.
 type otherPlatform struct{ dir string }
-
-func newPlatform() platform { return &otherPlatform{dir: portableDataDir()} }
 
 func (p *otherPlatform) dataDir() string                           { return p.dir }
 func (p *otherPlatform) setSystemDNS(v4, v6 string) error          { return nil }
@@ -38,5 +37,3 @@ func (p *otherPlatform) port53Owner() string                       { return "" }
 func (p *otherPlatform) startTunDNS(e *shield.Engine) (string, string, error) {
 	return "", "", errors.New("no tunnel on this system")
 }
-
-func localeFromOS() (lang, country string) { return "en", "" }

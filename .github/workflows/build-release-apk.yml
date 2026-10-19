@@ -181,3 +181,43 @@ jobs:
           gh release upload "$GITHUB_REF_NAME" \
             "out/SonderShield-Setup-$VERSION.exe" "SonderShield-Windows-$VERSION.exe" "SonderShield-Windows-$VERSION.zip" \
             --repo "$GITHUB_REPOSITORY" --clobber
+
+  linux:
+    name: Linux AppImage
+    needs: release
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: false
+      - name: Build tools
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libwebkit2gtk-4.1-dev > /dev/null
+      - name: Build the AppImage
+        shell: bash
+        run: |
+          set -o pipefail
+          cd engine && go mod tidy && cd ..
+          tools/build_appimage.sh "${GITHUB_REF_NAME#v}" dist 2>&1 | tee linux-build.log
+      - name: Upload to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT || github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" dist/*.AppImage dist/sondershield-linux-x86_64 \
+            --repo "$GITHUB_REPOSITORY" --clobber
+      - name: Report the failure
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          touch linux-build.log
+          gh release view ci-failure --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create ci-failure --repo "$GITHUB_REPOSITORY" --prerelease \
+              --title "Last CI failure" --notes "Replaced on every failed build."
+          { echo "$GITHUB_WORKFLOW (Linux) on $GITHUB_REF_NAME at $GITHUB_SHA"; tail -n 200 linux-build.log; } > failure.txt
+          gh release upload ci-failure failure.txt --repo "$GITHUB_REPOSITORY" --clobber

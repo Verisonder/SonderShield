@@ -75,3 +75,10 @@ func fatal(msg string) {
 	m, _ := syscall.UTF16PtrFromString(msg)
 	procMessageBox.Call(0, uintptr(unsafe.Pointer(m)), uintptr(unsafe.Pointer(t)), 0x10) // MB_ICONERROR
 }
+
+// osMain: nothing to do before the usual start on Windows.
+func osMain() bool { return false }
+
+func instanceDir(p platform) string { return p.dataDir() }
+
+func shareInstance(path string) {}

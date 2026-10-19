@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !windows && !linux
 
 package main
 
@@ -21,3 +21,7 @@ func openWindow(url string) {
 }
 
 func fatal(msg string) { fmt.Fprintln(os.Stderr, "SonderShield:", msg) }
+
+func osMain() bool { return false }
+
+func shareInstance(path string) {}

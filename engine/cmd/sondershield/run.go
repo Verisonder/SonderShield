@@ -196,3 +196,13 @@ func (a *App) active() bool {
 }
 
 var errNotRunning = errors.New("not running")
+
+// resumeAfterRestart marks protection as on in the saved settings, after stop() cleared it,
+// so a restarted (updated) copy turns it straight back on.
+func (a *App) resumeAfterRestart() {
+	a.mu.Lock()
+	a.cfg.On = true
+	cfg := a.cfg
+	a.mu.Unlock()
+	a.st.save("config.json", &cfg)
+}

@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -143,7 +144,11 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		w.Header().Set("Content-Type", "image/png")
+		ct := "image/png"
+		if head := strings.TrimSpace(string(png[:min(len(png), 256)])); strings.HasPrefix(head, "<svg") || strings.HasPrefix(head, "<?xml") {
+			ct = "image/svg+xml" // Linux app icons are often SVG
+		}
+		w.Header().Set("Content-Type", ct)
 		w.Header().Set("Cache-Control", "max-age=86400")
 		w.Write(png)
 	case "diag":
@@ -157,7 +162,7 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, map[string]bool{"kill": on})
 	case "catalog":
-		writeJSON(w, map[string]any{"upstreams": upstreams, "version": version})
+		writeJSON(w, map[string]any{"upstreams": upstreams, "version": version, "os": runtime.GOOS})
 	case "update/check":
 		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 		defer cancel()
@@ -172,8 +177,9 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		err := applyUpdate(ctx, func() {
 			if s.a.running() {
 				s.a.stop()
+				s.a.resumeAfterRestart() // the new version picks protection back up
 			}
-			removeInstance(s.a.plat.dataDir())
+			removeInstance(instanceDir(s.a.plat))
 		})
 		cancel()
 		if err != nil {
@@ -204,6 +210,7 @@ type stateView struct {
 	Apps       int       `json:"apps"`
 	ProfileNow string    `json:"profileNow"` // profile in use now ("" = own picks)
 	Scheduled  bool      `json:"scheduled"`  // ...because a schedule is running
+	OS         string    `json:"os"`         // "windows" or "linux": the window adapts its wording
 }
 
 func (s *server) state() stateView {
@@ -216,7 +223,7 @@ func (s *server) state() stateView {
 	out := stateView{
 		On: on, Active: a.active(), Problem: problem, Domains: int(a.eng.DomainCount()),
 		StartedAt: started, Stats: sv, Today: sv.Today, Config: cfg, Mode: mode,
-		Kill: a.plat.killSwitchOn(),
+		Kill: a.plat.killSwitchOn(), OS: runtime.GOOS,
 	}
 	out.ProfileNow, out.Scheduled = cfg.activeProfile(time.Now())
 	if on {

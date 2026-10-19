@@ -10,6 +10,11 @@ import (
 )
 
 func main() {
+	// Linux: the launcher, installer and window run here; only the service (--daemon)
+	// carries on below.
+	if osMain() {
+		return
+	}
 	// Commands the installer runs (no window).
 	if hasFlag("--uninstall") {
 		plat := newPlatform()
@@ -58,8 +63,8 @@ func main() {
 		fatal("Could not start the local interface: " + err.Error())
 		return
 	}
-	writeInstance(plat.dataDir(), srv.url())
-	defer removeInstance(plat.dataDir())
+	writeInstance(instanceDir(plat), srv.url())
+	defer removeInstance(instanceDir(plat))
 
 	go srv.serve()
 
@@ -94,7 +99,7 @@ func hasFlag(f string) bool {
 
 // existingInstance returns the running copy's window URL, if one answers.
 func existingInstance() (string, bool) {
-	dir := newPlatform().dataDir()
+	dir := instanceDir(newPlatform())
 	b, err := os.ReadFile(dir + string(os.PathSeparator) + "instance.url")
 	if err != nil {
 		return "", false
@@ -122,7 +127,9 @@ func showExisting(url string) bool {
 }
 
 func writeInstance(dir, url string) {
-	os.WriteFile(dir+string(os.PathSeparator)+"instance.url", []byte(url), 0o600)
+	p := dir + string(os.PathSeparator) + "instance.url"
+	os.WriteFile(p, []byte(url), 0o600)
+	shareInstance(p)
 }
 func removeInstance(dir string) { os.Remove(dir + string(os.PathSeparator) + "instance.url") }
 
