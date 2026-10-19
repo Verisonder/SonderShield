@@ -20,33 +20,33 @@
       <span class="wordmark">Sonder<span class="s2">Shield</span></span>
     </div>
     <button class="tab active" data-tab="home">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3.5 10.5L12 4l8.5 6.5"/><path d="M5.5 9v10.5h13V9"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path class="i-roof" d="M3.5 10.5L12 4l8.5 6.5"/><path class="i-walls" d="M5.5 9v10.5h13V9"/></svg>
       <span data-t="Home">Home</span>
     </button>
     <button class="tab" data-tab="filter">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3.5l7.5 2.8v5.4c0 4.6-3.1 7.9-7.5 9.3-4.4-1.4-7.5-4.7-7.5-9.3V6.3z"/></svg>
+      <svg class="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3.5l7.5 2.8v5.4c0 4.6-3.1 7.9-7.5 9.3-4.4-1.4-7.5-4.7-7.5-9.3V6.3z"/></svg>
       <span data-t="Filter">Filter</span>
     </button>
     <button class="tab" data-tab="rules">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h10"/><path d="M4 17h6"/><path d="M18 4v6"/><path d="M15 7h6"/><path d="M14 17h6"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path class="i-s1a" d="M4 7h10"/><path class="i-s2a" d="M4 17h6"/><path class="i-k1" d="M18 4v6"/><path class="i-s1b" d="M15 7h6"/><path class="i-s2b" d="M14 17h6"/></svg>
       <span data-t="Rules">Rules</span>
     </button>
     <button class="tab" data-tab="apps">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/></svg>
+      <svg class="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect class="i-t0" x="4" y="4" width="6" height="6"/><rect class="i-t1" x="14" y="4" width="6" height="6"/><rect class="i-t3" x="4" y="14" width="6" height="6"/><rect class="i-t2" x="14" y="14" width="6" height="6"/></svg>
       <span data-t="Firewall">Firewall</span>
     </button>
     <button class="tab" data-tab="conns">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3l2.5-6 4 13 3-9 1.5 2H21"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="i-pulse" pathLength="1" d="M3 12h3l2.5-6 4 13 3-9 1.5 2H21"/></svg>
       <span data-t="Connections">Connections</span>
     </button>
     <button class="tab" data-tab="settings">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M19.26 9.75L21.86 10.31L21.86 13.69L19.26 14.25L18.72 15.55L20.17 17.77L17.77 20.17L15.55 18.72L14.25 19.26L13.69 21.86L10.31 21.86L9.75 19.26L8.45 18.72L6.23 20.17L3.83 17.77L5.28 15.55L4.74 14.25L2.14 13.69L2.14 10.31L4.74 9.75L5.28 8.45L3.83 6.23L6.23 3.83L8.45 5.28L9.75 4.74L10.31 2.14L13.69 2.14L14.25 4.74L15.55 5.28L17.77 3.83L20.17 6.23L18.72 8.45Z"/><circle cx="12" cy="12" r="3"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path class="i-gear" d="M19.26 9.75L21.86 10.31L21.86 13.69L19.26 14.25L18.72 15.55L20.17 17.77L17.77 20.17L15.55 18.72L14.25 19.26L13.69 21.86L10.31 21.86L9.75 19.26L8.45 18.72L6.23 20.17L3.83 17.77L5.28 15.55L4.74 14.25L2.14 13.69L2.14 10.31L4.74 9.75L5.28 8.45L3.83 6.23L6.23 3.83L8.45 5.28L9.75 4.74L10.31 2.14L13.69 2.14L14.25 4.74L15.55 5.28L17.77 3.83L20.17 6.23L18.72 8.45Z"/><circle cx="12" cy="12" r="3"/></svg>
       <span data-t="Settings">Settings</span>
     </button>
     <div class="spacer"></div>
     <div class="statuschip" id="statuschip"><span class="dot"></span><span id="statustext">Off</span></div>
     <button class="tab" id="quitbtn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/><path d="M15 16l4-4-4-4"/><path d="M19 12H9"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/><path class="i-arrow" d="M15 16l4-4-4-4"/><path class="i-arrow" d="M19 12H9"/></svg>
       <span data-t="Quit">Quit</span>
     </button>
   </nav>

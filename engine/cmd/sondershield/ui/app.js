@@ -33,8 +33,11 @@ function eggCtx() {
     },
   };
 }
-document.querySelectorAll('nav .tab[data-tab]').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+// Each click replays the icon's own move (CSS: .play in app.css).
+function playIcon(b) { b.classList.remove('play'); void b.offsetWidth; b.classList.add('play'); }
+document.querySelectorAll('nav .tab[data-tab]').forEach(b => b.onclick = () => { playIcon(b); setTab(b.dataset.tab); });
 $('#quitbtn').onclick = async () => {
+  playIcon($('#quitbtn'));
   const r = await ask({ title: 'Quit SonderShield?', text: isLinux() ? 'Protection stops and DNS goes back to normal. Closing the window instead keeps SonderShield protecting in the background.' : 'Protection stops and Windows goes back to its usual DNS. Closing the window instead keeps SonderShield running in the tray.', ok: 'Quit', danger: true });
   if (r) await api('quit', { method: 'POST' });
 };

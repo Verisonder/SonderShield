@@ -526,3 +526,57 @@ svg.chart .lw { fill: none; stroke: var(--warn); stroke-width: 2; vector-effect:
 .sm-msg p { color: var(--dim); font-size: 14px; margin-top: 6px; }
 .sm-msg .sm-ate { color: var(--faint); font-size: 13px; }
 .sm-msg .sm-new { color: var(--accent); font-weight: 700; }
+
+/* ---- Sidebar icons: each plays its own move when clicked (class "play", set in app.js) ---- */
+nav button.tab svg, nav button.tab svg * { transform-box: fill-box; }
+nav button.tab svg { stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
+.play .i-roof { animation: roofDrop .9s both; }
+.play .i-walls { transform-origin: 50% 100%; animation: wallsSquash .9s both; }
+@keyframes roofDrop {
+  0% { transform: translateY(-8px); animation-timing-function: cubic-bezier(.55,0,1,.45); }
+  36% { transform: translateY(1.4px); animation-timing-function: cubic-bezier(0,.55,.45,1); }
+  55% { transform: translateY(-2.6px); animation-timing-function: cubic-bezier(.55,0,1,.45); }
+  73% { transform: translateY(.7px); animation-timing-function: cubic-bezier(0,.55,.45,1); }
+  84% { transform: translateY(-.8px); animation-timing-function: cubic-bezier(.55,0,1,.45); }
+  93%, 100% { transform: translateY(0); }
+}
+@keyframes wallsSquash {
+  0%, 30% { transform: none; }
+  38% { transform: scale(1.08, .86); }
+  48% { transform: none; }
+  73% { transform: scale(1.04, .93); }
+  80% { transform: none; }
+  93% { transform: scale(1.02, .97); }
+  100% { transform: none; }
+}
+.play .i-shield { animation: shieldFlip .65s cubic-bezier(.65,0,.35,1) both; }
+@keyframes shieldFlip {
+  0% { transform: perspective(60px) rotateY(0) scale(1); }
+  50% { transform: perspective(60px) rotateY(180deg) scale(1.18); }
+  100% { transform: perspective(60px) rotateY(360deg) scale(1); }
+}
+/* Rules: the two sliders slide over and settle back. */
+.play .i-k1 { animation: knobSlide .8s cubic-bezier(.34,1.5,.64,1) both; }
+.play .i-s1a { transform-origin: 0 50%; animation: s1a .8s cubic-bezier(.34,1.5,.64,1) both; }
+.play .i-s1b { transform-origin: 100% 50%; animation: s1b .8s cubic-bezier(.34,1.5,.64,1) both; }
+.play .i-s2a { transform-origin: 0 50%; animation: s2a .8s .08s cubic-bezier(.34,1.5,.64,1) both; }
+.play .i-s2b { transform-origin: 100% 50%; animation: s2b .8s .08s cubic-bezier(.34,1.5,.64,1) both; }
+@keyframes knobSlide { 45% { transform: translateX(-7px); } }
+@keyframes s1a { 45% { transform: scaleX(.3); } }
+@keyframes s1b { 45% { transform: scaleX(2.15); } }
+@keyframes s2a { 45% { transform: scaleX(1.8); } }
+@keyframes s2b { 45% { transform: scaleX(.2); } }
+/* Firewall: the tiles pop in one by one while the grid turns a quarter. */
+.play .i-grid { animation: gridTurn .75s cubic-bezier(.65,0,.35,1) both; }
+.play .i-grid rect { transform-origin: 50% 50%; animation: tilePop .45s cubic-bezier(.34,2,.64,1) both; }
+.play .i-t1 { animation-delay: .075s; } .play .i-t2 { animation-delay: .15s; } .play .i-t3 { animation-delay: .225s; }
+@keyframes gridTurn { from { transform: rotate(0); } to { transform: rotate(90deg); } }
+@keyframes tilePop { from { transform: scale(.25); } to { transform: scale(1); } }
+/* Connections: the pulse line draws itself. */
+.play .i-pulse { stroke-dasharray: 1; animation: pulseDraw .7s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes pulseDraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.play .i-gear { transform-origin: 50% 50%; animation: gearSpin .85s cubic-bezier(.34,1.56,.64,1) both; }
+@keyframes gearSpin { from { transform: rotate(0); } to { transform: rotate(180deg); } }
+.play .i-arrow { animation: arrowNudge .5s cubic-bezier(.34,1.8,.64,1) both; }
+@keyframes arrowNudge { 40% { transform: translateX(3px); } }
+@media (prefers-reduced-motion: reduce) { nav button.tab.play * { animation: none !important; } }
