@@ -67,7 +67,7 @@ internal fun LooseGear(g: GearState) {
     if (!g.loose || g.home == Offset.Unspecified) return
     val d = LocalDensity.current.density
     val haptic = LocalHapticFeedback.current
-    val color = Palette.accent
+    val color = Palette.text
     val small = 21f * d
     val big = 46f * d
     var pos by remember { mutableStateOf(g.home) }
