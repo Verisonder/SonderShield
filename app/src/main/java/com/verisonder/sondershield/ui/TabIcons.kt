@@ -51,8 +51,8 @@ private val line = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.R
 /** How long each icon's move takes, in ms. */
 private fun Tab.animMs() = when (this) {
     Tab.Home -> 900
-    Tab.Filter -> 650
-    Tab.Data -> 750
+    Tab.Filter -> 850
+    Tab.Data -> 950
     Tab.Apps -> 750
     Tab.Settings -> 850
 }
