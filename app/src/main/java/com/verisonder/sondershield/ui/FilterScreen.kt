@@ -1,5 +1,8 @@
 package com.verisonder.sondershield.ui
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.background
@@ -54,30 +57,39 @@ import kotlinx.coroutines.launch
 /** The Filter tab: profiles, block lists (grouped, searchable) and the live log. */
 @Composable
 fun FilterScreen() {
-    // Profiles | Lists | Log: tap a chip or swipe sideways. Each pane has its own header
-    // (title, line, chips) and scrolls with it, so the whole page slides.
+    // Profiles | Lists | Log: tap a chip or swipe sideways. The header and chips stay put; only
+    // the content under them slides. Each pane hands its header text to the one header here.
     val pager = rememberPagerState { 3 }
     val scope = rememberCoroutineScope()
     val view = pager.targetPage
     fun go(i: Int) { scope.launch { pager.animateScrollToPage(i) } }
-    val header: @Composable (String, String, @Composable RowScope.() -> Unit) -> Unit = { kicker, sub, action ->
-        ScreenHeader(tr("Filter", "Filtre", "Filter"), kicker = kicker, sub = sub, action = action)
+    val heads = remember { mutableStateMapOf<Int, PaneHead>() }
+    Column(Modifier.fillMaxSize()) {
+        val head = heads[view]
+        Column(Modifier.animateContentSize()) {
+            ScreenHeader(tr("Filter", "Filtre", "Filter"), kicker = head?.kicker ?: " ", sub = head?.sub ?: " ", action = head?.action ?: {})
+        }
         ChipRow(Modifier.padding(top = 4.dp)) {
             Chip(tr("Profiles", "Profils", "Profile"), view == 0) { go(0) }
             Chip(tr("Lists", "Listes", "Listen"), view == 1) { go(1) }
             Chip(tr("Log", "Journal", "Protokoll"), view == 2) { go(2) }
         }
-    }
-    HorizontalPager(pager, Modifier.fillMaxSize(), verticalAlignment = Alignment.Top) { page ->
-        Box(Modifier.fillMaxSize()) {
-            when (page) {
-                0 -> ProfilesPane(header)
-                1 -> ListsPane(header)
-                else -> LogScreen(header)
+        HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth(), beyondViewportPageCount = 2, verticalAlignment = Alignment.Top) { page ->
+            val header: @Composable (String, String, @Composable RowScope.() -> Unit) -> Unit = { kicker, sub, action ->
+                SideEffect { heads[page] = PaneHead(kicker, sub, action) }
+            }
+            Box(Modifier.fillMaxSize()) {
+                when (page) {
+                    0 -> ProfilesPane(header)
+                    1 -> ListsPane(header)
+                    else -> LogScreen(header)
+                }
             }
         }
     }
 }
+
+private class PaneHead(val kicker: String, val sub: String, val action: @Composable RowScope.() -> Unit)
 
 private fun groupName(g: ListGroup, lang: String) = when (g) {
     ListGroup.ADS -> when (lang) { "fr" -> "BLOCAGE DES PUBS"; "de" -> "WERBEBLOCKER"; else -> "AD BLOCKING" }
