@@ -23,6 +23,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -41,6 +43,9 @@ internal class GearState {
     /** Centre of the gear's slot in the bar, in root pixels. */
     var home by mutableStateOf(Offset.Unspecified)
     var loose by mutableStateOf(false)
+
+    /** The gear's colour in the bar right now (it fades from and back to this). */
+    var barTint by mutableStateOf(Color.Unspecified)
 
     /** 0..3, grows with each quick tap from the 4th (wider spin, more shake). */
     var wild by mutableIntStateOf(0)
@@ -67,13 +72,15 @@ internal fun LooseGear(g: GearState) {
     if (!g.loose || g.home == Offset.Unspecified) return
     val d = LocalDensity.current.density
     val haptic = LocalHapticFeedback.current
-    val color = Palette.text
+    val text = Palette.text
+    val bar = if (g.barTint == Color.Unspecified) text else g.barTint
     val small = 21f * d
     val big = 46f * d
     var pos by remember { mutableStateOf(g.home) }
     var deg by remember { mutableFloatStateOf(0f) }
     var size by remember { mutableFloatStateOf(small) }
     var caught by remember { mutableStateOf(false) }
+    var mix by remember { mutableFloatStateOf(0f) } // 0 = bar colour, 1 = text colour
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val w = constraints.maxWidth.toFloat()
@@ -95,6 +102,7 @@ internal fun LooseGear(g: GearState) {
                 prev = now
                 t += dt
                 size = small + (big - small) * easeOutBack((t / 0.35f).coerceAtMost(1f), 2f)
+                mix = (t / 0.3f).coerceIn(0f, 1f)
                 val r = size / 2f
                 vy += grav * dt
                 x += vx * dt
@@ -126,6 +134,7 @@ internal fun LooseGear(g: GearState) {
             val fromDeg = deg
             val toDeg = ((fromDeg + if (omega >= 0f) 360f else -360f) / 45f).roundToInt() * 45f
             val fromSize = size
+            val fromMix = mix
             val k = Animatable(0f)
             k.animateTo(1f, tween(700, easing = FastOutSlowInEasing)) {
                 val f = value
@@ -133,13 +142,14 @@ internal fun LooseGear(g: GearState) {
                 pos = Offset(from.x + (to.x - from.x) * f, from.y + (to.y - from.y) * f - sin(PI.toFloat() * f) * 120f * d)
                 deg = fromDeg + (toDeg - fromDeg) * f
                 size = fromSize + (small - fromSize) * f
+                mix = fromMix * (1f - ((f - 0.55f) / 0.45f).coerceIn(0f, 1f)) // back to the bar colour as it lands
             }
             g.loose = false
         }
 
         Canvas(Modifier.fillMaxSize()) {
             translate(pos.x - size / 2f, pos.y - size / 2f) {
-                scale(size / 24f, pivot = Offset.Zero) { gearIcon(color, deg) }
+                scale(size / 24f, pivot = Offset.Zero) { gearIcon(lerp(bar, text, mix), deg) }
             }
         }
         // Tap it to catch it.

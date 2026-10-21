@@ -52,6 +52,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
@@ -271,6 +272,7 @@ private fun BottomBar(current: Tab, gear: GearState, onPick: (Tab) -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         val isGear = t == Tab.Settings
+                        if (isGear) SideEffect { gear.barTint = tint }
                         Box(
                             Modifier
                                 .onGloballyPositioned { if (isGear) gear.home = it.boundsInRoot().center }
