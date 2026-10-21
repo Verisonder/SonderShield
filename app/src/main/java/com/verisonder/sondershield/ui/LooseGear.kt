@@ -71,7 +71,7 @@ internal class GearState {
 }
 
 /** Where the loose gear is and how it moves, in root pixels (read and written every frame). */
-private class Body(var x: Float, var y: Float) {
+private class GearBody(var x: Float, var y: Float) {
     var vx = 0f
     var vy = 0f
     var omega = 0f // deg/s
@@ -92,7 +92,7 @@ internal fun LooseGear(g: GearState) {
     val bar = if (g.barTint == Color.Unspecified) text else g.barTint
     val small = 21f * d
     val big = 46f * d
-    val body = remember { Body(g.home.x, g.home.y) }
+    val body = remember { GearBody(g.home.x, g.home.y) }
     var pos by remember { mutableStateOf(g.home) }
     var deg by remember { mutableFloatStateOf(0f) }
     var size by remember { mutableFloatStateOf(small) }
