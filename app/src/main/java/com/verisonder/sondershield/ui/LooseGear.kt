@@ -69,8 +69,8 @@ internal class GearState {
 
     fun tap() {
         val now = SystemClock.uptimeMillis()
-        // Tapping the empty slot calls it home, but only once it has been out for 10 s.
-        if (loose) { if (now - freedAt >= 10_000L) recall = true; return }
+        // Tapping the empty slot calls it home, but only once it has been out for 3 s.
+        if (loose) { if (now - freedAt >= 3_000L) recall = true; return }
         streak = if (now - last <= 1500L) streak + 1 else 1
         last = now
         wild = (streak - 3).coerceIn(0, 3)
@@ -89,6 +89,7 @@ private class GearBody(var x: Float, var y: Float) {
     var vy = 0f
     var omega = 0f // deg/s
     var held = false
+    var idle = 0f // seconds since it was last touched
 }
 
 /**
@@ -151,11 +152,12 @@ internal fun LooseGear(g: GearState) {
             var t = 0f
             var lastBuzz = -1f
             var prev = withFrameNanos { it }
-            while (!g.recall) {
+            while (!g.recall && body.idle < 10f) { // home by itself after 10 s untouched
                 val now = withFrameNanos { it }
                 val dt = ((now - prev) / 1e9f).coerceIn(0f, 1f / 30f)
                 prev = now
                 t += dt
+                if (body.held) body.idle = 0f else body.idle += dt
                 size = small + (big - small) * easeOutBack((t / 0.35f).coerceAtMost(1f), 2f)
                 mix = (t / 0.3f).coerceIn(0f, 1f)
                 val r = size / 2f

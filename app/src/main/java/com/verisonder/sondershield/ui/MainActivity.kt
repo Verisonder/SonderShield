@@ -164,7 +164,7 @@ class MainActivity : ComponentActivity() {
                     if (openUpdate > 0) tab = Tab.Settings
                 }
                 val gear = remember { GearState() }
-                // Leaving Settings sends a loose gear straight home (no 10 s wait).
+                // Leaving Settings sends a loose gear straight home (no wait).
                 LaunchedEffect(tab) { if (tab != Tab.Settings && gear.loose) gear.recall = true }
                 Box(Modifier.fillMaxSize()) {
                 Scaffold(
