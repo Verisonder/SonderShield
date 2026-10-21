@@ -175,7 +175,7 @@ fun DataMonitorScreen() {
                         PlanSetup(prefs, onDone = { editing = false; refresh++ }, onCancel = { editing = false })
                     }
                 } else {
-                    PlanSummary(prefs, d?.cycleMobile ?: 0L, planSeen.value, d?.full == true) { editing = true }
+                    PlanSummary(prefs, d?.cycleMobile ?: 0L, d?.todayMobile?.total ?: 0L, planSeen.value, d?.full == true) { editing = true }
                 }
             }
         }
@@ -275,7 +275,7 @@ internal fun FitText(text: String, widest: String, style: TextStyle, color: Colo
 
 /** Plan at a glance: the filled accent block (like Home's block rate), a bar that fills in, tiles. */
 @Composable
-private fun PlanSummary(prefs: Prefs, usedBytes: Long, seen: Boolean, ready: Boolean, onEdit: () -> Unit) {
+private fun PlanSummary(prefs: Prefs, usedBytes: Long, todayBytes: Long, seen: Boolean, ready: Boolean, onEdit: () -> Unit) {
     val now = System.currentTimeMillis()
     val (_, end) = planPeriod(prefs, now)
     val total = prefs.planTotalBytes
@@ -283,7 +283,13 @@ private fun PlanSummary(prefs: Prefs, usedBytes: Long, seen: Boolean, ready: Boo
     val msLeft = (end - now).coerceAtLeast(0L)
     val daysLeft = ceil(msLeft / 86_400_000.0).toLong()
     val hoursLeft = ceil(msLeft / 3_600_000.0).toLong()
-    val dailyQuota = if (daysLeft > 0) remainingTarget / daysLeft else 0L
+    // Today's share is fixed at midnight: what was left when the day began, split over the days left
+    // (today included). The tile then shows what's still free of it today, so it goes down as you use data.
+    val startPlan = planPeriod(prefs, now).first
+    val usedToday = if (startPlan > DataUsage.startOfToday()) usedBytes else todayBytes.coerceAtMost(usedBytes)
+    val leftAtDayStart = (total - (usedBytes - usedToday)).coerceAtLeast(0L)
+    val dailyQuota = if (daysLeft > 0) leftAtDayStart / daysLeft else 0L
+    val leftToday = (dailyQuota - usedToday).coerceAtLeast(0L)
     val frac = if (total > 0) (usedBytes.toFloat() / total).coerceIn(0f, 1f) else 0f
     val mode = prefs.planMode
     val modeLabel = when (mode) {
@@ -333,7 +339,11 @@ private fun PlanSummary(prefs: Prefs, usedBytes: Long, seen: Boolean, ready: Boo
                     Modifier.weight(1f).reveal(seen, 4),
                 )
             } else {
-                StatTile(fmtBytes(dailyQuota), tr("a day to stay\nwithin the limit", "par jour pour\nrester dans la limite", "pro Tag, um im\nLimit zu bleiben"), Modifier.weight(1f).reveal(seen, 3))
+                StatTile(
+                    fmtBytes(leftToday),
+                    tr("left today, of\n", "restants aujourd'hui,\nsur ", "heute übrig, von\n") + fmtBytes(dailyQuota) + tr(" a day", " par jour", " pro Tag"),
+                    Modifier.weight(1f).reveal(seen, 3),
+                )
                 val endLabel = if (mode == "custom") tr("left, ends on", "restants, fin le", "übrig, endet am") else tr("left, resets on", "restants, remise le", "übrig, Reset am")
                 // A custom period ends at the end of its last day; show that day, not the next.
                 val shownEnd = if (mode == "custom") end - 1 else end
