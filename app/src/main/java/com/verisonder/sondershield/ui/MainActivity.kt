@@ -78,6 +78,9 @@ import androidx.core.content.ContextCompat
 import com.verisonder.sondershield.core.ShieldState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.lifecycle.lifecycleScope
 import com.verisonder.sondershield.core.AppUpdate
 import com.verisonder.sondershield.service.ShieldVpnService
@@ -159,10 +162,12 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(openUpdate) {
                     if (openUpdate > 0) tab = Tab.Settings
                 }
+                val gear = remember { GearState() }
+                Box(Modifier.fillMaxSize()) {
                 Scaffold(
                     containerColor = Palette.bg,
                     bottomBar = {
-                        BottomBar(tab) { t ->
+                        BottomBar(tab, gear) { t ->
                             if (t == Tab.Home && tab == Tab.Home) uiScope.launch { homeScroll.animateScrollTo(0, spring(dampingRatio = 0.9f, stiffness = 300f)) }
                             tab = t
                         }
@@ -188,6 +193,8 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                }
+                LooseGear(gear)
                 }
             }
         }
@@ -232,7 +239,7 @@ class MainActivity : ComponentActivity() {
  * their icon only. Each slot is a full fifth of the width and the bar's full height.
  */
 @Composable
-private fun BottomBar(current: Tab, onPick: (Tab) -> Unit) {
+private fun BottomBar(current: Tab, gear: GearState, onPick: (Tab) -> Unit) {
     val hasUpdate = AppUpdate.available.collectAsState().value != null
     Column(Modifier.fillMaxWidth().background(Palette.bg)) {
         HorizontalDivider(color = Palette.line, thickness = 1.dp)
@@ -254,7 +261,7 @@ private fun BottomBar(current: Tab, onPick: (Tab) -> Unit) {
                 val scale by animateFloatAsState(if (pressed) 0.9f else 1f, spring(dampingRatio = 0.5f, stiffness = 900f), label = "s")
                 Box(
                     Modifier.weight(weight).fillMaxHeight()
-                        .clickable(interactionSource = press, indication = null) { plays++; onPick(t) }
+                        .clickable(interactionSource = press, indication = null) { plays++; if (t == Tab.Settings) gear.tap(); onPick(t) }
                         .semantics { role = Role.Tab; selected = on; contentDescription = name },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -263,8 +270,13 @@ private fun BottomBar(current: Tab, onPick: (Tab) -> Unit) {
                             .padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Box {
-                            TabIcon(t, tint, plays, 21.dp)
+                        val isGear = t == Tab.Settings
+                        Box(
+                            Modifier
+                                .onGloballyPositioned { if (isGear) gear.home = it.boundsInRoot().center }
+                                .alpha(if (isGear && gear.loose) 0f else 1f),
+                        ) {
+                            TabIcon(t, tint, plays, 21.dp, if (isGear) gear.wild else 0)
                             // A new version is out: a dot on Settings.
                             if (t == Tab.Settings && hasUpdate) {
                                 Box(

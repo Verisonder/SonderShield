@@ -62,7 +62,7 @@ private fun Tab.animMs() = when (this) {
  * At rest it is the plain icon.
  */
 @Composable
-fun TabIcon(tab: Tab, tint: Color, play: Int, size: Dp) {
+fun TabIcon(tab: Tab, tint: Color, play: Int, size: Dp, wild: Int = 0) {
     val p = remember { Animatable(1f) }
     val first = remember { play }
     LaunchedEffect(play) {
@@ -88,7 +88,7 @@ fun TabIcon(tab: Tab, tint: Color, play: Int, size: Dp) {
                 Tab.Filter -> drawPath(shield, tint, style = line)
                 Tab.Data -> drawData(tint, t)
                 Tab.Apps -> drawApps(tint, t)
-                Tab.Settings -> drawSettings(tint, t)
+                Tab.Settings -> drawSettings(tint, t, wild)
             }
         }
     }
@@ -127,14 +127,21 @@ private fun DrawScope.drawApps(c: Color, t: Float) {
     }
 }
 
-private fun DrawScope.drawSettings(c: Color, t: Float) {
-    rotate(180f * easeOutBack(t, 1.6f), pivot = Offset(12f, 12f)) { drawPath(gear, c, style = line) }
+private fun DrawScope.drawSettings(c: Color, t: Float, wild: Int) {
+    // [wild] 0..3: each quick tap spins it further and shakes it a little more.
+    val shake = if (wild > 0) sin(t * PI.toFloat() * 14f) * 0.8f * wild * (1f - t) else 0f
+    translate(left = shake) { gearIcon(c, 180f * (1f + wild * 0.5f) * easeOutBack(t, 1.6f)) }
+}
+
+/** The gear at [deg] degrees, in the 24-unit icon space. */
+internal fun DrawScope.gearIcon(c: Color, deg: Float) {
+    rotate(deg, pivot = Offset(12f, 12f)) { drawPath(gear, c, style = line) }
     drawCircle(c, radius = 3f, center = Offset(12f, 12f), style = line)
 }
 
 // ---- easing ----
 
-private fun easeOutBack(x: Float, s: Float = 1.70158f): Float {
+internal fun easeOutBack(x: Float, s: Float = 1.70158f): Float {
     val c3 = s + 1f
     val u = x - 1f
     return 1f + c3 * u * u * u + s * u * u
