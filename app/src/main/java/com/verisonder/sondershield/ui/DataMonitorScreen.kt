@@ -1,5 +1,9 @@
 package com.verisonder.sondershield.ui
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.pager.HorizontalPager
 import android.app.DatePickerDialog
 import android.content.Context
 import androidx.compose.animation.animateColorAsState
@@ -72,19 +76,25 @@ private val WifiGreen = Color(0xFF22C55E)
 /** The "Data" tab: a data monitor, with the block/allow Rules kept on a second sub-tab. */
 @Composable
 fun DataScreen() {
-    var view by rememberSaveable { mutableIntStateOf(0) } // 0 usage, 1 apps, 2 rules
+    // Usage | Apps | Rules: tap a chip or swipe sideways.
+    val pager = rememberPagerState { 3 }
+    val scope = rememberCoroutineScope()
+    val view = pager.targetPage
+    fun go(i: Int) { scope.launch { pager.animateScrollToPage(i) } }
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(tr("Data", "Données", "Daten"), kicker = tr("On this phone", "Sur ce téléphone", "Auf diesem Handy"))
         ChipRow(Modifier.padding(bottom = 2.dp)) {
-            Chip(tr("Usage", "Conso", "Verbrauch"), view == 0) { view = 0 }
-            Chip(tr("Apps", "Applis", "Apps"), view == 1) { view = 1 }
-            Chip(tr("Rules", "Règles", "Regeln"), view == 2) { view = 2 }
+            Chip(tr("Usage", "Conso", "Verbrauch"), view == 0) { go(0) }
+            Chip(tr("Apps", "Applis", "Apps"), view == 1) { go(1) }
+            Chip(tr("Rules", "Règles", "Regeln"), view == 2) { go(2) }
         }
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            when (view) {
-                0 -> DataMonitorScreen()
-                1 -> AppUsageScreen()
-                else -> RulesScreen(showHeader = false)
+        HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth(), verticalAlignment = Alignment.Top) { page ->
+            Box(Modifier.fillMaxSize()) {
+                when (page) {
+                    0 -> DataMonitorScreen()
+                    1 -> AppUsageScreen()
+                    else -> RulesScreen(showHeader = false)
+                }
             }
         }
     }
