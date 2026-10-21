@@ -133,7 +133,7 @@ fun AppUsageScreen() {
     }
 
     var periodPick by rememberSaveable { mutableIntStateOf(0) } // 0 today, 1 7 days, 2 30 days, 3 plan
-    var net by rememberSaveable { mutableIntStateOf(0) } // 0 all, 1 mobile, 2 Wi-Fi
+    var net by rememberSaveable { mutableIntStateOf(1) } // 0 all, 1 mobile, 2 Wi-Fi
     val period = if (periodPick == 3 && !prefs.planActive) 0 else periodPick
     var rows by remember(period) { mutableStateOf(lastAppUse[period]) }
     LaunchedEffect(period, refresh) {
